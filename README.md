@@ -1,107 +1,138 @@
 # AutoGrade+
 
-**AutoGrade+** is an AI-powered automated grading platform designed to assist instructors through interactive grading dashboards, automated rubric evaluation, human-in-the-loop audit safeguards, and statistical reliability benchmarking.
+**AutoGrade+** is an enterprise-grade, AI-powered automated grading platform designed for university courses. It combines **RAG-augmented vector similarity retrieval (ChromaDB)**, **Gemini 2.5 Flash LLM Chain-of-Thought evaluation**, **Human-in-the-Loop audit safeguards**, and **statistical reliability benchmarking**.
 
 ---
 
-## Directory Structure
+## 🌟 Key System Features
+
+- **RAG Vector Database (ChromaDB)**: Embeds self-contained question vectors (`question_id`, `max_score`, `Question Prompt`, and `Marking Criteria & Model Answer`) for targeted semantic retrieval.
+- **Multi-Format Rubric & Submission Parser**: Parses `.xlsx`, `.csv`, `.docx`, and `.pdf` files. Automatically groups student responses by `Student_ID` across questions.
+- **Database Upsert & Batch Tracking**: Enforces strict database uniqueness `(student_id, assignment_id)` to prevent duplicates on re-uploads, and assigns a `batch_id` to trace upload batches.
+- **Granular AI Pipeline Statuses**:
+  $$\text{uploaded} \longrightarrow \text{extracting\_answers} \longrightarrow \text{retrieving\_rubric} \longrightarrow \text{grading} \longrightarrow \text{graded / flagged}$$
+- **Human-in-the-Loop Audit & Override**: Flags low-confidence evaluations for lecturer review. Records all manual score overrides in PostgreSQL `AuditLog` and `EvaluationLog` benchmarking tables.
+- **Extracted Content Verification View**: Frontend visualization allowing instructors to verify raw extracted student text responses.
+
+---
+
+## 📁 Repository Directory Structure
 
 ```
 AutoGrade+ /
 ├── frontend/                     # React + Vite UI Application
-│   ├── public/
 │   ├── src/
-│   │   ├── components/           # UI Components (Dashboard, SubmissionReview, Header)
-│   │   ├── context/              # React Context (Assignment state & mock data)
-│   │   └── pages/                # Page layouts
+│   │   ├── components/           # UI Components (Navigation, Header, Layout)
+│   │   ├── context/              # React Context (Assignment & Submissions state)
+│   │   ├── pages/                # Pages (Dashboard, AssignmentCreator, BulkUpload, SubmissionsList, GradingReview)
+│   │   └── api/                  # Axios REST API client
 │   ├── package.json
 │   └── vite.config.js
 │
-├── backend/                      # Backend Service (Specifications & API endpoints)
-│   └── README.md
+├── backend/                      # FastAPI Python Service
+│   ├── app/
+│   │   ├── routes/               # API Endpoints (assignments.py, uploads.py, submissions.py)
+│   │   ├── services/             # Core Logic (embedding.py, grading.py, document_parser.py, storage.py)
+│   │   ├── models.py             # SQLAlchemy ORM Models (Assignment, Submission, AuditLog, EvaluationLog)
+│   │   ├── schemas.py            # Pydantic Schemas
+│   │   └── database.py           # PostgreSQL / SQLite Engine connection
+│   ├── chroma_db/                # ChromaDB Persistent Vector Store
+│   ├── uploads/                  # Local storage fallback for student submissions
+│   ├── reset_db.py               # Database table & vector store wipe helper
+│   ├── requirements.txt
+│   └── venv/
 │
-├── ai-pipeline/                  # Prompt Engineering & Data Generation
-│   ├── prompts.py                # Prompt strategies (Chain-of-Thought, Rubric-based)
-│   ├── generate_mock_data.py     # Script to generate frontend mock dataset
-│   └── README.md
+├── ai-pipeline/                  # Data Generation & Prompts
+│   └── generate_mock_data.py     # Script to generate mock datasets
 │
-├── evaluation/                   # Evaluation Benchmark & Statistical Analysis
-│   ├── evaluate_prompts.py       # LLM grading benchmarking runner script
-│   ├── Dataset for prompt.xlsx   # Question, rubric, and human response dataset
-│   ├── raw_grading_results.csv   # Raw grade comparisons
-│   ├── icc_summary_results.csv   # Intraclass Correlation Coefficient (ICC) report
-│   └── requirements.txt          # Python evaluation dependencies
+├── evaluation/                   # Rater Reliability & ICC Benchmarking
+│   ├── evaluate_prompts.py       # Prompt evaluation benchmark script
+│   └── raw_grading_results.csv
 │
-├── docs/                         # Documentation
-│   ├── architecture.md           # System architecture overview
-│   └── user_workflow.md          # Human-in-the-loop workflow
-│
-├── package.json                  # Root monorepo runner scripts
+├── package.json                  # Root runner scripts
 └── README.md                     # Project overview
 ```
 
 ---
 
-## Quick Start
+## ⚡ Quick Start
 
-### 1. Frontend Development
+### 1. Prerequisites
+- **Node.js**: v18+ 
+- **Python**: v3.10+
+- **npm**: v9+
 
-Run the React development server from the root directory:
+### 2. Environment Setup
 
-```bash
-npm run dev
-```
+Copy `.env.example` to `.env` in `backend/` and `evaluation/`:
 
-Or navigate to `frontend/`:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open your browser at `http://localhost:5173`.
-
----
-
-### 2. AI Pipeline & Mock Data Generation
-
-To regenerate the mock dataset for the frontend:
-
-```bash
-npm run generate-mock
-# OR
-python3 ai-pipeline/generate_mock_data.py
-```
-
----
-
-### 3. Running Prompt Benchmarking & Evaluation
-
-Install Python evaluation dependencies:
-
-```bash
-pip install -r evaluation/requirements.txt
-```
-
-Ensure your `.env` file in `evaluation/` contains your API key:
 ```env
 OPENROUTER_API_KEY=your_api_key_here
-```
-
-Run the prompt evaluation pipeline:
-
-```bash
-npm run evaluate
-# OR
-python3 evaluation/evaluate_prompts.py
+LLM_MODEL=google/gemini-2.5-flash
+PROMPT_VERSION=v1.2-rubric-cot
 ```
 
 ---
 
-## Key Features
+### 3. Running the Application
 
-- **Lecturer Dashboard:** Class-wide score distributions and average marks per question.
-- **Human-in-the-Loop Safeguards:** Flags for *Borderline Grades*, *Auditor Conflicts*, *Random Audits*, and *Low Confidence*.
-- **Detailed Grading Review:** Side-by-side rubric comparison, AI reasoning highlights, and lecturer manual grade overrides.
-- **Rater Reliability Analysis:** Intraclass Correlation Coefficient (ICC) calculation comparing LLM grades against human instructor evaluations.
+#### Option A: Running Full Stack (Backend + Frontend)
+
+From the root directory, run:
+
+```bash
+npm start
+```
+
+#### Option B: Running Services Separately
+
+1. **Start FastAPI Backend Server**:
+   ```bash
+   npm run backend:dev
+   # OR
+   cd backend && venv/bin/uvicorn app.main:app --reload --port 8000
+   ```
+   API Docs available at: `http://localhost:8000/docs`
+
+2. **Start React Frontend Server**:
+   ```bash
+   npm run dev
+   # OR
+   cd frontend && npm run dev
+   ```
+   Frontend Application available at: `http://localhost:5173`
+
+---
+
+## 📊 Dataset Templates & CSV Formats
+
+### 1. Rubric Excel / CSV Format (`question_n,question,answer,max_mark`)
+```csv
+question_n,question,answer,max_mark
+6,"(a) Polymer microspheres advantages & disadvantages (5 marks)...","(a) Advantages: May be biodegradable (+1). Disadvantages: Complex manufacture (+1)...",10
+8,"Consider the five statements... (a) Lyophilization (b) Protein structure...","(a) Disagree: Not necessary if stable in solution (+1)...",10
+```
+
+### 2. Student Submissions CSV Format (`Student_ID,question_no,Response`)
+```csv
+Student_ID,question_no,Response
+30720842,6,"-"
+30881447,6,"(a) Advantages: May be biodegradable - do not need removal. Reduces administration frequency..."
+30883350,6,"(a) Advantages: Reduces administration frequency. Injectable system no surgery required..."
+30720842,8,"(a) Disagree: Lyophilization is not necessary if drug is stable in solution..."
+```
+
+---
+
+## 🛠️ Management Commands
+
+### Reset Database & Vector Stores
+Wipes all database records, drops/recreates schema tables, and clears ChromaDB vector collections:
+
+```bash
+npm run reset-db
+```
+
+### Delete Submissions via API
+- **Delete Single Submission**: `DELETE http://localhost:8000/api/submissions/{submission_id}`
+- **Delete All Submissions for Assignment**: `DELETE http://localhost:8000/api/assignments/{assignment_id}/submissions`
