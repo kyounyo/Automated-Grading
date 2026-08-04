@@ -10,7 +10,7 @@
 - **Multi-Format Rubric & Submission Parser**: Parses `.xlsx`, `.csv`, `.docx`, and `.pdf` files. Automatically groups student responses by `Student_ID` across questions.
 - **Database Upsert & Batch Tracking**: Enforces strict database uniqueness `(student_id, assignment_id)` to prevent duplicates on re-uploads, and assigns a `batch_id` to trace upload batches.
 - **Granular AI Pipeline Statuses**:
-  $$\text{uploaded} \longrightarrow \text{extracting\_answers} \longrightarrow \text{retrieving\_rubric} \longrightarrow \text{grading} \longrightarrow \text{graded / flagged}$$
+  `uploaded` → `extracting_answers` → `retrieving_rubric` → `grading` → `graded` / `flagged`
 - **Human-in-the-Loop Audit & Override**: Flags low-confidence evaluations for lecturer review. Records all manual score overrides in PostgreSQL `AuditLog` and `EvaluationLog` benchmarking tables.
 - **Extracted Content Verification View**: Frontend visualization allowing instructors to verify raw extracted student text responses.
 
