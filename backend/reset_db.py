@@ -1,6 +1,10 @@
-#!/usr/bin/env python3
 import os
+import sys
 import shutil
+
+# Ensure backend directory is in Python path for Windows/Mac cross-platform execution
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from app.database import engine, Base, SessionLocal
 from app.models import Assignment, Submission, AuditLog, EvaluationLog
 

@@ -74,33 +74,51 @@ PROMPT_VERSION=v1.2-rubric-cot
 
 ---
 
-### 3. Running the Application
+### 3. Setup & Execution Guide (Windows & Mac)
 
-#### Option A: Running Full Stack (Backend + Frontend)
+#### 🪟 Windows Setup (PowerShell / Command Prompt)
 
-From the root directory, run:
-
-```bash
-npm start
-```
-
-#### Option B: Running Services Separately
-
-1. **Start FastAPI Backend Server**:
-   ```bash
-   npm run backend:dev
-   # OR
-   cd backend && venv/bin/uvicorn app.main:app --reload --port 8000
+1. **Backend Setup (Windows)**:
+   ```cmd
+   cd backend
+   python -m venv venv
+   venv\Scripts\activate
+   pip install -r requirements.txt
+   copy .env.example .env
    ```
-   API Docs available at: `http://localhost:8000/docs`
+   *Edit `backend\.env` to add your `OPENROUTER_API_KEY`.*
 
-2. **Start React Frontend Server**:
-   ```bash
+2. **Start Backend (Windows)**:
+   ```cmd
+   python -m uvicorn app.main:app --reload --port 8000
+   ```
+
+3. **Start Frontend (Windows)**:
+   Open a new terminal window:
+   ```cmd
+   cd frontend
+   npm install
    npm run dev
-   # OR
-   cd frontend && npm run dev
    ```
-   Frontend Application available at: `http://localhost:5173`
+
+---
+
+#### 🍎 Mac / Linux Setup
+
+1. **Backend Setup (Mac)**:
+   ```bash
+   cd backend
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   cp .env.example .env
+   ```
+
+2. **Start Services (Mac)**:
+   ```bash
+   npm run backend:dev   # Terminal 1 (Backend: http://localhost:8000/docs)
+   npm run dev           # Terminal 2 (Frontend: http://localhost:5173)
+   ```
 
 ---
 
