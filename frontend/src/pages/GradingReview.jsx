@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, AlertTriangle, Edit3, ShieldAlert, Cpu, Clock, Layers, Save, FileText } from 'lucide-react';
+import { ArrowLeft, CheckCircle, AlertTriangle, Edit3, ShieldAlert, Cpu, Clock, Layers, Save, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
 const GradingReview = () => {
@@ -16,6 +16,7 @@ const GradingReview = () => {
   const [overrideScore, setOverrideScore] = useState('');
   const [overrideComment, setOverrideComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const [showRawContent, setShowRawContent] = useState(false);
 
   useEffect(() => {
     if (activeSubmission && activeSubmission.score != null) {
@@ -101,52 +102,73 @@ const GradingReview = () => {
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
-          {/* Submission Details Banner */}
-          <div className="glass-panel" style={{ padding: '1.5rem', borderLeft: '4px solid var(--primary)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {/* Compact Submission Details Banner */}
+          <div className="glass-panel" style={{ padding: '0.9rem 1.25rem', borderLeft: '4px solid var(--primary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h2 style={{ margin: 0, color: 'var(--primary-dark)' }}>{activeSubmission.student_name}</h2>
-                <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '1.15rem' }}>{activeSubmission.student_name}</h3>
+                <p style={{ margin: '0.15rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
                   Student ID: <strong>{activeSubmission.student_id}</strong> | File: <strong>{activeSubmission.file_name}</strong>
                 </p>
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--primary)' }}>
-                  {activeSubmission.score != null ? activeSubmission.score : 'N/A'} <span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/ 100</span>
+                <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--primary)' }}>
+                  {activeSubmission.score != null ? activeSubmission.score : 'N/A'} <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ 100</span>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   Confidence: {activeSubmission.confidence_score ? `${Math.round(activeSubmission.confidence_score * 100)}%` : 'N/A'}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Extracted Student Submission Content (Verification View) */}
-          <div className="glass-panel" style={{ padding: '1.5rem', backgroundColor: 'rgba(244, 247, 249, 0.7)', borderLeft: '4px solid var(--primary)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={20} color="var(--primary)" /> Extracted Student Submission Content (Verification View)
+          {/* Collapsible Extracted Student Submission Content (Verification View) */}
+          <div 
+            className="glass-panel" 
+            style={{ 
+              padding: '1.15rem 1.35rem', 
+              backgroundColor: 'rgba(244, 247, 249, 0.7)', 
+              borderLeft: '4px solid var(--primary)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <div 
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              onClick={() => setShowRawContent(!showRawContent)}
+            >
+              <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.05rem' }}>
+                <FileText size={18} color="var(--primary)" /> Extracted Student Submission Content (Verification View)
               </h3>
-              <span className="status-badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontSize: '0.8rem', fontWeight: 600 }}>
-                Verification Mode
-              </span>
+              <button 
+                type="button" 
+                className="btn btn-outline" 
+                style={{ fontSize: '0.8rem', padding: '0.3rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', pointerEvents: 'none' }}
+              >
+                {showRawContent ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                {showRawContent ? 'Hide Raw Submission' : 'View Raw Submission'}
+              </button>
             </div>
-            <pre style={{ 
-              margin: 0, 
-              padding: '1rem', 
-              backgroundColor: '#fff', 
-              border: '1px solid var(--border)', 
-              borderRadius: '8px', 
-              fontSize: '0.875rem', 
-              lineHeight: '1.6', 
-              whiteSpace: 'pre-wrap', 
-              fontFamily: 'monospace',
-              maxHeight: '350px',
-              overflowY: 'auto'
-            }}>
-              {activeSubmission.raw_text || activeSubmission.extracted_text || `Student Response for ${activeSubmission.student_name} (${activeSubmission.student_id}):\n(File: ${activeSubmission.file_name})\n\nQuestion Q6:\n(a) Advantages: May be biodegradable - do not need removal. Provides longer release duration. Disadvantages: Limited to non-acid labile. (b) In situ gelling attributes: Systems contain solvent...\n\nQuestion Q8:\n(a) Disagree: Lyophilization is not necessary if drug is stable in solution...`}
-            </pre>
+
+            {showRawContent && (
+              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                <pre style={{ 
+                  margin: 0, 
+                  padding: '1rem', 
+                  backgroundColor: '#fff', 
+                  border: '1px solid var(--border)', 
+                  borderRadius: '8px', 
+                  fontSize: '0.875rem', 
+                  lineHeight: '1.6', 
+                  whiteSpace: 'pre-wrap', 
+                  fontFamily: 'monospace',
+                  maxHeight: '350px',
+                  overflowY: 'auto'
+                }}>
+                  {activeSubmission.raw_text || activeSubmission.extracted_text || `Student Response for ${activeSubmission.student_name} (${activeSubmission.student_id}):\n(File: ${activeSubmission.file_name})\n\nQuestion Q6:\n(a) Advantages: May be biodegradable - do not need removal. Provides longer release duration. Disadvantages: Limited to non-acid labile. (b) In situ gelling attributes: Systems contain solvent...\n\nQuestion Q8:\n(a) Disagree: Lyophilization is not necessary if drug is stable in solution...`}
+                </pre>
+              </div>
+            )}
           </div>
 
           {/* AI Overall Summary */}
