@@ -78,47 +78,47 @@ PROMPT_VERSION=v1.2-rubric-cot
 
 #### 🪟 Windows Setup (PowerShell / Command Prompt)
 
-1. **Backend Setup (Windows)**:
+1. **Initial Setup (Windows)**:
    ```cmd
+   # Terminal 1: Backend
    cd backend
    python -m venv venv
    venv\Scripts\activate
    pip install -r requirements.txt
    copy .env.example .env
-   ```
-   *Edit `backend\.env` to add your `OPENROUTER_API_KEY`.*
 
-2. **Start Backend (Windows)**:
-   ```cmd
-   python -m uvicorn app.main:app --reload --port 8000
-   ```
-
-3. **Start Frontend (Windows)**:
-   Open a new terminal window:
-   ```cmd
+   # Terminal 2: Frontend
    cd frontend
    npm install
-   npm run dev
    ```
+   *Note: Open `backend\.env` in VS Code and paste your `OPENROUTER_API_KEY`.*
+
+2. **Running the App (Windows)**:
+   * **Terminal 1 (Backend)**: `npm run backend:dev` (or `python -m uvicorn app.main:app --reload --port 8000`)
+   * **Terminal 2 (Frontend)**: `npm run dev`
 
 ---
 
 #### 🍎 Mac / Linux Setup
 
-1. **Backend Setup (Mac)**:
+1. **Initial Setup (Mac)**:
    ```bash
+   # Terminal 1: Backend
    cd backend
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
    cp .env.example .env
-   ```
 
-2. **Start Services (Mac)**:
-   ```bash
-   npm run backend:dev   # Terminal 1 (Backend: http://localhost:8000/docs)
-   npm run dev           # Terminal 2 (Frontend: http://localhost:5173)
+   # Terminal 2: Frontend
+   cd frontend
+   npm install
    ```
+   *Note: Open `backend/.env` in VS Code and paste your `OPENROUTER_API_KEY`.*
+
+2. **Running the App (Mac)**:
+   * **Terminal 1 (Backend)**: `npm run backend:dev`  *(API Docs at http://localhost:8000/docs)*
+   * **Terminal 2 (Frontend)**: `npm run dev`          *(UI Application at http://localhost:5173)*
 
 ---
 
