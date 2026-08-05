@@ -31,7 +31,7 @@ client = OpenAI(
     api_key=api_key,
     base_url="https://openrouter.ai/api/v1"
 )
-MODEL_NAME = "mistralai/mistral-medium-3-5"
+MODEL_NAME = "google/gemini-3.1-flash-lite"
 
 def extract_score(text):
     """Extracts the final score by parsing JSON."""

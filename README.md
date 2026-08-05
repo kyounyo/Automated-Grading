@@ -1,6 +1,6 @@
 # AutoGrade+
 
-**AutoGrade+** is an enterprise-grade, AI-powered automated grading platform designed for university courses. It combines **RAG-augmented vector similarity retrieval (ChromaDB)**, **Gemini 2.5 Flash LLM Chain-of-Thought evaluation**, **Human-in-the-Loop audit safeguards**, and **statistical reliability benchmarking**.
+**AutoGrade+** is an enterprise-grade, AI-powered automated grading platform designed for university courses. It combines **RAG-augmented vector similarity retrieval (ChromaDB)**, **Gemini 3.1 Flash Lite LLM Chain-of-Thought evaluation**, **Human-in-the-Loop audit safeguards**, and **statistical reliability benchmarking**.
 
 ---
 
