@@ -10,7 +10,7 @@ class Assignment(Base):
     id = Column(String, primary_key=True, index=True)
     title = Column(String, nullable=False, index=True)
     course_code = Column(String, nullable=False, index=True)
-    due_date = Column(String, nullable=False)
+    due_date = Column(String, nullable=True, default="")
     status = Column(String, default="active")  # active, completed, archived
     total_submissions = Column(Integer, default=0)
     average_score = Column(Float, default=0.0)

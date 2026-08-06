@@ -11,7 +11,6 @@ const AssignmentCreator = () => {
   // Form State initialized clean/empty for user input
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [courseCode, setCourseCode] = useState('');
-  const [dueDate, setDueDate] = useState('');
   const [auditPercentage, setAuditPercentage] = useState(5);
   const [confidenceThreshold, setConfidenceThreshold] = useState(75);
   const [rubricFiles, setRubricFiles] = useState([]);
@@ -116,7 +115,7 @@ const AssignmentCreator = () => {
   };
 
   // Strict Validation Checks for Step 1 and Step 2
-  const isStep1Valid = Boolean(courseCode.trim() && assignmentTitle.trim() && dueDate);
+  const isStep1Valid = Boolean(courseCode.trim() && assignmentTitle.trim());
   const isStep2Valid = Boolean(rubricFiles.length > 0);
   const isFormValid = isStep1Valid && isStep2Valid;
 
@@ -124,7 +123,7 @@ const AssignmentCreator = () => {
     e.preventDefault();
 
     if (!isStep1Valid) {
-      alert("⚠️ Step 1 Incomplete: Please fill in the Course Code, Assignment Title, and Due Date before creating the assignment.");
+      alert("⚠️ Step 1 Incomplete: Please fill in the Course Code and Assignment Title before creating the assignment.");
       return;
     }
 
@@ -145,7 +144,6 @@ const AssignmentCreator = () => {
       const payload = {
         title: assignmentTitle.trim(),
         course_code: courseCode.trim(),
-        due_date: dueDate,
         rubric_data: rubricData,
         model_answer: ""
       };
@@ -181,7 +179,7 @@ const AssignmentCreator = () => {
           <h3 style={{ marginBottom: '1.25rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <FileText size={20} color="var(--primary)" /> 1. Assignment Details <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>*Required</span>
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
             <div>
               <label className="label">Course Code *</label>
               <input
@@ -201,16 +199,6 @@ const AssignmentCreator = () => {
                 value={assignmentTitle}
                 onChange={(e) => setAssignmentTitle(e.target.value)}
                 placeholder="Enter assignment title..."
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Due Date *</label>
-              <input
-                type="date"
-                className="input-field"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
                 required
               />
             </div>

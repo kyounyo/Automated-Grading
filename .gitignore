@@ -10,9 +10,20 @@ frontend/dist/
 __pycache__/
 *.pyc
 .env
+backend/.env
 evaluation/.env
 venv/
 .venv/
+backend/venv/
+
+# Database, Vector Stores & Uploads
+*.db
+*.sqlite3
+*.bin
+chroma_db/
+**/chroma_db/
+uploads/
+**/uploads/
 
 # Logs & Temporary Files
 *.log

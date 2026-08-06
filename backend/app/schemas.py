@@ -18,7 +18,7 @@ class RubricItem(BaseModel):
 class AssignmentCreate(BaseModel):
     title: str
     course_code: str
-    due_date: str
+    due_date: Optional[str] = ""
     rubric_data: Optional[List[Dict[str, Any]]] = []
     model_answer: Optional[str] = ""
 
@@ -27,7 +27,7 @@ class AssignmentResponse(BaseModel):
     id: str
     title: str
     course_code: str
-    due_date: str
+    due_date: Optional[str] = ""
     status: str
     total_submissions: int
     average_score: float

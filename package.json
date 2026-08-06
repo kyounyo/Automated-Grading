@@ -5,12 +5,12 @@
   "description": "AutoGrade+ Monorepo - AI-Powered Automated Grading System",
   "scripts": {
     "dev": "cd frontend && npm run dev",
-    "backend:dev": "cd backend && python -m uvicorn app.main:app --reload --port 8000",
+    "backend:dev": "cd backend && (venv/bin/uvicorn app.main:app --reload --port 8000 || venv\\Scripts\\uvicorn app.main:app --reload --port 8000)",
     "build": "cd frontend && npm run build",
     "lint": "cd frontend && npm run lint",
     "preview": "cd frontend && npm run preview",
-    "generate-mock": "python ai-pipeline/generate_mock_data.py",
-    "evaluate": "python evaluation/evaluate_prompts.py",
-    "reset-db": "cd backend && python reset_db.py"
+    "generate-mock": "cd backend && venv/bin/python ../ai-pipeline/generate_mock_data.py",
+    "evaluate": "cd backend && venv/bin/python ../evaluation/evaluate_prompts.py",
+    "reset-db": "cd backend && (venv/bin/python reset_db.py || venv\\Scripts\\python reset_db.py)"
   }
 }
