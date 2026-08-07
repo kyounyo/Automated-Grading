@@ -5,7 +5,7 @@
   "description": "AutoGrade+ Monorepo - AI-Powered Automated Grading System",
   "scripts": {
     "dev": "cd frontend && npm run dev",
-    "backend:dev": "cd backend && python -m uvicorn app.main:app --reload --port 8000",
+    "backend:dev": "cd backend && (venv/bin/python -m uvicorn app.main:app --reload --port 8000 || venv/Scripts/python -m uvicorn app.main:app --reload --port 8000 || python -m uvicorn app.main:app --reload --port 8000)",
     "build": "cd frontend && npm run build",
     "lint": "cd frontend && npm run lint",
     "preview": "cd frontend && npm run preview",
