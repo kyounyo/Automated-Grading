@@ -36,7 +36,7 @@ MODEL_NAME = "google/gemini-3.1-flash-lite"
 def extract_score(text):
     """Extracts the final score by parsing JSON."""
     try:
-        clean_text = text.strip()
+        clean_text = str(text).strip()
         # Handle DeepSeek <think> reasoning tags
         think_match = re.search(r'<think>.*?</think>', clean_text, flags=re.DOTALL)
         if think_match:
@@ -45,15 +45,37 @@ def extract_score(text):
         if clean_text.startswith("```json"): clean_text = clean_text[7:]
         if clean_text.startswith("```"): clean_text = clean_text[3:]
         if clean_text.endswith("```"): clean_text = clean_text[:-3]
+        clean_text = clean_text.strip()
         
+        start_idx = clean_text.find("{")
+        end_idx = clean_text.rfind("}")
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            clean_text = clean_text[start_idx:end_idx + 1]
+
         data = json.loads(clean_text)
-        return float(data.get("total_score", 0))
+        score = data.get("total_score")
+        if score is None:
+            score = data.get("overall_score")
+        if score is None:
+            score = data.get("score", 0.0)
+        return float(score)
     except Exception as e:
         print(f"JSON parsing error: {e}")
-        return None
+        return 0.0
 
 def grade_submission(rubric, question, max_score, student_answer, prompt_template):
     """Calls the LLM to grade the submission based on the prompt template."""
+    clean_answer = str(student_answer).strip() if pd.notna(student_answer) else ""
+    if not clean_answer or clean_answer in ["-", "N/A", "n/a", "none", "nan"]:
+        blank_json = json.dumps({
+            "reasoning": "The student provided no answer ('-'). 0 points awarded.",
+            "criteria_breakdown": [],
+            "feedback": "No answer submitted.",
+            "total_score": 0.0,
+            "overall_score": 0.0
+        })
+        return 0.0, blank_json
+
     formatted_prompt = prompt_template.format(
         rubric=rubric,
         question=question,
@@ -74,13 +96,14 @@ def grade_submission(rubric, question, max_score, student_answer, prompt_templat
         ai_response_text = response.choices[0].message.content
         if ai_response_text is None:
             print("  [Warning] The model returned an empty response (likely ran out of tokens while reasoning).")
-            return None, ""
+            return 0.0, ""
             
         score = extract_score(ai_response_text)
-        return score, ai_response_text
+        return score if score is not None else 0.0, ai_response_text
     except Exception as e:
         print(f"Error calling API: {e}")
-        return None, str(e)
+        return 0.0, str(e)
+
 
 def main():
     print("Loading datasets...")

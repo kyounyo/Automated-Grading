@@ -1,12 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, CheckCircle2, AlertTriangle, Clock, Play, ArrowRight, Sparkles, Layers } from 'lucide-react';
+import { FileText, CheckCircle2, AlertTriangle, Clock, Play, ArrowRight, Sparkles, Layers, Download } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { currentAssignment, submissions = [], gradeAll, loading } = useAssignment();
+  const { currentAssignment, currentAssignmentId, submissions = [], gradeAll, loading, handleExportCSV } = useAssignment();
+
+  const onExportCSVClick = () => {
+    handleExportCSV(currentAssignment?.id || currentAssignmentId);
+  };
 
   const totalSubmissions = submissions.length;
   const gradedApproved = submissions.filter(s => s.status === 'graded' || s.status === 'approved').length;
@@ -16,19 +20,31 @@ const Dashboard = () => {
   const gradedSubs = submissions.filter(s => s.score != null && (s.status === 'graded' || s.status === 'approved' || s.status === 'flagged'));
   const unassessedSubs = submissions.filter(s => s.score == null || s.status === 'pending' || s.status === 'uploaded' || s.status === 'extracting_answers' || s.status === 'retrieving_rubric' || s.status === 'grading');
 
+  const totalRubricMax = (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0)
+    ? currentAssignment.rubric_data.reduce((acc, item) => acc + (parseFloat(item.max_score || item.maxMark) || 0), 0)
+    : null;
+
+  const maxMark = totalRubricMax || 20;
+  const b1 = maxMark * 0.25;
+  const b2 = maxMark * 0.50;
+  const b3 = maxMark * 0.75;
+
+  const fmt = (v) => (v % 1 === 0 ? Math.round(v) : v.toFixed(1));
+
   const scoreDistribution = [
     { range: 'Unassessed', count: unassessedSubs.length },
-    { range: '0-50', count: gradedSubs.filter(s => s.score < 50).length },
-    { range: '51-60', count: gradedSubs.filter(s => s.score >= 51 && s.score <= 60).length },
-    { range: '61-70', count: gradedSubs.filter(s => s.score >= 61 && s.score <= 70).length },
-    { range: '71-80', count: gradedSubs.filter(s => s.score >= 71 && s.score <= 80).length },
-    { range: '81-90', count: gradedSubs.filter(s => s.score >= 81 && s.score <= 90).length },
-    { range: '91-100', count: gradedSubs.filter(s => s.score >= 91 && s.score <= 100).length },
+    { range: `0 - ${fmt(b1)} pts`, count: gradedSubs.filter(s => s.score <= b1).length },
+    { range: `${fmt(b1 + 0.1)} - ${fmt(b2)} pts`, count: gradedSubs.filter(s => s.score > b1 && s.score <= b2).length },
+    { range: `${fmt(b2 + 0.1)} - ${fmt(b3)} pts`, count: gradedSubs.filter(s => s.score > b2 && s.score <= b3).length },
+    { range: `${fmt(b3 + 0.1)} - ${fmt(maxMark)} pts`, count: gradedSubs.filter(s => s.score > b3).length },
   ];
 
   // Class Average calculated strictly from graded papers
   const totalScoreSum = gradedSubs.reduce((acc, curr) => acc + curr.score, 0);
-  const averageScore = gradedSubs.length > 0 ? Math.round(totalScoreSum / gradedSubs.length) : 0;
+  const averageScore = gradedSubs.length > 0 ? (totalScoreSum / gradedSubs.length).toFixed(1) : '0.0';
+  const averageDisplay = gradedSubs.length > 0
+    ? (totalRubricMax ? `${averageScore} / ${totalRubricMax} marks` : `${averageScore} marks`)
+    : (totalRubricMax ? `0.0 / ${totalRubricMax} marks` : 'N/A');
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -38,25 +54,31 @@ const Dashboard = () => {
           <h2 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <Sparkles size={24} color="var(--primary)" /> Evaluation Overview
           </h2>
-          <p style={{ margin: '0.4rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.925rem' }}>
-            Real-time assessment analytics and submission performance metrics powered by PostgreSQL & ChromaDB RAG.
-          </p>
         </div>
-        <button className="btn btn-primary" onClick={gradeAll} disabled={loading || totalSubmissions === 0 || unassessedSubs.length === 0} style={{ padding: '0.6rem 1.25rem' }}>
-          <Play size={18} /> Grade All Pending Submissions
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button
+            className="btn btn-outline"
+            onClick={onExportCSVClick}
+            disabled={totalSubmissions === 0}
+            style={{ backgroundColor: '#fff', border: '1px solid var(--border)', color: 'var(--primary-dark)', padding: '0.6rem 1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Download size={18} color="var(--primary)" /> Export Grades (CSV)
+          </button>
+          <button className="btn btn-primary" onClick={gradeAll} disabled={loading || totalSubmissions === 0 || unassessedSubs.length === 0} style={{ padding: '0.6rem 1.25rem' }}>
+            <Play size={18} /> Grade All Pending Submissions
+          </button>
+        </div>
       </div>
 
       {/* Active Assignment Info Panel */}
       <div className="glass-panel" style={{ backgroundColor: '#fff', borderLeft: '4px solid var(--primary)', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h3 style={{ margin: '0 0 0.4rem 0', color: 'var(--primary-dark)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={20} color="var(--primary)" /> {currentAssignment?.title || 'Assignment Overview'}
+            <FileText size={20} color="var(--primary)" /> {currentAssignment?.title || 'No Active Assignment'}
           </h3>
           <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.9rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
             <span>Course Code: <strong style={{ color: 'var(--primary)' }}>{currentAssignment?.course_code || 'N/A'}</strong></span>
             {currentAssignment?.due_date && <span>Due Date: <strong>{currentAssignment.due_date}</strong></span>}
-            <span>Class Average (Graded): <strong style={{ color: 'var(--success)' }}>{averageScore}%</strong></span>
           </p>
         </div>
         <button className="btn btn-outline" onClick={() => navigate('/assignment-creator')} style={{ fontSize: '0.85rem' }}>
@@ -117,7 +139,11 @@ const Dashboard = () => {
             </div>
           </div>
           <div style={{ marginTop: '0.5rem' }}>
-            <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--primary-dark)', lineHeight: 1.1 }}>{averageScore}%</div>
+            <div style={{ fontSize: totalRubricMax ? '1.5rem' : '2.1rem', fontWeight: 800, color: 'var(--primary-dark)', lineHeight: 1.1 }}>
+              {gradedSubs.length > 0
+                ? (totalRubricMax ? `${averageScore} / ${totalRubricMax}` : `${averageScore} pts`)
+                : (totalRubricMax ? `0.0 / ${totalRubricMax}` : 'N/A')}
+            </div>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'block' }}>Based on {gradedSubs.length} graded paper(s)</span>
           </div>
         </div>
@@ -145,14 +171,14 @@ const Dashboard = () => {
               <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid var(--border)' }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {scoreDistribution.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
+                  <Cell
+                    key={`cell-${index}`}
                     fill={
-                      entry.range === 'Unassessed' ? '#f59e0b' : 
-                      index > 4 ? 'var(--success)' : 
-                      index > 2 ? 'var(--primary)' : 
-                      'var(--primary-dark)'
-                    } 
+                      entry.range === 'Unassessed' ? '#f59e0b' :
+                        index > 4 ? 'var(--success)' :
+                          index > 2 ? 'var(--primary)' :
+                            'var(--primary-dark)'
+                    }
                   />
                 ))}
               </Bar>

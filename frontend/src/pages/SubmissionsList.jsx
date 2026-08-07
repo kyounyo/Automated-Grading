@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, RefreshCw } from 'lucide-react';
+import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, RefreshCw, Download } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
 const SubmissionsList = () => {
@@ -8,7 +8,19 @@ const SubmissionsList = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [gradingBatch, setGradingBatch] = useState(false);
-  const { currentAssignmentId, submissions, triggerGradeSubmission, triggerGradeAll, loadSubmissions } = useAssignment();
+  const { currentAssignmentId, currentAssignment, submissions, triggerGradeSubmission, triggerGradeAll, loadSubmissions, handleExportCSV } = useAssignment();
+
+  const getSubmissionMaxScore = (sub) => {
+    if (sub?.feedback?.breakdown && sub.feedback.breakdown.length > 0) {
+      const sumBreakdown = sub.feedback.breakdown.reduce((acc, item) => acc + (parseFloat(item.max_score) || 0), 0);
+      if (sumBreakdown > 0) return sumBreakdown;
+    }
+    if (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0) {
+      const sumRubric = currentAssignment.rubric_data.reduce((acc, item) => acc + (parseFloat(item.max_score || item.maxMark) || 0), 0);
+      if (sumRubric > 0) return sumRubric;
+    }
+    return null;
+  };
 
   const handleGradeSingle = async (e, subId) => {
     e.stopPropagation();
@@ -31,6 +43,10 @@ const SubmissionsList = () => {
     }
   };
 
+  const onExportCSVClick = () => {
+    handleExportCSV(currentAssignmentId);
+  };
+
   const getStatusBadge = (sub) => {
     switch (sub.status) {
       case 'graded':
@@ -40,9 +56,10 @@ const SubmissionsList = () => {
           </span>
         );
       case 'flagged':
+        const flagReason = sub.feedback?.flag_reasons?.[0] || sub.multi_agent_audit?.audit_note || 'Multi-Agent Quality Audit requested lecturer verification.';
         return (
-          <span className="status-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning)', padding: '0.25rem 0.6rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center' }}>
-            <AlertTriangle size={14} style={{ marginRight: '4px' }} /> Flagged for Review
+          <span className="status-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#b45309', padding: '0.35rem 0.75rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', fontWeight: 600, fontSize: '0.825rem', border: '1px solid rgba(245, 158, 11, 0.3)', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`Flagged for Audit: ${flagReason}`}>
+            <AlertTriangle size={14} style={{ marginRight: '6px', flexShrink: 0 }} /> ⚠️ Flagged for Audit: {flagReason}
           </span>
         );
       case 'processing':
@@ -106,7 +123,16 @@ const SubmissionsList = () => {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <button 
+            className="btn btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#fff', border: '1px solid var(--border)', color: 'var(--primary-dark)', padding: '0.5rem 0.9rem', fontSize: '0.875rem', fontWeight: 600 }}
+            onClick={onExportCSVClick}
+            title="Download full student grades as a CSV spreadsheet"
+          >
+            <Download size={16} color="var(--primary)" /> Export Grades (CSV)
+          </button>
+
           <button 
             className="btn btn-primary"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--primary)', padding: '0.5rem 1rem' }}
@@ -164,7 +190,7 @@ const SubmissionsList = () => {
                   <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>{sub.file_name}</td>
                   <td style={{ padding: '1.2rem 1.5rem', fontWeight: 600 }}>
                     {sub.score != null ? (
-                      <span>{sub.score} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.875rem' }}>/ 100</span></span>
+                      <span>{sub.score} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.875rem' }}>/ {getSubmissionMaxScore(sub)}</span></span>
                     ) : (
                       <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassessed</span>
                     )}

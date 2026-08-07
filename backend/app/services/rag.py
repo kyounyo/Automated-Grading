@@ -6,9 +6,18 @@ def retrieve_rubric_context(assignment_id: str, student_text: str, top_k: int = 
     """
     Retrieves the most relevant rubric criteria and model answer chunks from ChromaDB for a student's submission text.
     """
-    context_chunks = embedding_service.query_reference_context(assignment_id, student_text[:1000], top_k=top_k)
+    try:
+        if hasattr(embedding_service, "query_reference_context"):
+            context_chunks = embedding_service.query_reference_context(assignment_id, student_text[:1000], top_k=top_k)
+        else:
+            context_chunks = embedding_service.query_relevant_rubric(assignment_id, student_text[:1000], top_k=top_k)
+    except Exception as e:
+        print(f"[RAG Warning] Retrieval failed for assignment {assignment_id}: {e}")
+        context_chunks = []
+
     if not context_chunks:
         return "No specific vector context found. Evaluate strictly against provided rubric rules."
     
     formatted_context = "\n".join([f"- {chunk}" for chunk in context_chunks])
     return f"Retrieved Rubric & Model Answer Reference Context:\n{formatted_context}"
+

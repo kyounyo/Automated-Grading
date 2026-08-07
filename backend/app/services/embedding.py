@@ -109,6 +109,11 @@ class EmbeddingService:
             print(f"[ChromaDB Warning] Query failed for collection {collection_name}: {e}")
             return []
 
+    def query_reference_context(self, assignment_id: str, student_submission_text: str, top_k: int = 3) -> List[str]:
+        """Alias for query_relevant_rubric to maintain backward compatibility."""
+        return self.query_relevant_rubric(assignment_id, student_submission_text, top_k=top_k)
+
 
 # Global instance
 embedding_service = EmbeddingService()
+

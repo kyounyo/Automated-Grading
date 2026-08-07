@@ -43,6 +43,7 @@ class ScoreOverrideRequest(BaseModel):
     new_score: float
     comment: Optional[str] = "Manual grade adjustment by lecturer"
     lecturer_name: Optional[str] = "Lecturer"
+    updated_breakdown: Optional[List[Dict[str, Any]]] = None
 
 
 class SubmissionResponse(BaseModel):

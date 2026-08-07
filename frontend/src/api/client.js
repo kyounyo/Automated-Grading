@@ -83,3 +83,23 @@ export async function fetchVectorStore(assignmentId) {
   if (!response.ok) throw new Error('Failed to fetch vector store');
   return await response.json();
 }
+
+export async function downloadGradesCSV(assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/export-csv`);
+  if (!response.ok) throw new Error('Failed to download CSV grade export');
+  const blob = await response.blob();
+  const contentDisp = response.headers.get('content-disposition');
+  let fileName = `Grades_Export.csv`;
+  if (contentDisp && contentDisp.includes('filename=')) {
+    const match = contentDisp.match(/filename=["']?([^"']+)["']?/);
+    if (match && match[1]) fileName = match[1];
+  }
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
