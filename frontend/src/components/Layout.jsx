@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, FileUp, Files, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, FileUp, Files, CheckSquare, Database } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
+import VectorStoreModal from './VectorStoreModal';
 import './Layout.css';
 
 const Layout = () => {
   const { currentAssignmentId, setCurrentAssignmentId, assignments = [] } = useAssignment();
+  const [isVectorModalOpen, setIsVectorModalOpen] = useState(false);
 
   const availableAssignments = assignments.length > 0 ? assignments : [
     { id: '', title: 'No Active Assignments' }
@@ -59,11 +61,26 @@ const Layout = () => {
               ))}
             </select>
           </div>
+
+          <button
+            className="btn btn-outline"
+            onClick={() => setIsVectorModalOpen(true)}
+            disabled={!currentAssignmentId}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', padding: '0.45rem 1rem' }}
+          >
+            <Database size={16} color="var(--primary)" /> View Vector Embeddings
+          </button>
         </header>
 
         <div className="page-content animate-fade-in">
           <Outlet />
         </div>
+
+        <VectorStoreModal
+          assignmentId={currentAssignmentId}
+          isOpen={isVectorModalOpen}
+          onClose={() => setIsVectorModalOpen(false)}
+        />
       </main>
     </div>
   );

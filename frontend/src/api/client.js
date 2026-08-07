@@ -77,3 +77,9 @@ export async function parseRubricFile(formData) {
   if (!response.ok) throw new Error('Failed to parse rubric file');
   return await response.json();
 }
+
+export async function fetchVectorStore(assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/vector-store`);
+  if (!response.ok) throw new Error('Failed to fetch vector store');
+  return await response.json();
+}

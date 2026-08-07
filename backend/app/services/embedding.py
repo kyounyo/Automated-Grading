@@ -23,7 +23,8 @@ class EmbeddingService:
         try:
             client = self._get_client()
             return client.get_collection(name=collection_name)
-        except Exception:
+        except Exception as e:
+            print(f"[ChromaDB Error] get_assignment_collection error for {collection_name}: {e}")
             return None
 
     def index_assignment_reference(self, assignment_id: str, rubric_data: List[Dict[str, Any]], model_answer: str = ""):

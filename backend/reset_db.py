@@ -29,14 +29,23 @@ try:
 except Exception as e:
     print(f"[Schema Migration Warning] {e}")
 
-# Wipe ChromaDB vector store directory
-chroma_dir = os.path.join(os.path.dirname(__file__), "chroma_db")
-if os.path.exists(chroma_dir):
-    try:
-        shutil.rmtree(chroma_dir)
-        os.makedirs(chroma_dir, exist_ok=True)
-        print("✓ All ChromaDB vector collections cleared!")
-    except Exception as e:
-        print(f"Warning clearing ChromaDB: {e}")
+# Clear ChromaDB vector stores gracefully via API without breaking active file locks
+try:
+    from app.services.embedding import embedding_service
+    client = embedding_service._get_client()
+    collections = client.list_collections()
+    for col in collections:
+        col_name = col.name if hasattr(col, 'name') else str(col)
+        client.delete_collection(col_name)
+    print("✓ All ChromaDB vector collections cleared!")
+except Exception as e:
+    chroma_dir = os.path.join(os.path.dirname(__file__), "chroma_db")
+    if os.path.exists(chroma_dir):
+        try:
+            shutil.rmtree(chroma_dir)
+            os.makedirs(chroma_dir, exist_ok=True)
+            print("✓ All ChromaDB vector collections cleared!")
+        except Exception as err:
+            print(f"Warning clearing ChromaDB: {err}")
 
 print("[Reset Complete] Database is now 100% empty!")

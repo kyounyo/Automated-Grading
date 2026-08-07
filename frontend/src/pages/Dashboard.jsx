@@ -55,7 +55,7 @@ const Dashboard = () => {
           </h3>
           <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.9rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
             <span>Course Code: <strong style={{ color: 'var(--primary)' }}>{currentAssignment?.course_code || 'N/A'}</strong></span>
-            <span>Due Date: <strong>{currentAssignment?.due_date || 'N/A'}</strong></span>
+            {currentAssignment?.due_date && <span>Due Date: <strong>{currentAssignment.due_date}</strong></span>}
             <span>Class Average (Graded): <strong style={{ color: 'var(--success)' }}>{averageScore}%</strong></span>
           </p>
         </div>
