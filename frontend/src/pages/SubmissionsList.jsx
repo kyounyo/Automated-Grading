@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, RefreshCw, Download } from 'lucide-react';
+import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, RefreshCw, Download, ShieldAlert } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
 const SubmissionsList = () => {
@@ -8,7 +8,39 @@ const SubmissionsList = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [gradingBatch, setGradingBatch] = useState(false);
+  const [qcSettings, setQcSettings] = useState({ enable_random_qc: false, qc_audit_rate: 0.05 });
   const { currentAssignmentId, currentAssignment, submissions, triggerGradeSubmission, triggerGradeAll, loadSubmissions, handleExportCSV } = useAssignment();
+
+  useEffect(() => {
+    fetch('/api/assignments/qc-settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data === 'object') {
+          setQcSettings({
+            enable_random_qc: !!data.enable_random_qc,
+            qc_audit_rate: parseFloat(data.qc_audit_rate || 0.05)
+          });
+        }
+      })
+      .catch(err => console.warn('Could not load QC settings:', err));
+  }, []);
+
+  const handleUpdateQCSettings = async (enable, rate) => {
+    try {
+      const res = await fetch('/api/assignments/qc-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable_random_qc: enable, qc_audit_rate: rate })
+      });
+      const data = await res.json();
+      setQcSettings({
+        enable_random_qc: !!data.enable_random_qc,
+        qc_audit_rate: parseFloat(data.qc_audit_rate || 0.05)
+      });
+    } catch (err) {
+      alert(`Could not update QC settings: ${err.message}`);
+    }
+  };
 
   const getSubmissionMaxScore = (sub) => {
     if (sub?.feedback?.breakdown && sub.feedback.breakdown.length > 0) {
@@ -79,7 +111,11 @@ const SubmissionsList = () => {
 
   const filteredSubmissions = submissions.filter(s => {
     const matchesFilter = filter === 'all' || s.status === filter;
-    const matchesSearch = !searchTerm || s.student_id.toLowerCase().includes(searchTerm.toLowerCase()) || s.student_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || 
+      (s.student_id && s.student_id.toLowerCase().includes(term)) || 
+      (s.student_name && s.student_name.toLowerCase().includes(term)) ||
+      (s.student_email && s.student_email.toLowerCase().includes(term));
     return matchesFilter && matchesSearch;
   });
 
@@ -184,8 +220,12 @@ const SubmissionsList = () => {
                   onClick={() => navigate(`/review`, { state: { submission: sub } })}
                 >
                   <td style={{ padding: '1.2rem 1.5rem' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{sub.student_name}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: {sub.student_id}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{sub.student_name || `Student ${sub.student_id}`}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+                      <span>ID: <strong>{sub.student_id}</strong></span>
+                      <span>•</span>
+                      <span>Email: <strong>{sub.student_email || 'N/A'}</strong></span>
+                    </div>
                   </td>
                   <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>{sub.file_name}</td>
                   <td style={{ padding: '1.2rem 1.5rem', fontWeight: 600 }}>

@@ -22,6 +22,7 @@ const GradingReview = () => {
 
   useEffect(() => {
     if (activeSubmission) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       if (activeSubmission.score != null) {
         setOverrideScore(activeSubmission.score.toString());
       }
@@ -35,7 +36,7 @@ const GradingReview = () => {
       setQuestionScores(initialScores);
       setActiveHighlightPop(null);
     }
-  }, [activeSubmission]);
+  }, [activeSubmission?.id]);
 
   if (!activeSubmission) {
     return (
@@ -55,13 +56,25 @@ const GradingReview = () => {
 
   const navigateToSubmission = (targetSub) => {
     if (targetSub) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       navigate('/review', { state: { submission: targetSub }, replace: true });
     }
   };
 
   const feedback = activeSubmission.feedback || {};
-  const breakdown = feedback.breakdown || [];
+  const rawBreakdown = feedback.breakdown || [];
   const highlights = activeSubmission.highlights || [];
+
+  const breakdown = rawBreakdown.length > 0
+    ? rawBreakdown
+    : (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0
+      ? currentAssignment.rubric_data.map((r, idx) => ({
+          question_number: r.question_number || r.criterion || `Q${idx + 1}`,
+          score_awarded: 0.0,
+          max_score: parseFloat(r.max_score || r.maxMark || 5.0),
+          reasoning: "Rubric criteria loaded. Pending AI grading evaluation."
+        }))
+      : []);
 
   const totalMaxScore = breakdown.length > 0
     ? breakdown.reduce((acc, item) => acc + (parseFloat(item.max_score) || 0), 0)
@@ -322,13 +335,24 @@ const GradingReview = () => {
         {/* Left Column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-          {/* Compact Submission Details Banner */}
-          <div className="glass-panel" style={{ padding: '0.9rem 1.25rem', borderLeft: '4px solid var(--primary)' }}>
+          {/* Sticky Freeze Student Information Details Banner */}
+          <div 
+            className="glass-panel" 
+            style={{ 
+              padding: '0.9rem 1.25rem', 
+              borderLeft: '4px solid var(--primary)',
+              position: 'sticky',
+              top: '1rem',
+              zIndex: 10,
+              backgroundColor: '#fff',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)'
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '1.15rem' }}>{activeSubmission.student_name}</h3>
+                <h3 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '1.15rem' }}>{activeSubmission.student_name || `Student ${activeSubmission.student_id}`}</h3>
                 <p style={{ margin: '0.15rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-                  Student ID: <strong>{activeSubmission.student_id}</strong> | File: <strong>{activeSubmission.file_name}</strong>
+                  Student ID: <strong>{activeSubmission.student_id}</strong> | Email: <strong>{activeSubmission.student_email || 'N/A'}</strong> | File: <strong>{activeSubmission.file_name}</strong>
                 </p>
               </div>
 
@@ -397,7 +421,13 @@ const GradingReview = () => {
             </div>
 
             {breakdown.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)' }}>No breakdown data available.</p>
+              <div style={{ padding: '1.25rem', backgroundColor: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                  {activeSubmission.status === 'pending'
+                    ? '⌛ Submission pending AI grading. Click "Run AI Grading Pipeline" to evaluate this paper.'
+                    : 'No rubric breakdown available for this assignment.'}
+                </p>
+              </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {breakdown.map((item, index) => {

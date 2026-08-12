@@ -25,11 +25,11 @@ const AssignmentCreator = () => {
   ]);
 
   const downloadExcelTemplate = () => {
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + "question_n,question,answer,max_mark\n"
       + "6,\"(a) Polymer-based injectable modified release systems come in a range of formats. One format is a polymer microsphere. Describe in point form the advantages and disadvantages... (5 marks)  (b) A rival technology to microspheres is 'in situ gelling' polymer systems... (5 marks)\",\"(a) Advantages: May be biodegradable. Disadvantages: Limited to non-acid labile. (b) Attributes: Systems contain a solvent...\",10\n"
       + "8,\"Consider the following five statements, answering whether you (1) agree or disagree and (2) provide a brief reason for your answer. (a) Lyophilization (b) Protein structure (c) Antibody-drug (d) Light sensitivity (e) Co-solvents\",\"(a) 1 mark for disagree (b) 1 mark for agree (c) 1 mark for disagree (d) 1 mark for disagree (e) 1 mark for agree\",10\n";
-    
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -39,8 +39,15 @@ const AssignmentCreator = () => {
     document.body.removeChild(link);
   };
 
-  const processRubricFiles = async (filesArray) => {
-    const validFiles = filesArray.slice(0, 3);
+  const processRubricFiles = async (filesArray, isAppend = false) => {
+    let newFiles = Array.from(filesArray);
+    let combinedFiles = isAppend ? [...rubricFiles, ...newFiles] : newFiles;
+
+    // Deduplicate by file name and size
+    const uniqueMap = new Map();
+    combinedFiles.forEach(f => uniqueMap.set(`${f.name}-${f.size}`, f));
+    const validFiles = Array.from(uniqueMap.values()).slice(0, 5);
+
     setRubricFiles(validFiles);
     setRubricWarning(null);
     setIsParsing(true);
@@ -69,7 +76,7 @@ const AssignmentCreator = () => {
             question_number: `Q${qCount}`,
             text: lines[i] || `Question ${qCount}`,
             maxMark: 10,
-            modelAnswer: lines[i+1] || `Extracted criteria: ${lines[i]}`
+            modelAnswer: lines[i + 1] || `Extracted criteria: ${lines[i]}`
           });
           qCount++;
           if (qCount > 10) break;
@@ -104,13 +111,26 @@ const AssignmentCreator = () => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processRubricFiles(Array.from(e.dataTransfer.files));
+      processRubricFiles(Array.from(e.dataTransfer.files), true);
     }
   };
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = (e, isAppend = false) => {
+    e.stopPropagation();
     if (e.target.files && e.target.files.length > 0) {
-      processRubricFiles(Array.from(e.target.files));
+      processRubricFiles(Array.from(e.target.files), isAppend);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveRubricFile = (indexToRemove, e) => {
+    e.stopPropagation();
+    const updated = rubricFiles.filter((_, idx) => idx !== indexToRemove);
+    if (updated.length > 0) {
+      processRubricFiles(updated, false);
+    } else {
+      setRubricFiles([]);
+      setRubricWarning(null);
     }
   };
 
@@ -149,6 +169,21 @@ const AssignmentCreator = () => {
       };
 
       const created = await createAssignment(payload);
+
+      // Save Quality Control Audit settings (0% closes/disables QC audit)
+      try {
+        await fetch('/api/assignments/qc-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enable_random_qc: (parseFloat(auditPercentage) > 0),
+            qc_audit_rate: parseFloat(auditPercentage) / 100.0
+          })
+        });
+      } catch (e) {
+        console.warn("Could not save QC settings:", e);
+      }
+
       await loadAssignments();
       setCurrentAssignmentId(created.id);
 
@@ -222,9 +257,9 @@ const AssignmentCreator = () => {
               </div>
             </div>
 
-            <button 
-              type="button" 
-              className="btn btn-outline" 
+            <button
+              type="button"
+              className="btn btn-outline"
               onClick={downloadExcelTemplate}
               style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem' }}
             >
@@ -263,16 +298,55 @@ const AssignmentCreator = () => {
                 </div>
               </div>
             ) : rubricFiles.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', color: 'var(--success)' }}>
                 <CheckCircle2 size={32} />
                 <h4 style={{ margin: 0, color: 'var(--text-main)' }}>{rubricFiles.length} File(s) Attached</h4>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {rubricFiles.map((f, i) => (
-                    <span key={i} className="status-badge" style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)' }}>
-                      📄 {f.name} ({(f.size/1024).toFixed(1)} KB)
+                    <span 
+                      key={i} 
+                      className="status-badge" 
+                      style={{ 
+                        backgroundColor: 'var(--success-bg)', 
+                        color: 'var(--success)', 
+                        display: 'inline-flex', 
+                        alignItems: 'center', 
+                        gap: '0.4rem', 
+                        padding: '0.35rem 0.65rem' 
+                      }}
+                    >
+                      📄 {f.name} ({(f.size / 1024).toFixed(1)} KB)
+                      <span 
+                        onClick={(e) => handleRemoveRubricFile(i, e)}
+                        title="Remove file"
+                        style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.2rem', color: 'var(--danger)' }}
+                      >
+                        ✕
+                      </span>
                     </span>
                   ))}
                 </div>
+
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    document.getElementById('addMoreRubricFileInput').click();
+                  }}
+                  style={{ marginTop: '0.4rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem', backgroundColor: '#fff', border: '1px solid var(--primary)', color: 'var(--primary-dark)', fontWeight: 600 }}
+                >
+                  <Plus size={16} color="var(--primary)" /> Add More Files
+                </button>
+                <input
+                  id="addMoreRubricFileInput"
+                  type="file"
+                  multiple
+                  accept=".xlsx,.csv,.pdf,.docx,.txt"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => handleFileSelect(e, true)}
+                  style={{ display: 'none' }}
+                />
               </div>
             ) : (
               <div>
@@ -381,19 +455,24 @@ const AssignmentCreator = () => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
             <div>
               <label className="label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Random Quality Audit Sampling Rate</span>
-                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{auditPercentage}%</span>
+                <span>Random Quality Control Audit Sampling Rate</span>
+                <span style={{ color: auditPercentage > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700 }}>
+                  {auditPercentage > 0 ? `${auditPercentage}%` : '0% (OFF)'}
+                </span>
               </label>
               <input
                 type="range"
                 min="0"
                 max="20"
+                step="5"
                 value={auditPercentage}
                 onChange={(e) => setAuditPercentage(e.target.value)}
                 style={{ width: '100%', accentColor: 'var(--primary)' }}
               />
               <p style={{ fontSize: '0.8rem', marginTop: '0.4rem', color: 'var(--text-muted)' }}>
-                Randomly flags {auditPercentage}% of auto-approved papers for quality assurance.
+                {auditPercentage > 0
+                  ? `Randomly flags ${auditPercentage}% of papers for quality control audit. Set slider to 0% to turn OFF (close).`
+                  : 'Random Quality Control Audit is currently turned OFF (0%). Move slider to enable sampling.'}
               </p>
             </div>
 
@@ -423,10 +502,10 @@ const AssignmentCreator = () => {
           <button type="button" className="btn btn-outline" onClick={() => navigate('/')}>
             Cancel
           </button>
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            disabled={isSaving || isParsing || !isFormValid} 
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSaving || isParsing || !isFormValid}
             style={{ padding: '0.625rem 1.5rem', fontSize: '0.95rem', opacity: !isFormValid ? 0.6 : 1, cursor: !isFormValid ? 'not-allowed' : 'pointer' }}
           >
             {isSaving ? 'Creating...' : 'Create Assignment & Index Rubric'} <ArrowRight size={18} />

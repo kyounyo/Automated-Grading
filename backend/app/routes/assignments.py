@@ -48,6 +48,31 @@ def get_assignment_detail(assignment_id: str, db: Session = Depends(get_db)):
     return assign
 
 
+@router.get("/qc-settings")
+def get_qc_settings():
+    """Retrieve current Quality Control Audit settings."""
+    enable_qc = os.getenv("ENABLE_RANDOM_QC_AUDIT", "false").lower() in ["true", "1", "yes"]
+    qc_rate = float(os.getenv("QC_AUDIT_RATE", "0.05"))
+    return {
+        "enable_random_qc": enable_qc,
+        "qc_audit_rate": qc_rate
+    }
+
+
+@router.post("/qc-settings")
+def update_qc_settings(data: dict):
+    """Update Quality Control Audit settings (ON/OFF toggle & sampling percentage rate)."""
+    enable_qc = bool(data.get("enable_random_qc", False))
+    qc_rate = float(data.get("qc_audit_rate", 0.05))
+    os.environ["ENABLE_RANDOM_QC_AUDIT"] = "true" if enable_qc else "false"
+    os.environ["QC_AUDIT_RATE"] = str(qc_rate)
+    return {
+        "message": "Quality Control Audit settings updated successfully",
+        "enable_random_qc": enable_qc,
+        "qc_audit_rate": qc_rate
+    }
+
+
 @router.get("/{assignment_id}/vector-store")
 def get_assignment_vector_store(assignment_id: str):
     """
@@ -266,6 +291,7 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
     header = [
         "Student ID",
         "Student Name",
+        "Student Email",
         "Submission File",
         "Total Score",
         "Max Score",
@@ -309,7 +335,8 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
 
         row = [
             sub.student_id,
-            sub.student_name,
+            sub.student_name or "N/A",
+            getattr(sub, "student_email", None) or "N/A",
             sub.file_name,
             score_val,
             total_rubric_max,

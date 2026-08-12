@@ -51,7 +51,8 @@ class SubmissionResponse(BaseModel):
     assignment_id: str
     batch_id: Optional[str] = None
     student_id: str
-    student_name: str
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
     file_name: str
     file_s3_url: Optional[str] = None
     file_path: Optional[str] = None

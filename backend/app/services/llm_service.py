@@ -3,6 +3,7 @@ import re
 import json
 import urllib.request
 from typing import Dict, Any, Optional
+from .confidence import evaluate_confidence_and_status
 
 def get_openrouter_api_key() -> str:
     return os.getenv("OPENROUTER_API_KEY", "").strip()
@@ -244,10 +245,11 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 def call_auditor_verification_agent(student_text: str, rubric_json: list, primary_eval: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Agent 3 (Auditor & Verification Agent):
-    Uses google/gemini-3.1-flash-lite to audit Agent 2's evaluation, check score bounds, verify CoT reasoning consistency, and compute agent agreement.
+    Uses google/gemini-3.1-flash-lite to audit Agent 2's evaluation.
+    Provides independent per-question auditor scores, identifies specific question conflicts, and determines audit_passed.
     """
     prompt = f"""
-You are a Senior Academic Quality Auditor. Audit the following AI grading evaluation for fairness, accuracy, and score bounds.
+You are a Senior Academic Quality Auditor. Audit the following AI grading evaluation for fairness, accuracy, score bounds, and per-question score agreement.
 
 Rubric:
 {json.dumps(rubric_json, indent=2)}
@@ -258,19 +260,40 @@ Student Submission:
 Primary AI Evaluation Result:
 {json.dumps(primary_eval, indent=2)}
 
-AUDIT AUDITING TASKS:
-1. Check if awarded scores exceed maximum allowed marks per question.
-2. Verify if reasoning logically supports awarded marks.
-3. Check if empty/blank ('-') answers received 0 marks as required.
-4. Determine if primary confidence score is realistic.
+INDEPENDENCE REQUIREMENT:
+Do NOT simply agree with or copy the Primary AI Evaluation.
+Independently evaluate the student text per subquestion first using only:
+1. Student Submission Text
+2. Rubric Criteria & Model Answer
+
+After determining your independent scores for each subquestion, compare your scores against the Primary Grader.
+
+AUDIT TASKS:
+1. Re-evaluate student text independently per rubric subquestion (e.g. Q6(a), Q6(b), Q8(a)).
+2. Provide your independent score for EVERY subquestion in "auditor_breakdown".
+3. Identify EXACT subquestion(s) where you disagree with the primary grader's score.
+4. List conflicting subquestions in "conflicting_questions" array.
+5. Set "audit_passed" to FALSE if you disagree on any subquestion score or if total discrepancy is > 10%. Set TRUE only if all question scores align.
+6. Provide a clear explanation in "discrepancy_note" stating which question(s) had conflict and why.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
-  "audit_passed": true,
-  "auditor_score": 8.5,
-  "auditor_confidence": 0.92,
-  "discrepancy_note": "Scores align well with rubric criteria.",
-  "suggested_status": "graded"
+  "audit_passed": false,
+  "auditor_score": 7.5,
+  "auditor_breakdown": [
+    {{
+      "question_number": "Q6(a)",
+      "auditor_score": 2.5,
+      "max_score": 2.5
+    }},
+    {{
+      "question_number": "Q6(b)",
+      "auditor_score": 1.0,
+      "max_score": 2.5
+    }}
+  ],
+  "conflicting_questions": ["Q6(b)"],
+  "discrepancy_note": "Multi-Agent Conflict on Q6(b): Primary grader awarded 2.5 marks whereas auditor recommends 1.0 mark due to missing sol-to-gel mechanism."
 }}
 """
     messages = [
@@ -286,6 +309,7 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
     - Agent 1: Rubric & RAG Context Parser Agent
     - Agent 2: Primary CoT Evaluation Agent
     - Agent 3: Auditor Verification Agent
+    - Step 4: Deterministic Confidence & Audit Engine
     """
     if not get_openrouter_api_key():
         print("[LLM Service] OPENROUTER_API_KEY not set. Running fallback structured scoring engine.")
@@ -301,9 +325,31 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
         print("[LLM Service Warning] Primary Agent call failed. Using heuristic fallback.")
         return _mock_heuristic_evaluation(student_text, rubric_json)
 
-    # Recalculate overall_score as the exact sum of score_awarded across question breakdown items
+    # Ensure feedback dictionary and breakdown list exist
     feedback = primary_res.get("feedback", {})
-    breakdown = feedback.get("breakdown", []) if isinstance(feedback, dict) else []
+    if not isinstance(feedback, dict):
+        feedback = {"summary": "AI Evaluation completed."}
+        primary_res["feedback"] = feedback
+
+    breakdown = feedback.get("breakdown", [])
+    if not breakdown or not isinstance(breakdown, list):
+        breakdown = []
+        if isinstance(rubric_json, list) and len(rubric_json) > 0:
+            for idx, r_item in enumerate(rubric_json):
+                if isinstance(r_item, dict):
+                    q_num = r_item.get("question_number") or r_item.get("criterion") or f"Q{idx + 1}"
+                    max_sc = float(r_item.get("max_score", r_item.get("maxMark", 5.0)))
+                    proportion = max_sc / total_max_score if total_max_score > 0 else (1.0 / len(rubric_json))
+                    score_aw = round(float(primary_res.get("overall_score", 0.0)) * proportion, 1)
+                    breakdown.append({
+                        "question_number": q_num,
+                        "score_awarded": min(max_sc, score_aw),
+                        "max_score": max_sc,
+                        "reasoning": "Evaluated against rubric criteria."
+                    })
+        feedback["breakdown"] = breakdown
+
+    # Recalculate overall_score as the exact sum of score_awarded across question breakdown items
     if breakdown:
         exact_breakdown_sum = sum(float(item.get("score_awarded", 0.0)) for item in breakdown if isinstance(item, dict))
         primary_res["overall_score"] = round(exact_breakdown_sum, 1)
@@ -315,36 +361,45 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
     auditor_res = call_auditor_verification_agent(student_text, rubric_json, primary_res)
 
     if auditor_res:
-        audit_passed = auditor_res.get("audit_passed", True)
-        auditor_score = auditor_res.get("auditor_score", primary_res.get("overall_score", 0.0))
-        primary_score = primary_res.get("overall_score", 0.0)
+        audit_passed = bool(auditor_res.get("audit_passed", True))
+        auditor_score = float(auditor_res.get("auditor_score", primary_res.get("overall_score", 0.0)))
+        auditor_breakdown = auditor_res.get("auditor_breakdown", [])
+        if not isinstance(auditor_breakdown, list):
+            auditor_breakdown = []
+
+        primary_score = float(primary_res.get("overall_score", 0.0))
+        conflicting_qs = auditor_res.get("conflicting_questions", [])
+        if not isinstance(conflicting_qs, list):
+            conflicting_qs = []
         
-        # Calculate multi-agent agreement ratio (1.0 = complete agreement, 0.0 = severe conflict)
-        max_denom = total_max_score if total_max_score > 0 else 10.0
         score_diff = abs(primary_score - auditor_score)
+        max_denom = total_max_score if total_max_score > 0 else 10.0
         agreement_ratio = max(0.0, 1.0 - (score_diff / max_denom))
 
-        # Scale confidence score directly by multi-agent agreement
-        primary_conf = primary_res.get("confidence_score", 0.85)
-        auditor_conf = auditor_res.get("auditor_confidence", 0.85)
-        base_conf = min(primary_conf, auditor_conf if audit_passed else 0.55)
-        
-        # Serious multi-agent conflict directly lowers the confidence score
-        combined_confidence = round(max(0.10, min(1.0, base_conf * agreement_ratio)), 2)
-        
-        primary_res["confidence_score"] = combined_confidence
         primary_res["multi_agent_audit"] = {
             "auditor_passed": audit_passed,
             "auditor_score": auditor_score,
+            "auditor_breakdown": auditor_breakdown,
             "score_discrepancy": round(score_diff, 1),
             "agreement_ratio": round(agreement_ratio, 2),
+            "conflicting_questions": conflicting_qs,
             "audit_note": auditor_res.get("discrepancy_note", ""),
             "model_used": get_llm_model()
         }
 
-        # If auditor failed or discrepancy > 15% of total_max_score, flag for lecturer review
-        if not audit_passed or score_diff > (total_max_score * 0.15):
-            primary_res["status"] = "flagged"
+    # Step 4: Deterministic Confidence & Decision Engine
+    confidence_result = evaluate_confidence_and_status(
+        primary_res,
+        student_text,
+        total_max_score
+    )
+
+    primary_res["confidence_score"] = confidence_result["confidence_score"]
+    primary_res["status"] = confidence_result["status"]
+    primary_res["flag_reasons"] = confidence_result["flag_reasons"]
+    primary_res["is_borderline"] = confidence_result["is_borderline"]
+    primary_res["is_audit_flagged"] = confidence_result["is_audit_flagged"]
+    primary_res["confidence_components"] = confidence_result["confidence_components"]
 
     return primary_res
 

@@ -46,6 +46,87 @@ const Dashboard = () => {
     ? (totalRubricMax ? `${averageScore} / ${totalRubricMax} marks` : `${averageScore} marks`)
     : (totalRubricMax ? `0.0 / ${totalRubricMax} marks` : 'N/A');
 
+  // Extract Whole Question Breakdown Analytics (aggregating subparts Q6(a), Q6(b) -> Q6)
+  const getParentQuestionKey = (qNum) => {
+    if (!qNum) return 'Q1';
+    const match = String(qNum).match(/(?:Question\s*|Q)?\s*(\d+)/i);
+    return match ? `Q${match[1]}` : String(qNum);
+  };
+
+  const parentQuestionMap = {};
+
+  // First seed max scores from rubric_data
+  if (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0) {
+    currentAssignment.rubric_data.forEach((r, idx) => {
+      const rawKey = r.question_number || r.criterion || `Q${idx + 1}`;
+      const pKey = getParentQuestionKey(rawKey);
+      const maxSc = parseFloat(r.max_score || r.maxMark || 5.0);
+
+      if (!parentQuestionMap[pKey]) {
+        parentQuestionMap[pKey] = {
+          question_number: pKey,
+          max_score: 0.0,
+          studentScores: {}
+        };
+      }
+      parentQuestionMap[pKey].max_score += maxSc;
+    });
+  }
+
+  // Accumulate scores awarded per student for each parent question
+  gradedSubs.forEach(sub => {
+    const breakdown = sub.feedback?.breakdown || [];
+    const studentQuestionTotals = {};
+
+    breakdown.forEach((item, idx) => {
+      if (item && typeof item === 'object') {
+        const rawKey = item.question_number || `Q${idx + 1}`;
+        const pKey = getParentQuestionKey(rawKey);
+        const maxSc = parseFloat(item.max_score || 5.0);
+        const awarded = parseFloat(item.score_awarded || 0.0);
+
+        if (!parentQuestionMap[pKey]) {
+          parentQuestionMap[pKey] = {
+            question_number: pKey,
+            max_score: 0.0,
+            studentScores: {}
+          };
+        }
+        
+        if (!currentAssignment?.rubric_data || currentAssignment.rubric_data.length === 0) {
+          parentQuestionMap[pKey].max_score += maxSc;
+        }
+
+        studentQuestionTotals[pKey] = (studentQuestionTotals[pKey] || 0.0) + awarded;
+      }
+    });
+
+    Object.entries(studentQuestionTotals).forEach(([pKey, totalAwarded]) => {
+      if (parentQuestionMap[pKey]) {
+        parentQuestionMap[pKey].studentScores[sub.id] = totalAwarded;
+      }
+    });
+  });
+
+  const questionAnalyticsList = Object.values(parentQuestionMap).map(q => {
+    const scores = Object.values(q.studentScores);
+    const count = scores.length;
+    const avg = count > 0 ? (scores.reduce((a, b) => a + b, 0) / count) : 0;
+    const minScore = count > 0 ? Math.min(...scores) : 0;
+    const maxScoreAchieved = count > 0 ? Math.max(...scores) : 0;
+    const percentage = q.max_score > 0 ? (avg / q.max_score) * 100 : 0;
+
+    return {
+      question_number: q.question_number,
+      avgScore: avg.toFixed(1),
+      max_score: q.max_score,
+      percentage: Math.round(percentage),
+      minScore: minScore.toFixed(1),
+      maxScoreAchieved: maxScoreAchieved.toFixed(1),
+      count
+    };
+  });
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Premium Header Banner */}
@@ -189,6 +270,67 @@ const Dashboard = () => {
         {unassessedSubs.length > 0 && (
           <div style={{ marginTop: '0.75rem', fontSize: '0.825rem', color: 'var(--warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <AlertTriangle size={15} /> Note: {unassessedSubs.length} submission(s) are currently unassessed (Pending AI Grade) and categorized in the Unassessed bar.
+          </div>
+        )}
+      </div>
+
+      {/* Question-by-Question Average Mark Breakdown Panel */}
+      <div className="glass-panel" style={{ padding: '1.5rem 2rem', backgroundColor: '#fff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <div>
+            <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Layers size={20} color="var(--primary)" /> Question-by-Question Performance Breakdown
+            </h3>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+              Average marks awarded per rubric subquestion across evaluated student papers.
+            </p>
+          </div>
+          <span style={{ fontSize: '0.825rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+            {questionAnalyticsList.length} Question Criteria Evaluated
+          </span>
+        </div>
+
+        {questionAnalyticsList.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No question breakdown available yet. Grade submissions to view per-question analytics.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            {questionAnalyticsList.map((item, idx) => {
+              const barColor = item.percentage >= 75 ? 'var(--success)' : item.percentage >= 50 ? 'var(--primary)' : 'var(--warning)';
+
+              return (
+                <div 
+                  key={idx} 
+                  style={{ 
+                    padding: '1.15rem 1.25rem', 
+                    border: '1px solid var(--border)', 
+                    borderRadius: '10px', 
+                    backgroundColor: 'var(--bg-main)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justify: 'space-between'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--primary-dark)' }}>{item.question_number}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: barColor }}>
+                      {item.avgScore} / {item.max_score} marks <span style={{ fontSize: '0.78rem', opacity: 0.8 }}>({item.percentage}%)</span>
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden', marginBottom: '0.85rem' }}>
+                    <div style={{ width: `${Math.min(100, Math.max(0, item.percentage))}%`, height: '100%', backgroundColor: barColor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
+                  </div>
+
+                  {/* Detailed Stats */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border)', paddingTop: '0.55rem' }}>
+                    <span>Lowest: <strong>{item.minScore}</strong></span>
+                    <span>Highest: <strong>{item.maxScoreAchieved}</strong></span>
+                    <span>Evaluated: <strong>{item.count} paper(s)</strong></span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

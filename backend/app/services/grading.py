@@ -1,5 +1,6 @@
 import time
 import os
+import random
 import datetime
 from sqlalchemy.orm import Session
 from ..models import Submission, Assignment, EvaluationLog
@@ -129,23 +130,38 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         total_max_score=total_max_score
     )
 
-    # Step 5: Confidence Score & Flagging Check
-    conf_eval = evaluate_confidence_and_status(llm_result, extracted_text)
-
-    # Step 6: Save Record to PostgreSQL
+    # Step 5: Save Record to PostgreSQL
     duration = time.time() - start_time
     raw_overall_score = float(llm_result.get("overall_score", 0.0))
     # Cap score between 0.0 and total_max_score
     submission.score = round(max(0.0, min(total_max_score, raw_overall_score)), 1)
-    submission.confidence_score = conf_eval["confidence_score"]
-    submission.status = conf_eval["status"]
+    submission.confidence_score = float(llm_result.get("confidence_score", 0.85))
+    submission.status = str(llm_result.get("status", "graded"))
+
     feedback_dict = llm_result.get("feedback", {})
     if not isinstance(feedback_dict, dict):
         feedback_dict = {"summary": str(feedback_dict), "breakdown": []}
-    
-    if conf_eval.get("flag_reasons"):
-        feedback_dict["flag_reasons"] = conf_eval["flag_reasons"]
-        
+
+    flag_list = list(llm_result.get("flag_reasons", []))
+
+    # Operational Quality Control Sampling (Configurable: Disabled by default, enabled via toggle)
+    enable_qc_audit = os.getenv("ENABLE_RANDOM_QC_AUDIT", "false").lower() in ["true", "1", "yes"]
+    qc_audit_rate = float(os.getenv("QC_AUDIT_RATE", "0.05"))
+
+    if enable_qc_audit and qc_audit_rate > 0:
+        submission_count = db.query(Submission).filter(Submission.assignment_id == assignment.id).count()
+        qc_prob = max(qc_audit_rate, 1.0 / max(1, submission_count)) if submission_count <= 20 else qc_audit_rate
+
+        if random.random() < qc_prob:
+            if "🎲 Random Quality Control Audit Sample" not in flag_list:
+                flag_list.append("🎲 Random Quality Control Audit Sample")
+                submission.status = "flagged"
+
+    if flag_list:
+        feedback_dict["flag_reasons"] = flag_list
+    if llm_result.get("confidence_components"):
+        feedback_dict["confidence_components"] = llm_result["confidence_components"]
+
     submission.feedback = feedback_dict
     submission.highlights = llm_result.get("highlights", [])
     submission.grading_duration = round(duration, 2)

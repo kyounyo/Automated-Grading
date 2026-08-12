@@ -244,7 +244,9 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
 
         cols = [str(c).strip().lower() for c in df.columns]
         
-        stu_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_id", "student_no", "student", "stu_id", "id"])), df.columns[0])
+        stu_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_id", "student_no", "stu_id", "student", "id"])), df.columns[0])
+        email_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_gmail", "student_gma", "student_email", "gmail", "email", "gma", "mail"])), None)
+        name_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_name", "student_nam", "name", "nam"])), None)
         q_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["question_no", "question_n", "question", "q_no", "q_num"])), None)
         resp_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["response", "answer", "student_answer", "submission", "text"])), df.columns[-1])
 
@@ -255,6 +257,9 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
                 s_id = str(row[stu_col]).strip() if pd.notna(row[stu_col]) else f"STU{1000 + idx}"
                 if s_id.endswith(".0"): s_id = s_id[:-2]
 
+                s_name = str(row[name_col]).strip() if (name_col and pd.notna(row[name_col]) and str(row[name_col]).strip() and str(row[name_col]).strip() != "nan") else f"Student {s_id}"
+                s_email = str(row[email_col]).strip() if (email_col and pd.notna(row[email_col]) and str(row[email_col]).strip() and str(row[email_col]).strip() != "nan") else "N/A"
+
                 q_num = str(row[q_col]).strip() if pd.notna(row[q_col]) else f"Q{idx + 1}"
                 if q_num.endswith(".0"): q_num = q_num[:-2]
                 q_label = q_num if q_num.lower().startswith("q") else f"Q{q_num}"
@@ -262,32 +267,45 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
                 resp_text = str(row[resp_col]).strip() if pd.notna(row[resp_col]) else ""
 
                 if s_id not in students:
-                    students[s_id] = []
-                students[s_id].append(f"Question {q_label}:\n{resp_text}")
+                    students[s_id] = {
+                        "name": s_name,
+                        "email": s_email,
+                        "responses": []
+                    }
+                else:
+                    if students[s_id]["name"].startswith("Student ") and not s_name.startswith("Student "):
+                        students[s_id]["name"] = s_name
+                    if students[s_id]["email"] == "N/A" and s_email != "N/A":
+                        students[s_id]["email"] = s_email
+
+                students[s_id]["responses"].append(f"Question {q_label}:\n{resp_text}")
 
             rows = []
-            for s_id, resp_list in students.items():
+            for s_id, s_data in students.items():
                 rows.append({
                     "student_id": s_id,
-                    "student_name": f"Student {s_id}",
-                    "text": "\n\n".join(resp_list)
+                    "student_name": s_data["name"],
+                    "student_email": s_data["email"],
+                    "text": "\n\n".join(s_data["responses"])
                 })
             return rows
 
         # Fallback for single-row per student format
         rows = []
         for idx, row in df.iterrows():
-            row_dict = {str(k).strip().lower(): str(v) for k, v in row.items() if pd.notna(v)}
+            row_dict = {str(k).strip().lower(): str(v).strip() for k, v in row.items() if pd.notna(v) and str(v).strip()}
             
             student_id = next((str(row_dict[k]) for k in row_dict if "id" in k or "student" in k or "num" in k), f"STU{1000 + idx}")
-            student_name = next((str(row_dict[k]) for k in row_dict if "name" in k or "student" in k), f"Student {idx + 1}")
+            student_name = next((str(row_dict[k]) for k in row_dict if "name" in k or "nam" in k), "N/A")
+            student_email = next((str(row_dict[k]) for k in row_dict if "email" in k or "gmail" in k or "gma" in k or "mail" in k), "N/A")
             
-            text_parts = [f"{k.capitalize()}: {v}" for k, v in row_dict.items() if k not in ["student_id", "id", "student_name", "name"]]
+            text_parts = [f"{k.capitalize()}: {v}" for k, v in row_dict.items() if not any(x in k for x in ["student_id", "id", "student_name", "name", "email", "gmail", "gma", "mail"])]
             full_text = "\n".join(text_parts) if text_parts else str(row.to_dict())
 
             rows.append({
                 "student_id": student_id,
                 "student_name": student_name,
+                "student_email": student_email,
                 "text": full_text
             })
         return rows
