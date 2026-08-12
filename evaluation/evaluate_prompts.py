@@ -32,7 +32,7 @@ client = OpenAI(
     api_key=api_key,
     base_url="https://openrouter.ai/api/v1"
 )
-MODEL_NAME = "google/gemini-3.1-flash-lite"
+MODEL_NAME = "openai/gpt-5.6-sol"
 
 def extract_score(text):
     """Extracts the final score by parsing JSON."""
