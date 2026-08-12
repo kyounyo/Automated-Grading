@@ -4,6 +4,7 @@ import pandas as pd
 import pingouin as pg
 import sys
 import json
+from dotenv import load_dotenv
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(script_dir, "../ai-pipeline")))
@@ -131,16 +132,26 @@ def main():
     json_outputs_data = []
     graded_response_ids = set()
     
-    if os.path.exists(os.path.join(script_dir, "raw_grading_results.csv")):
-        existing_df = pd.read_csv(os.path.join(script_dir, "raw_grading_results.csv"))
-        results_data = existing_df.to_dict('records')
-        graded_response_ids = set(existing_df['response_id'].tolist())
-        print(f"Resuming progress: Found {len(set(existing_df[existing_df['rater'] != 'Human']['response_id']))} already graded AI responses.")
+    raw_csv_path = os.path.join(script_dir, "raw_grading_results.csv")
+    if os.path.exists(raw_csv_path) and os.path.getsize(raw_csv_path) > 0:
+        try:
+            existing_df = pd.read_csv(raw_csv_path)
+            if not existing_df.empty and 'response_id' in existing_df.columns:
+                results_data = existing_df.to_dict('records')
+                graded_ai = existing_df[existing_df['rater'] != 'Human']
+                if not graded_ai.empty:
+                    graded_response_ids = set(graded_ai['response_id'].tolist())
+                    print(f"Resuming progress: Found {len(graded_response_ids)} already graded AI responses.")
+        except Exception as e:
+            print(f"Could not load existing raw_grading_results.csv ({e}). Starting fresh.")
 
     print(f"Evaluating {len(df_responses)} responses with chain_of_thought strategy...")
     
     for index, row in df_responses.iterrows():
         response_id = row['ID Number']
+        if response_id in graded_response_ids:
+            continue
+
         # Convert to string and remove any 'Q' prefix to safely match both dataset styles
         question_no = str(row['question_no']).strip().replace('Q', '')
 
@@ -224,7 +235,7 @@ def main():
 
         # Save raw results continuously to avoid losing data on API crash
         df_results = pd.DataFrame(results_data)
-        df_results.to_csv("raw_grading_results.csv", index=False)
+        df_results.to_csv(raw_csv_path, index=False)
         
     df_results = pd.DataFrame(results_data)
     print("\nSaved raw grades to raw_grading_results.csv")
