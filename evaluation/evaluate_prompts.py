@@ -4,6 +4,7 @@ import pandas as pd
 import pingouin as pg
 import sys
 import json
+from dotenv import load_dotenv
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(script_dir, "../ai-pipeline")))

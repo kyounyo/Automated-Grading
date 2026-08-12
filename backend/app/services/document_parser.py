@@ -3,10 +3,11 @@ import re
 from pathlib import Path
 from typing import List, Dict, Any
 
+from .llm_service import call_llm_for_parsing
 
 def extract_text_from_file(file_path: str) -> str:
     """
-    Extracts plain text from PDF, DOCX, XLSX, CSV, or TXT files.
+    Extracts plain text from PDF, XLSX, CSV, or TXT files.
     """
     path = Path(file_path)
     if not path.exists():
@@ -16,8 +17,6 @@ def extract_text_from_file(file_path: str) -> str:
     
     if ext == ".pdf":
         return _extract_pdf(file_path)
-    elif ext in [".docx", ".doc"]:
-        return _extract_docx(file_path)
     elif ext in [".xlsx", ".xls", ".csv"]:
         return _extract_excel(file_path)
     elif ext in [".txt", ".md"]:
@@ -30,7 +29,7 @@ def extract_text_from_file(file_path: str) -> str:
 
 def calculate_question_max_mark(prompt_text: str) -> float:
     """
-    Precision extractor for question max marks from PDF & DOCX prompt text ONLY:
+    Precision extractor for question max marks from PDF prompt text ONLY:
     1. Looks for "(Total: X marks)", "[Total X Marks]", "Total: X marks".
     2. Sums parenthesized sub-part marks e.g. "(5 marks)", "(2 marks)", "[5 pts]".
     3. Handles multiplier patterns like "(5 marks each)".
@@ -123,7 +122,7 @@ def parse_excel_rubric(file_path: str) -> List[Dict[str, Any]]:
 
 def parse_separate_question_and_rubric_docs(q_doc: str, r_doc: str) -> List[Dict[str, Any]]:
     """
-    Pairs a Question Paper document with a separate Marking Rubric document for DOCX & PDF files.
+    Pairs a Question Paper document with a separate Marking Rubric document for PDF files.
     """
     q_matches = list(re.finditer(r"(?:^|\n|\s{2,})(?:Question|Q)?\s*(\d+)[\.\s]", q_doc, re.IGNORECASE))
     if not q_matches:
@@ -147,11 +146,11 @@ def parse_separate_question_and_rubric_docs(q_doc: str, r_doc: str) -> List[Dict
 
         prompt_text = q_doc[start:next_start].strip()
 
-        # Find exact "Marking Rubric for Question X" section in r_doc
-        m_rubric = re.search(r"Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*" + q_num, r_doc, re.IGNORECASE)
+        # Find exact "Marking Rubric for Question X" or "Answer: X" section in r_doc
+        m_rubric = re.search(r"(?:Marking\s+(?:Rubric\s+)?for|Answers?(?:\s+for)?\:?)\s*(?:Question|Q)?\s*" + q_num, r_doc, re.IGNORECASE)
         if m_rubric:
             r_start = m_rubric.start()
-            r_all = list(re.finditer(r"Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*\d+", r_doc, re.IGNORECASE))
+            r_all = list(re.finditer(r"(?:Marking\s+(?:Rubric\s+)?for|Answers?(?:\s+for)?\:?)\s*(?:Question|Q)?\s*\d+", r_doc, re.IGNORECASE))
             r_end = len(r_doc)
             for rm in r_all:
                 if rm.start() > r_start:
@@ -162,6 +161,12 @@ def parse_separate_question_and_rubric_docs(q_doc: str, r_doc: str) -> List[Dict
             rubric_text = prompt_text
 
         total_marks = calculate_question_max_mark(prompt_text)
+
+        prompt_text = re.sub(r'[ \t]+', ' ', prompt_text)
+        prompt_text = re.sub(r'([a-zA-Z0-9,])\s*\n\s*([a-z])', r'\1 \2', prompt_text).strip()
+        
+        rubric_text = re.sub(r'[ \t]+', ' ', rubric_text)
+        rubric_text = re.sub(r'([a-zA-Z0-9,])\s*\n\s*([a-z])', r'\1 \2', rubric_text).strip()
 
         parsed.append({
             "id": len(parsed) + 1,
@@ -176,7 +181,7 @@ def parse_separate_question_and_rubric_docs(q_doc: str, r_doc: str) -> List[Dict
 
 def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
     """
-    Intelligently splits raw PDF/Docx text into distinct Question blocks (e.g. Question 6, Question 8).
+    Intelligently splits raw PDF text into distinct Question blocks (e.g. Question 6, Question 8).
     """
     clean_text = re.sub(r'--- Page \d+ ---', '', raw_text)
     clean_text = re.sub(r'[\u2060\u200b\ufeff]', '', clean_text)
@@ -207,15 +212,33 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
 
         block = clean_text[start_idx:next_start].strip()
 
-        rubric_match = re.search(r'Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*' + q_num, block, re.IGNORECASE)
-        if rubric_match:
-            prompt_text = block[:rubric_match.start()].strip()
-            rubric_text = block[rubric_match.start():].strip()
-        else:
-            prompt_text = block
-            rubric_text = block
+        # Try LLM Parsing first
+        llm_extracted = call_llm_for_parsing(block, q_num)
 
-        total_marks = calculate_question_max_mark(prompt_text)
+        if llm_extracted and "question" in llm_extracted and "rubric" in llm_extracted:
+            prompt_text = str(llm_extracted.get("question", block))
+            rubric_text = str(llm_extracted.get("rubric", block))
+            try:
+                total_marks = float(llm_extracted.get("max_marks", 10.0))
+            except (ValueError, TypeError):
+                total_marks = 10.0
+        else:
+            # Fallback to Regex matching
+            rubric_match = re.search(r'(?:Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*' + q_num + r'|(?:^|\n)\s*Answers?\:?)', block, re.IGNORECASE)
+            if rubric_match:
+                prompt_text = block[:rubric_match.start()].strip()
+                rubric_text = block[rubric_match.start():].strip()
+            else:
+                prompt_text = block
+                rubric_text = block
+            total_marks = calculate_question_max_mark(prompt_text)
+
+
+        prompt_text = re.sub(r'[ \t]+', ' ', prompt_text)
+        prompt_text = re.sub(r'([a-zA-Z0-9,])\s*\n\s*([a-z])', r'\1 \2', prompt_text).strip()
+        
+        rubric_text = re.sub(r'[ \t]+', ' ', rubric_text)
+        rubric_text = re.sub(r'([a-zA-Z0-9,])\s*\n\s*([a-z])', r'\1 \2', rubric_text).strip()
 
         parsed.append({
             "id": len(parsed) + 1,
@@ -307,36 +330,12 @@ def _extract_pdf(file_path: str) -> str:
                 text = re.sub(r'[\u2060\u200b\ufeff]', '', text)
                 extracted.append(text)
         
-        full = "\n\n".join(extracted)
+        full = "\n\n".join(extracted) 
         return re.sub(r'\n{3,}', '\n\n', full).strip()
     except Exception as e:
         print(f"[DocumentParser Error] PyPDF failed on {file_path}: {e}")
         return ""
 
-
-def _extract_docx(file_path: str) -> str:
-    try:
-        import docx
-        doc = docx.Document(file_path)
-        extracted = []
-        
-        # Extract paragraph text
-        for p in doc.paragraphs:
-            if p.text.strip():
-                extracted.append(p.text.strip())
-                
-        # Extract Word table cell text if present
-        for table in doc.tables:
-            for row in table.rows:
-                row_cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                if row_cells:
-                    extracted.append(" | ".join(row_cells))
-
-        full_txt = "\n".join(extracted)
-        return re.sub(r'\n{3,}', '\n\n', full_txt).strip()
-    except Exception as e:
-        print(f"[DocumentParser Error] docx parsing failed on {file_path}: {e}")
-        return ""
 
 
 def _extract_excel(file_path: str) -> str:
