@@ -182,50 +182,69 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
     clean_text = re.sub(r'[\u2060\u200b\ufeff]', '', clean_text)
     clean_text = re.sub(r'\n{3,}', '\n\n', clean_text).strip()
 
-    q_matches = list(re.finditer(r'(?<!for\s)(?<!Rubric\s)(?<!Marking\s)\b(?:Question|Q)\s*(\d+)', clean_text, re.IGNORECASE))
-    if not q_matches:
-        q_matches = list(re.finditer(r'(?:^|\n)\s*(\d+)[\.\)]', clean_text))
+    q_num_keys = ["question_no", "question_n", "q_num", "q_no", "num"]
+    q_text_keys = ["question_text", "question", "prompt", "criteria"] 
+    ans_keys = ["model_answer", "answer", "rubric", "marking", "solution"]
+    mark_keys = ["max_score", "max_mark", "mark", "score", "points"]
 
-    if not q_matches:
-        return []
+    def _build_pattern(keys):
+        sorted_keys = sorted(keys, key=len, reverse=True)
+        # format eg.(?:question_text|question|prompt|criteria)\s*:
+        return r"(?:" + "|".join(sorted_keys) + r")\s*:"
 
-    parsed = []
-    seen_nums = set()
+    q_num_regex = _build_pattern(q_num_keys)
+    q_text_regex = _build_pattern(q_text_keys)
+    ans_regex = _build_pattern(ans_keys)
+    mark_regex = _build_pattern(mark_keys)
 
-    for i in range(len(q_matches)):
-        q_num = q_matches[i].group(1)
-        if q_num in seen_nums:
-            continue
-        seen_nums.add(q_num)
-
-        start_idx = q_matches[i].start()
-        next_start = len(clean_text)
-        for j in range(i + 1, len(q_matches)):
-            if q_matches[j].group(1) != q_num:
-                next_start = q_matches[j].start()
-                break
-
-        block = clean_text[start_idx:next_start].strip()
-
-        rubric_match = re.search(r'Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*' + q_num, block, re.IGNORECASE)
-        if rubric_match:
-            prompt_text = block[:rubric_match.start()].strip()
-            rubric_text = block[rubric_match.start():].strip()
-        else:
-            prompt_text = block
-            rubric_text = block
-
-        total_marks = calculate_question_max_mark(prompt_text)
-
-        parsed.append({
-            "id": len(parsed) + 1,
-            "question_number": f"Q{q_num}",
-            "text": prompt_text,
-            "maxMark": total_marks,
-            "modelAnswer": rubric_text
-        })
-
-    return parsed
+    if re.search(q_num_regex, raw_text, re.IGNORECASE) and re.search(q_text_regex, raw_text, re.IGNORECASE):
+        parsed = []
+        
+        blocks = re.split(q_num_regex, raw_text, flags=re.IGNORECASE)
+        
+        for block in blocks:
+            if not block.strip():
+                continue
+            
+            # 1. Extract the question number (when block starts with a number)
+            q_num_match = re.search(r'(\d+)', block.strip())
+            q_num = q_num_match.group(1) if q_num_match else str(len(parsed) + 1)
+            
+            # 2. Extract the question text (stop when encountering any answer label, mark label, or end of block)
+            q_text = ""
+            q_text_pattern = f"{q_text_regex}\\s*(.*?)(?={ans_regex}|{mark_regex}|$)"
+            q_text_match = re.search(q_text_pattern, block, flags=re.IGNORECASE | re.DOTALL)
+            if q_text_match:
+                q_text = q_text_match.group(1).strip()
+                
+            # 3. Extract the model answer (stop when encountering any mark label or end of block)
+            ans_text = ""
+            ans_text_pattern = f"{ans_regex}\\s*(.*?)(?={mark_regex}|$)"
+            ans_text_match = re.search(ans_text_pattern, block, flags=re.IGNORECASE | re.DOTALL)
+            if ans_text_match:
+                ans_text = ans_text_match.group(1).strip()
+                
+            # 4. Extract the max mark
+            mark_val = 10.0
+            mark_pattern = f"{mark_regex}\\s*(\\d+(\\.\\d+)?)"
+            mark_match = re.search(mark_pattern, block, flags=re.IGNORECASE)
+            if mark_match:
+                mark_val = float(mark_match.group(1))
+                
+            # Exclude faulty parses caused by empty blocks at the beginning of the document
+            if not q_text and not ans_text:
+                continue
+                
+            parsed.append({
+                "id": len(parsed) + 1,
+                "question_number": f"Q{q_num}",
+                "text": q_text,
+                "maxMark": mark_val,
+                "modelAnswer": ans_text
+            })
+        
+        if parsed:
+            return parsed
 
 
 def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
