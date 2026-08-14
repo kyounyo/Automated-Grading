@@ -179,7 +179,8 @@ const GradingReview = () => {
     let parts = [rawText];
 
     sortedHighlights.forEach((hl, idx) => {
-      const quote = hl.text.trim();
+      const quote = hl.text ? hl.text.trim() : '';
+      if (!quote) return;
       const newParts = [];
 
       parts.forEach(part => {
@@ -191,11 +192,22 @@ const GradingReview = () => {
         let matchIdx = part.toLowerCase().indexOf(quote.toLowerCase());
         let matchLen = quote.length;
 
-        if (matchIdx === -1 && quote.length > 20) {
-          const subKey = quote.slice(0, Math.min(30, quote.length)).toLowerCase();
+        if (matchIdx === -1 && quote.length > 15) {
+          const subKey = quote.slice(0, Math.min(25, quote.length)).toLowerCase();
           matchIdx = part.toLowerCase().indexOf(subKey);
           if (matchIdx !== -1) {
             matchLen = Math.min(quote.length, part.length - matchIdx);
+          }
+        }
+
+        if (matchIdx === -1 && quote.length > 5) {
+          const words = quote.split(/\s+/).filter(w => w.length > 2);
+          if (words.length > 0) {
+            const firstWord = words[0].toLowerCase();
+            matchIdx = part.toLowerCase().indexOf(firstWord);
+            if (matchIdx !== -1) {
+              matchLen = Math.min(quote.length, part.length - matchIdx);
+            }
           }
         }
 

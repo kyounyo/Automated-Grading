@@ -271,9 +271,9 @@ After determining your independent scores for each subquestion, compare your sco
 AUDIT TASKS:
 1. Re-evaluate student text independently per rubric subquestion (e.g. Q6(a), Q6(b), Q8(a)).
 2. Provide your independent score for EVERY subquestion in "auditor_breakdown".
-3. Identify EXACT subquestion(s) where you disagree with the primary grader's score.
-4. List conflicting subquestions in "conflicting_questions" array.
-5. Set "audit_passed" to FALSE if you disagree on any subquestion score or if total discrepancy is > 10%. Set TRUE only if all question scores align.
+3. Identify subquestion(s) where you have a material score disagreement (>= 1.0 mark) with the primary grader.
+4. List materially conflicting subquestions in "conflicting_questions" array.
+5. Set "audit_passed" to FALSE if you have a material subquestion disagreement (>= 1.0 mark) or if total score discrepancy is > 15%. Set TRUE if question scores align within 1.0 mark.
 6. Provide a clear explanation in "discrepancy_note" stating which question(s) had conflict and why.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
@@ -453,7 +453,7 @@ def _mock_heuristic_evaluation(student_text: str, rubric_json: list) -> Dict[str
 def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_text: str) -> None:
     """
     Enriches highlight items with specific question number and raw text section location.
-    Matches text quotes against student submission text and breakdown question items.
+    Matches text quotes against student submission text using fuzzy normalization so frontend highlighting never fails.
     """
     highlights = primary_res.get("highlights", [])
     if not isinstance(highlights, list):
@@ -465,6 +465,9 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
 
     import re
 
+    def clean_str(s: str) -> str:
+        return re.sub(r'[\W_]+', ' ', s).strip().lower()
+
     for hl in highlights:
         if not isinstance(hl, dict):
             continue
@@ -472,17 +475,32 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         quote = hl.get("text", "").strip()
         q_num = hl.get("question_number", "")
 
-        # Ensure hl["text"] is an EXACT slice from student_text so frontend highlighting never fails
-        quote_lower = quote.lower()
-        pos = -1
-        if quote_lower:
-            # Try finding first 30 chars of quote in student text
-            search_key = quote_lower[:min(35, len(quote_lower))]
-            pos = text_lower.find(search_key)
+        if not quote:
+            continue
+
+        # 1. Try finding exact match first
+        pos = student_text.lower().find(quote.lower())
+        exact_len = len(quote)
+
+        # 2. If exact match fails, try matching first 30 chars
+        if pos == -1 and len(quote) > 10:
+            sub_search = quote.lower()[:min(30, len(quote))]
+            pos = student_text.lower().find(sub_search)
+
+        # 3. If still fails, try normalized word sequence search
+        if pos == -1:
+            quote_words = [w for w in re.split(r'[\W_]+', quote) if len(w) > 2]
+            if quote_words:
+                for m in re.finditer(re.escape(quote_words[0]), student_text, re.IGNORECASE):
+                    start_p = m.start()
+                    snippet_candidate = student_text[start_p:start_p + len(quote) + 40]
+                    if (quote_words[1] in snippet_candidate.lower()) if len(quote_words) > 1 else True:
+                        pos = start_p
+                        exact_len = min(len(quote) + 20, len(student_text) - pos)
+                        break
 
         if pos != -1:
-            # Replace hl["text"] with the EXACT slice from student_text
-            exact_len = min(len(quote), len(student_text) - pos)
+            # Replace hl["text"] with the EXACT physical slice from student_text
             hl["text"] = student_text[pos:pos + exact_len]
             
             prefix = student_text[max(0, pos - 350):pos]
@@ -499,19 +517,20 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         else:
             hl["location_in_raw_text"] = "Student Submission Response"
 
-        # 2. Fallback matching against breakdown questions
+        # Fallback matching against breakdown questions
         if (not hl.get("question_number") or hl.get("question_number") in ["Rubric Evidence", "Rubric", "N/A", "General Rubric Evidence"]) and breakdown:
+            quote_clean = clean_str(quote)
             for b in breakdown:
                 b_q = b.get("question_number", "")
-                b_reason = b.get("reasoning", "").lower()
-                if any(w in b_reason for w in quote_lower.split()[:4] if len(w) > 3):
+                b_reason = clean_str(b.get("reasoning", ""))
+                if any(w in b_reason for w in quote_clean.split()[:4] if len(w) > 3):
                     hl["question_number"] = b_q
                     break
 
         if not hl.get("question_number") or hl.get("question_number") in ["Rubric Evidence", "Rubric", "N/A"]:
             hl["question_number"] = "General Rubric Evidence"
 
-    # 3. Ensure EVERY question in breakdown has at least one highlight entry
+    # Ensure EVERY question in breakdown has at least one highlight entry
     existing_q_nums = set(h.get("question_number") for h in highlights if isinstance(h, dict) and h.get("question_number"))
     
     for b in breakdown:
@@ -531,7 +550,6 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         if clean_bq:
             q_pos = text_lower.find(clean_bq)
         if q_pos == -1 and len(b_q) > 1:
-            # Try searching for question prefix like "Question Q8" or "Q8" or "(a)"
             m_q = re.search(r'(?:Question|Q)?\s*' + re.escape(b_q), student_text, re.IGNORECASE)
             if m_q:
                 q_pos = m_q.start()

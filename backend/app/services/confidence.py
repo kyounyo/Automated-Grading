@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Any, List
 
-AUDIT_DISCREPANCY_THRESHOLD = 0.10  # Standardized 10% discrepancy threshold across system
+AUDIT_DISCREPANCY_THRESHOLD = 0.15  # Standardized 15% discrepancy threshold across system
 
 
 def normalize_question_number(q_num: str) -> str:
@@ -35,11 +35,10 @@ def evaluate_confidence_and_status(
     auditor_passed = bool(multi_audit.get("auditor_passed", True))
     auditor_score = float(multi_audit.get("auditor_score", primary_score))
     score_discrepancy = float(multi_audit.get("score_discrepancy", abs(primary_score - auditor_score)))
-    conflicting_qs = multi_audit.get("conflicting_questions", [])
-    if not isinstance(conflicting_qs, list):
-        conflicting_qs = []
+    raw_conflicting_qs = multi_audit.get("conflicting_questions", [])
+    if not isinstance(raw_conflicting_qs, list):
+        raw_conflicting_qs = []
     
-    conflicting_qs_norm = [normalize_question_number(q) for q in conflicting_qs]
     audit_note = multi_audit.get("audit_note", "")
 
     # Component 1: Overall Score Agreement (0.0 to 1.0)
@@ -51,6 +50,7 @@ def evaluate_confidence_and_status(
     auditor_breakdown = multi_audit.get("auditor_breakdown", [])
 
     question_agreements: List[float] = []
+    material_conflicting_qs: List[str] = []
 
     if primary_breakdown and isinstance(primary_breakdown, list):
         auditor_map = {}
@@ -75,9 +75,14 @@ def evaluate_confidence_and_status(
                     a_q_score = auditor_map[norm_key]
                     diff = abs(p_q_score - a_q_score)
                     q_agreed = max(0.0, 1.0 - (diff / q_max))
+                    
+                    # Only treat as material conflict if score difference >= 1.0 mark
+                    if diff >= 1.0:
+                        material_conflicting_qs.append(q_num)
                 else:
-                    if norm_key in conflicting_qs_norm:
+                    if norm_key in [normalize_question_number(q) for q in raw_conflicting_qs]:
                         q_agreed = 0.5
+                        material_conflicting_qs.append(q_num)
                     else:
                         q_agreed = score_agreement
 
@@ -88,8 +93,8 @@ def evaluate_confidence_and_status(
     else:
         question_agreement = score_agreement
 
-    # Component 3: Audit Factor (1.0 if audit passed, else 0.5)
-    audit_factor = 1.0 if auditor_passed else 0.5
+    # Component 3: Audit Factor (1.0 if audit passed and no material conflicts, else 0.5)
+    audit_factor = 1.0 if (auditor_passed and len(material_conflicting_qs) == 0) else 0.5
 
     # Deterministic Final Confidence Formula
     deterministic_confidence = round(
@@ -98,26 +103,23 @@ def evaluate_confidence_and_status(
     )
     final_confidence = max(0.05, min(1.0, deterministic_confidence))
 
-    # Multi-Factor Flagging Rules (Consistent 10% threshold)
+    # Multi-Factor Flagging Rules (Pragmatic 15% threshold & material conflicts only)
     flag_reasons: List[str] = []
 
-    q_str = f" on {', '.join(conflicting_qs)}" if conflicting_qs else ""
+    q_str = f" on {', '.join(material_conflicting_qs)}" if material_conflicting_qs else ""
     discrepancy_pct = (score_discrepancy / max_sc) * 100.0
 
-    if not auditor_passed or len(conflicting_qs) > 0:
-        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: {audit_note or 'Scoring logic discrepancy detected between agents'}")
+    if len(material_conflicting_qs) > 0:
+        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: Material subquestion score discrepancy (>= 1.0 mark)")
     elif discrepancy_pct > (AUDIT_DISCREPANCY_THRESHOLD * 100.0):
-        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: Overall score discrepancy of {score_discrepancy:.1f} points ({discrepancy_pct:.1f}%)")
+        flag_reasons.append(f"🤖 Multi-Agent Conflict: Overall score discrepancy of {score_discrepancy:.1f} points ({discrepancy_pct:.1f}%)")
 
-    if final_confidence < 0.75:
-        flag_reasons.append(f"📉 Low System Confidence ({final_confidence * 100:.0f}% < 75%)")
+    if final_confidence < 0.65:
+        flag_reasons.append(f"📉 Low System Confidence ({final_confidence * 100:.0f}% < 65%)")
 
     score_pct = (primary_score / max_sc) * 100.0
-    if 45.0 <= score_pct <= 55.0:
+    if 48.0 <= score_pct <= 52.0:
         flag_reasons.append("⚖️ Borderline Pass/Fail Grade: Human verification recommended")
-
-    if llm_result.get("status") == "flagged" and not flag_reasons:
-        flag_reasons.append(f"🤖 Auditor requested review: {audit_note or 'Audit verification required'}")
 
     status = "flagged" if len(flag_reasons) > 0 else "graded"
 
@@ -125,7 +127,7 @@ def evaluate_confidence_and_status(
         "confidence_score": final_confidence,
         "status": status,
         "flag_reasons": flag_reasons,
-        "is_borderline": (45.0 <= score_pct <= 55.0),
+        "is_borderline": (48.0 <= score_pct <= 52.0),
         "is_audit_flagged": len(flag_reasons) > 0,
         "confidence_components": {
             "score_agreement": round(score_agreement, 2),
