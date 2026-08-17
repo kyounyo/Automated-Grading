@@ -112,6 +112,13 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
 
         db.commit()
         db.refresh(submission)
+
+        try:
+            from .icc_tracker import record_and_evaluate_submission
+            record_and_evaluate_submission(submission)
+        except Exception as e:
+            print(f"[ICC Tracker Warning] Error updating ICC tracker for blank submission {submission.id}: {e}")
+
         return submission
 
     # Step 3: Query ChromaDB for RAG context
@@ -190,5 +197,12 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
 
     db.commit()
     db.refresh(submission)
+
+    try:
+        from .icc_tracker import record_and_evaluate_submission
+        record_and_evaluate_submission(submission)
+    except Exception as e:
+        print(f"[ICC Tracker Warning] Error updating ICC tracker for submission {submission.id}: {e}")
+
     return submission
 

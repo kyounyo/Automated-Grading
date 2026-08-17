@@ -189,4 +189,11 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
 
     db.commit()
     db.refresh(sub)
+
+    try:
+        from ..services.icc_tracker import record_and_evaluate_submission
+        record_and_evaluate_submission(sub)
+    except Exception as e:
+        print(f"[ICC Tracker Warning] Error updating ICC tracker for override on {sub.id}: {e}")
+
     return sub

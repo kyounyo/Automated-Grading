@@ -257,8 +257,8 @@ async def parse_rubric_file(files: List[UploadFile] = File(...)):
 @router.get("/{assignment_id}/export-csv")
 def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
     """
-    Exports all student grades for an assignment as a structured CSV file matching academic marking sheets.
-    Dynamically includes columns for every question/sub-part in the rubric.
+    Exports student grades for an assignment as a simplified CSV file containing:
+    Student ID, Student Name, Submission File, Student Response, Total Score, Status, AI Evaluation Summary
     """
     import io
     import csv
@@ -270,89 +270,35 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
 
     submissions = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
 
-    # Collect all unique question numbers from rubric and submission breakdowns
-    question_keys = []
-    rubric_data = assignment.rubric_data or []
-    for item in rubric_data:
-        q_num = item.get("question_number") or item.get("questionNumber")
-        if q_num and q_num not in question_keys:
-            question_keys.append(q_num)
-
-    for sub in submissions:
-        fb = sub.feedback if isinstance(sub.feedback, dict) else {}
-        bd = fb.get("breakdown", [])
-        for item in bd:
-            if isinstance(item, dict):
-                q_num = item.get("question_number")
-                if q_num and q_num not in question_keys:
-                    question_keys.append(q_num)
-
     # Build CSV Header
     header = [
         "Student ID",
         "Student Name",
-        "Student Email",
         "Submission File",
+        "Student Response",
         "Total Score",
-        "Max Score",
-        "Percentage (%)",
         "Status",
-        "AI Confidence",
+        "AI Evaluation Summary"
     ]
-    # Add per-question columns
-    for qk in question_keys:
-        header.append(f"{qk} Score")
-
-    header.extend([
-        "AI Evaluation Summary",
-        "Audit Flag Reasons",
-        "Graded Timestamp"
-    ])
 
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(header)
 
-    # Compute Total Rubric Max
-    total_rubric_max = sum(float(item.get("max_score", item.get("maxMark", 10.0))) for item in rubric_data) if rubric_data else 20.0
-
     for sub in submissions:
-        score_val = sub.score if sub.score is not None else 0.0
-        pct = f"{round((score_val / total_rubric_max) * 100, 1)}%" if total_rubric_max > 0 else "0.0%"
-        conf = f"{int(sub.confidence_score * 100)}%" if sub.confidence_score is not None else "N/A"
-        
         fb = sub.feedback if isinstance(sub.feedback, dict) else {}
         summary = fb.get("summary", "")
-        flag_reasons = "; ".join(fb.get("flag_reasons", []))
-        
-        # Build score dictionary for per-question columns
-        q_scores = {}
-        for item in fb.get("breakdown", []):
-            if isinstance(item, dict):
-                qk = item.get("question_number")
-                if qk:
-                    q_scores[qk] = item.get("score_awarded", 0.0)
+        score_val = sub.score if sub.score is not None else ""
 
         row = [
             sub.student_id,
             sub.student_name or "N/A",
-            getattr(sub, "student_email", None) or "N/A",
             sub.file_name,
+            sub.raw_text or "",
             score_val,
-            total_rubric_max,
-            pct,
             sub.status,
-            conf,
+            summary
         ]
-        # Append per-question scores
-        for qk in question_keys:
-            row.append(q_scores.get(qk, 0.0))
-
-        row.extend([
-            summary,
-            flag_reasons,
-            sub.graded_at.strftime("%Y-%m-%d %H:%M:%S") if sub.graded_at else "Unassessed"
-        ])
         writer.writerow(row)
 
     output.seek(0)
@@ -362,3 +308,4 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
         'Content-Disposition': f'attachment; filename="{filename}"'
     }
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+
