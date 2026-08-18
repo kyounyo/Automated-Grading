@@ -415,9 +415,10 @@ const AssignmentCreator = () => {
 
                 <div style={{ marginBottom: '0.75rem' }}>
                   <label className="label">Question Prompt / Criteria Description</label>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={3}
                     className="input-field"
+                    style={{ resize: 'vertical' }}
                     placeholder="Enter question prompt..."
                     value={q.text}
                     onChange={(e) => {
