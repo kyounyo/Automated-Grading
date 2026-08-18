@@ -35,8 +35,9 @@ evaluation/.DS_Store
 .vscode/
 .idea/
 
-# Local Evaluation Comparison & Results CSVs
+# Local Evaluation Comparison & Results CSVs and Excel files
 evaluation/*.csv
+evaluation/*.xlsx
 evaluation/backend_score_comparison.csv
 evaluation/backend_icc_results.csv
 evaluation/raw_grading_results.csv

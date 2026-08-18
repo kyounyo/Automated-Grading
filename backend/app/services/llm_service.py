@@ -121,13 +121,16 @@ def _call_openrouter_api(messages: list, model: str, temperature: float = 0.1) -
         with urllib.request.urlopen(req, timeout=35) as resp:
             body = json.loads(resp.read().decode("utf-8"))
             content = body["choices"][0]["message"]["content"]
-            return _clean_json_response(content)
+            parsed = _clean_json_response(content)
+            if isinstance(parsed, dict):
+                parsed["_usage"] = body.get("usage", {})
+            return parsed
     except Exception as e:
         print(f"[OpenRouter API Warning] Call failed for model {model}: {e}")
         return None
 
 
-def call_rubric_context_parser_agent(rubric_json: list, model_answer: str, rag_context: str) -> Optional[Dict[str, Any]]:
+def call_rubric_context_parser_agent(rubric_json: list, model_answer: str, rag_context: str, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Agent 1 (Rubric & RAG Context Parser Agent):
     Uses google/gemini-3.1-flash-lite to parse, clean, and standardize rubric criteria & retrieved RAG vector context.
@@ -161,10 +164,11 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
         {"role": "system", "content": "You are a precise academic rubric parsing agent. Always respond strictly in valid JSON format."},
         {"role": "user", "content": prompt}
     ]
-    return _call_openrouter_api(messages, get_llm_model(), temperature=0.0)
+    target_model = model or get_llm_model()
+    return _call_openrouter_api(messages, target_model, temperature=0.0)
 
 
-def call_primary_grading_agent(student_text: str, structured_rubric: Dict[str, Any], raw_rubric_json: list, model_answer: str, rag_context: str, total_max_score: float = 10.0) -> Optional[Dict[str, Any]]:
+def call_primary_grading_agent(student_text: str, structured_rubric: Dict[str, Any], raw_rubric_json: list, model_answer: str, rag_context: str, total_max_score: float = 10.0, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Agent 2 (Primary CoT Evaluation Agent):
     Uses google/gemini-3.1-flash-lite to evaluate student responses against standardized rubric rules and RAG context.
@@ -239,10 +243,11 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
         {"role": "system", "content": "You are a precise, objective automated academic grading engine. Always respond strictly in valid JSON format."},
         {"role": "user", "content": prompt}
     ]
-    return _call_openrouter_api(messages, get_llm_model(), temperature=0.1)
+    target_model = model or get_llm_model()
+    return _call_openrouter_api(messages, target_model, temperature=0.1)
 
 
-def call_auditor_verification_agent(student_text: str, rubric_json: list, primary_eval: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def call_auditor_verification_agent(student_text: str, rubric_json: list, primary_eval: Dict[str, Any], model: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Agent 3 (Auditor & Verification Agent):
     Uses google/gemini-3.1-flash-lite to audit Agent 2's evaluation.
@@ -300,7 +305,8 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
         {"role": "system", "content": "You are a rigorous academic audit agent. Respond strictly in valid JSON."},
         {"role": "user", "content": prompt}
     ]
-    return _call_openrouter_api(messages, get_auditor_model(), temperature=0.0)
+    target_model = model or get_auditor_model()
+    return _call_openrouter_api(messages, target_model, temperature=0.0)
 
 
 def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str, rag_context: str, total_max_score: float = 10.0) -> Dict[str, Any]:

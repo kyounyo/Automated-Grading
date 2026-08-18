@@ -1,92 +1,160 @@
-# Prompt Evaluation Suite
+# AutoGrade+ Empirical Evaluation Suite (Experiments 1 & 2)
 
-This directory contains evaluation tools and datasets for benchmarking AI grading performance against human rater scores using Intraclass Correlation Coefficient (ICC).
+This directory contains the automated evaluation framework used to benchmark and validate the **AutoGrade+ Multi-Agent Grading and Quality-Control Architecture** against human lecturer ground truth.
 
 ---
 
-## 🚀 Quick Start & How to Run
+## 📑 Table of Contents
+1. [Evaluation Dataset & Sampling Methodology](#1-evaluation-dataset--sampling-methodology)
+2. [Experiment 1: Primary Grader Model Benchmark (Baseline)](#2-experiment-1-primary-grader-model-benchmark-baseline)
+3. [Experiment 2: Two-Agent Auditor Quality-Control Benchmark](#3-experiment-2-two-agent-auditor-quality-control-benchmark)
+4. [Statistical & Quality-Control Metrics Explained](#4-statistical--quality-control-metrics-explained)
+5. [Checkpoint Resuming & Auto-Save Safety](#5-checkpoint-resuming--auto-save-safety)
 
-### 1. Environment & API Setup
-Ensure you have a `.env` file in the `evaluation` directory with your OpenRouter API key:
+---
 
-```env
-OPENROUTER_API_KEY=sk-or-v1-your-openrouter-api-key
+## 1. Evaluation Dataset & Sampling Methodology
+
+The evaluation uses authentic pharmacy student submissions from `Dataset for prompt.xlsx`:
+
+| Question No. | Question Type / Concept | Max Mark | Sample Size ($N$) | Total Available |
+| :---: | :--- | :---: | :---: | :---: |
+| **Q6** | Polymer Microspheres & In-Situ Gelling | 10.0 | **25** | 125 |
+| **Q8** | Peptide & Protein Delivery Concepts | 10.0 | **25** | 125 |
+| **Q9** | Lipid Emulsions & Surfactants | 6.0 | **25** | 130 |
+| **Q22** | Drug Delivery Mechanics | 6.0 | **25** | 130 |
+| **TOTAL** | **Stratified Fixed Sample (`seed=42`)** | **All Scales** | **100** | **510** |
+
+*Note: A composite key `(response_id, question_no)` is used to guarantee that all 4 questions get evaluated with exactly 25 responses each, even across duplicate student IDs.*
+
+---
+
+## 2. Experiment 1: Primary Grader Model Benchmark (Baseline)
+
+### 🎯 Purpose
+Evaluates the **standalone grading accuracy** of individual LLM models when acting as **Agent 2 (Primary Grader)** using Chain-of-Thought (CoT) prompting without an auditor.
+
+```
+Student Answer ──► [ Primary Grader Model ] ──► Predicted Score & Reasoning
 ```
 
-### 2. Install Dependencies
-Make sure all required Python packages are installed in your virtual environment:
+### 🚀 How to Run Experiment 1
 
 ```bash
-# From the repository root using the backend virtual environment:
-./backend/venv/bin/pip install -r evaluation/requirements.txt
+# Run Gemini 3.1 Flash Lite only (100 responses, ~8 mins)
+./backend/venv/bin/python evaluation/run_experiment_suite.py --model A
+
+# Run Nemotron 3 Super 120B only (100 responses, ~59 mins)
+./backend/venv/bin/python evaluation/run_experiment_suite.py --model B
+
+# Run both models sequentially and compile Master Comparison
+./backend/venv/bin/python evaluation/run_experiment_suite.py --model all
 ```
 
-Alternatively, if using an active virtual environment:
+### 📁 Output Files Generated:
+* `results_Gemini_3.1_Flash_Lite.xlsx` (Multi-tab workbook: `Summary_Metrics`, `Q6`, `Q8`, `Q9`, `Q22`, `All_Responses`)
+* `results_Nemotron_3_Super_120B.xlsx` (Multi-tab workbook: `Summary_Metrics`, `Q6`, `Q8`, `Q9`, `Q22`, `All_Responses`)
+* `Model_Comparison_Master.xlsx` (Master Leaderboard & per-question ICC comparison matrix)
+
+### 🏆 Baseline Results Summary:
+| Model | Overall ICC (A,1) | MAE | Mean Error (Bias) | $\pm 1$ Mark (%) | Exact Match (%) | Pearson $r$ | Avg Latency / Resp | Total Run Time (100 Qs) | Total Cost |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Gemini 3.1 Flash Lite** | 0.787 | 0.91 | -0.32 *(strict)* | 76.0% | 37.0% | 0.721 | **5.04s** | **8m 23s** | **$0.045** |
+| **Nemotron 3 Super 120B** | **0.881** | **0.70** | **+0.06** *(unbiased)* | **79.0%** | **50.0%** | **0.809** | 35.59s | 59m 19s | $0.266 |
+
+---
+
+## 3. Experiment 2: Two-Agent Auditor Quality-Control Benchmark
+
+### 🎯 Purpose
+Evaluates the **Multi-Agent Quality-Control Architecture** (Grader $\to$ Auditor $\to$ Confidence Engine). 
+
+In AutoGrade+, **the Auditor does not overwrite grades**; instead, it detects grading conflicts and triggers the **Deterministic Flagging Engine** to isolate errors for human lecturer review.
+
+```
+                    Student Answer
+                          │
+                          ▼
+                  ┌───────────────┐
+                  │Primary Grader │ ── Assigns Predicted Grade
+                  └───────┬───────┘
+                          │
+                          ▼
+                  ┌───────────────┐
+                  │ Auditor Agent │ ── Checks for Material Discrepancies
+                  └───────┬───────┘
+                          │
+            ┌─────────────┴─────────────┐
+            ▼                           ▼
+   [AUDIT PASSED: "graded"]    [CONFLICT: "flagged"]
+   Auto-approved for student   Sent to Lecturer Review Queue
+```
+
+### 🚀 How to Run Experiment 2
+
+You can manually specify any **Grader** and **Auditor** model via CLI flags or interactive prompt:
+
+#### Shorthand Model Keys:
+* `A` = Gemini 3.1 Flash Lite (`google/gemini-3.1-flash-lite`)
+* `B` = Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`)
+* `C` = Claude 4.6 Sonnet (`anthropic/claude-sonnet-4.6`)
+
+#### Commands:
 ```bash
-pip install -r requirements.txt
+# 1. Heterogeneous: Fast Grader + Deep Auditor (Gemini 3.1 -> Nemotron 120B)
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader A --auditor B
+
+# 2. Self-Audit A: Gemini 3.1 -> Gemini 3.1
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader A --auditor A
+
+# 3. Heterogeneous: Deep Grader + Fast Guardrail (Nemotron 120B -> Gemini 3.1)
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader B --auditor A
+
+# 4. Self-Audit B: Nemotron 120B -> Nemotron 120B
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader B --auditor B
+
+# 5. Interactive Mode (prompts in terminal):
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py
+
+# 6. Re-compile Master Comparison from existing CSVs:
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py --compile_only
 ```
 
-Required packages listed in `requirements.txt`:
-- `pandas`
-- `openpyxl`
-- `openai`
-- `pingouin`
-- `python-dotenv`
+### 📁 Output Files Generated:
+* `results_exp2_{Grader}_to_{Auditor}.xlsx` (Contains tabs: `Audit_Summary`, `Q6_Audit`, `Q8_Audit`, `Q9_Audit`, `Q22_Audit`, `Flagged_For_Lecturer`, `All_Responses`)
+* `Experiment_2_Audit_Master_Comparison.xlsx` (Master Leaderboard comparing all audited pairings side-by-side)
 
 ---
 
-### 3. Run Evaluation Script
+## 4. Statistical & Quality-Control Metrics Explained
 
-Run the evaluation script using the virtual environment Python interpreter:
+### A. Reliability & Agreement Metrics
+* **ICC (A,1) (Two-Way Random, Absolute Agreement)**: Measures agreement between AI score and Lecturer Ground Truth. ($>0.75$ = Good, $>0.90$ = Excellent).
+* **MAE (Mean Absolute Error)**: Average mark discrepancy between AI and Human.
+* **Mean Error (Bias)**: Positive value = AI is lenient (over-marks); Negative value = AI is strict (under-marks).
+* **$\pm 1$ Mark Accuracy (%)**: Percentage of submissions within 1 mark of human grade.
 
-```bash
-# Option A: Executing directly with backend virtual environment (Recommended)
-/usr/bin/env python3 -m venv ../backend/venv # if not existing
-../backend/venv/bin/python evaluate_prompts.py
+### B. Quality-Control & Flagging Confusion Matrix
+* **Actual Grading Error**: Defined operationally as $|\text{Grader Score} - \text{Human Score}| \ge 1.0\text{ mark}$.
+* **Positive**: Flagged by system (`status = "flagged"` $\to$ sent to lecturer).
+* **Negative**: Auto-approved (`status = "graded"` $\to$ no human review).
 
-# Option B: From project root
-./backend/venv/bin/python evaluation/evaluate_prompts.py
-```
-
----
-
-## 🛠️ Step-by-Step Troubleshooting & Bug Fixes
-
-If you encountered issues previously when running the evaluation script, here is what was causing them and how they were resolved:
-
-### Issue 1: `ModuleNotFoundError: No module named 'pandas'` (or `pingouin`)
-* **Root Cause**: Running `python3 evaluate_prompts.py` used system Python (`/usr/bin/python3`) which did not have the dependencies installed.
-* **Fix**: Run using the project's virtual environment python (`../backend/venv/bin/python evaluate_prompts.py`) after installing `requirements.txt`.
-
-### Issue 2: `NameError: name 'load_dotenv' is not defined`
-* **Root Cause**: `load_dotenv` was called on line 21, but `from dotenv import load_dotenv` was missing from imports at the top of `evaluate_prompts.py`.
-* **Fix**: Added `from dotenv import load_dotenv` to the top-level imports in `evaluate_prompts.py`.
-
-### Issue 3: `pandas.errors.EmptyDataError: No columns to parse from file`
-* **Root Cause**: An empty (0-byte) `raw_grading_results.csv` file existed on disk. `pd.read_csv` crashed when trying to read an empty CSV.
-* **Fix**: Updated `evaluate_prompts.py` resume logic to check `os.path.getsize(raw_csv_path) > 0` before calling `read_csv`, gracefully falling back to a fresh run if the file is empty.
+| Metric | Formula | Academic Meaning |
+| :--- | :---: | :--- |
+| **Flagging Recall (Sensitivity)** | $\frac{\text{TP}}{\text{TP} + \text{FN}}$ | **Error Detection Power**: Percentage of genuine AI grading errors caught and flagged by the Auditor. |
+| **Flagging Precision (PPV)** | $\frac{\text{TP}}{\text{TP} + \text{FP}}$ | **Flag Quality**: Percentage of flagged submissions that were actual grading mistakes. |
+| **Flagging $F_1$-Score** | $2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}$ | **Overall Balance**: Harmonic mean balancing error detection power vs over-flagging. |
+| **Leakage Rate (FN Rate)** | $\frac{\text{FN}}{\text{TP} + \text{FN}}$ | **Safety Risk**: Percentage of erroneous grades that slipped through unflagged. |
+| **Over-flagging Rate (FP Rate)** | $\frac{\text{FP}}{\text{FP} + \text{TN}}$ | **Friction**: Percentage of accurate grades unnecessarily flagged. |
+| **Automation Rate (%)** | $100\% - \text{Flag Rate}$ | Percentage of total class volume graded with zero human effort. |
+| **Auto-Approved Cohort ICC** | $ICC \mid \text{Status} = \text{"graded"}$ | Accuracy on the safe auto-passed cohort. |
 
 ---
 
-## ⚙️ Configuration & Customization
+## 5. Checkpoint Resuming & Auto-Save Safety
 
-In `evaluate_prompts.py`:
-
-- **Sample Size (`STUDENTS_PER_QUESTION`)**:
-  ```python
-  STUDENTS_PER_QUESTION = 8  # Set to integer (e.g., 8) or None to process full dataset
-  ```
-- **Model Name (`MODEL_NAME`)**:
-  ```python
-  MODEL_NAME = "google/gemini-3.1-flash-lite"
-  ```
-- **Resuming Progress**:
-  The script auto-saves to `raw_grading_results.csv` after grading each response. If interrupted, re-running the script will automatically skip previously graded responses. To restart evaluation from scratch, delete `raw_grading_results.csv`.
-
----
-
-## 📊 Output Files Explanation
-
-- **`raw_grading_results.csv`**: Contains line-by-line scores from Human raters and AI strategies for each response.
-- **`icc_summary_results.csv`**: Summary table showing the Intraclass Correlation Coefficient (ICC) between AI strategies and Human raters.
-- **`ai_json_responses32(M).json`**: Detailed JSON logs containing step-by-step reasoning, criteria breakdowns, and feedback generated by the LLM for every submission.
+Both evaluation scripts include **live persistence and interruption safety**:
+* **Every 5 responses**: The multi-tab `.xlsx` workbook is updated and saved to disk.
+* **Every single response**: Appended to the `.csv` checkpoint log.
+* **Safe to Intercept (`Ctrl+C`)**: If you stop the script at any time, the Excel files will **never disappear**.
+* **Seamless Resuming**: Re-running the command automatically skips previously evaluated students and continues from where it left off.
