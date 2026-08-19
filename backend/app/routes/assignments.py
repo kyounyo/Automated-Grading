@@ -48,6 +48,31 @@ def get_assignment_detail(assignment_id: str, db: Session = Depends(get_db)):
     return assign
 
 
+@router.get("/qc-settings")
+def get_qc_settings():
+    """Retrieve current Quality Control Audit settings."""
+    enable_qc = os.getenv("ENABLE_RANDOM_QC_AUDIT", "false").lower() in ["true", "1", "yes"]
+    qc_rate = float(os.getenv("QC_AUDIT_RATE", "0.05"))
+    return {
+        "enable_random_qc": enable_qc,
+        "qc_audit_rate": qc_rate
+    }
+
+
+@router.post("/qc-settings")
+def update_qc_settings(data: dict):
+    """Update Quality Control Audit settings (ON/OFF toggle & sampling percentage rate)."""
+    enable_qc = bool(data.get("enable_random_qc", False))
+    qc_rate = float(data.get("qc_audit_rate", 0.05))
+    os.environ["ENABLE_RANDOM_QC_AUDIT"] = "true" if enable_qc else "false"
+    os.environ["QC_AUDIT_RATE"] = str(qc_rate)
+    return {
+        "message": "Quality Control Audit settings updated successfully",
+        "enable_random_qc": enable_qc,
+        "qc_audit_rate": qc_rate
+    }
+
+
 @router.get("/{assignment_id}/vector-store")
 def get_assignment_vector_store(assignment_id: str):
     """
@@ -135,7 +160,7 @@ def create_assignment(payload: AssignmentCreate, db: Session = Depends(get_db)):
         id=assign_id,
         title=payload.title,
         course_code=payload.course_code,
-        due_date=payload.due_date,
+        due_date=payload.due_date or "",
         rubric_data=normalized_rubric_data,
         model_answer="",
         status="active",
@@ -227,3 +252,60 @@ async def parse_rubric_file(files: List[UploadFile] = File(...)):
         "rubric_warning": rubric_warning,
         "message": f"Parsed {len(files)} file(s). Extracted {len(parsed_questions)} questions."
     }
+
+
+@router.get("/{assignment_id}/export-csv")
+def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
+    """
+    Exports student grades for an assignment as a simplified CSV file containing:
+    Student ID, Student Name, Submission File, Student Response, Total Score, Status, AI Evaluation Summary
+    """
+    import io
+    import csv
+    from fastapi.responses import StreamingResponse
+
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    submissions = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
+
+    # Build CSV Header
+    header = [
+        "Student ID",
+        "Student Name",
+        "Submission File",
+        "Student Response",
+        "Total Score",
+        "Status",
+        "AI Evaluation Summary"
+    ]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(header)
+
+    for sub in submissions:
+        fb = sub.feedback if isinstance(sub.feedback, dict) else {}
+        summary = fb.get("summary", "")
+        score_val = sub.score if sub.score is not None else ""
+
+        row = [
+            sub.student_id,
+            sub.student_name or "N/A",
+            sub.file_name,
+            sub.raw_text or "",
+            score_val,
+            sub.status,
+            summary
+        ]
+        writer.writerow(row)
+
+    output.seek(0)
+    clean_code = re.sub(r'[^a-zA-Z0-9_-]', '', assignment.course_code or 'Assignment')
+    filename = f"{clean_code}_Grades.csv"
+    headers = {
+        'Content-Disposition': f'attachment; filename="{filename}"'
+    }
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+

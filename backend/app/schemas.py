@@ -18,7 +18,7 @@ class RubricItem(BaseModel):
 class AssignmentCreate(BaseModel):
     title: str
     course_code: str
-    due_date: str
+    due_date: Optional[str] = ""
     rubric_data: Optional[List[Dict[str, Any]]] = []
     model_answer: Optional[str] = ""
 
@@ -27,7 +27,7 @@ class AssignmentResponse(BaseModel):
     id: str
     title: str
     course_code: str
-    due_date: str
+    due_date: Optional[str] = ""
     status: str
     total_submissions: int
     average_score: float
@@ -43,6 +43,7 @@ class ScoreOverrideRequest(BaseModel):
     new_score: float
     comment: Optional[str] = "Manual grade adjustment by lecturer"
     lecturer_name: Optional[str] = "Lecturer"
+    updated_breakdown: Optional[List[Dict[str, Any]]] = None
 
 
 class SubmissionResponse(BaseModel):
@@ -50,7 +51,8 @@ class SubmissionResponse(BaseModel):
     assignment_id: str
     batch_id: Optional[str] = None
     student_id: str
-    student_name: str
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
     file_name: str
     file_s3_url: Optional[str] = None
     file_path: Optional[str] = None

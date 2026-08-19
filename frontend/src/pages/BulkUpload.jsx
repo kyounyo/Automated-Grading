@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, FileText, CheckCircle2, AlertCircle, Play, Trash2, ArrowRight, Loader2, Sparkles, Download } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, Play, Trash2, ArrowRight, Loader2, Sparkles, Download, Plus } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { uploadSubmissionFile } from '../api/client';
 
@@ -234,9 +234,19 @@ const BulkUpload = () => {
             <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <CheckCircle2 size={20} color="var(--success)" /> Prepared Submissions ({uploadedFiles.length})
             </h3>
-            <button className="btn btn-outline" onClick={() => setUploadedFiles([])} style={{ fontSize: '0.85rem' }}>
-              Clear Files
-            </button>
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <button 
+                type="button"
+                className="btn btn-outline" 
+                onClick={() => document.getElementById('bulkFileInput').click()} 
+                style={{ fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#fff', border: '1px solid var(--primary)', color: 'var(--primary-dark)', fontWeight: 600 }}
+              >
+                <Plus size={16} color="var(--primary)" /> Add More Submissions
+              </button>
+              <button className="btn btn-outline" onClick={() => setUploadedFiles([])} style={{ fontSize: '0.85rem' }}>
+                Clear Files
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>

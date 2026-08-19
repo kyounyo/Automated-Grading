@@ -1,24 +1,25 @@
 import os
+import re
 import json
 import urllib.request
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
-# ==============================================================================
-# LLM CONFIGURATION PLACEHOLDERS
-# Paste your credentials below, or set them as environment variables in your .env file:
-#   LLM_API_KEY=""
-#   LLM_API_URL="https://openrouter.ai/api/v1/chat/completions" (or your custom API endpoint)
-#   LLM_MODEL="google/gemini-2.5-flash" (or your chosen model name)
-# ==============================================================================
-LLM_API_KEY = os.getenv("LLM_API_KEY", os.getenv("OPENROUTER_API_KEY", ""))
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+LLM_API_KEY = os.getenv("LLM_API_KEY", OPENROUTER_API_KEY)
 LLM_API_URL = os.getenv("LLM_API_URL", "https://openrouter.ai/api/v1/chat/completions")
-LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.5-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite")
 
 
-def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str, rag_context: str) -> Dict[str, Any]:
+def call_llm_for_grading(
+    student_text: str,
+    rubric_json: list,
+    model_answer: str,
+    rag_context: str,
+    total_max_score: float = 10.0
+) -> Dict[str, Any]:
     """
     Executes Chain-of-Thought Rubric evaluation prompt via LLM (OpenRouter / Gemini) and returns structured JSON output.
-    If OPENROUTER_API_KEY is not set or API call fails, returns a high-quality deterministic evaluation response.
+    If LLM_API_KEY is not set or API call fails, returns a high-quality deterministic evaluation response.
     """
     prompt = f"""
 You are an expert academic evaluator. Grade the following student submission based on the assignment rubric and reference model answer.
@@ -31,13 +32,15 @@ Model Answer:
 Rubric:
 {json.dumps(rubric_json, indent=2)}
 
+Total Max Score: {total_max_score}
+
 Student Submission:
 {student_text}
 
 OUTPUT INSTRUCTIONS:
 Return strictly valid JSON with no markdown wrapping, matching this format:
 {{
-  "overall_score": 85.0,
+  "overall_score": 8.5,
   "confidence_score": 0.92,
   "status": "graded",
   "feedback": {{
@@ -45,8 +48,8 @@ Return strictly valid JSON with no markdown wrapping, matching this format:
     "breakdown": [
       {{
         "question_number": "Q1",
-        "score_awarded": 18,
-        "max_score": 20,
+        "score_awarded": 4.5,
+        "max_score": 5.0,
         "reasoning": "Correct methodology used. Slight omission in boundary case explanation."
       }}
     ]
@@ -61,14 +64,15 @@ Return strictly valid JSON with no markdown wrapping, matching this format:
 }}
 """
 
-    if not LLM_API_KEY or not LLM_API_URL:
-        print("[LLM Service] LLM_API_KEY or LLM_API_URL not configured. Running fallback structured scoring.")
+    api_key = LLM_API_KEY or OPENROUTER_API_KEY
+    if not api_key or not LLM_API_URL:
+        print("[LLM Service] API key not configured. Running fallback structured scoring.")
         return _mock_heuristic_evaluation(student_text, rubric_json)
 
     try:
         url = LLM_API_URL
         headers = {
-            "Authorization": f"Bearer {LLM_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://autograde.ai",
             "X-Title": "AutoGrade+"
@@ -86,7 +90,6 @@ Return strictly valid JSON with no markdown wrapping, matching this format:
         with urllib.request.urlopen(req, timeout=30) as resp:
             body = json.loads(resp.read().decode("utf-8"))
             content = body["choices"][0]["message"]["content"]
-            # Clean markdown JSON fences if present
             cleaned = content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
             return json.loads(cleaned)
     except Exception as e:
@@ -96,7 +99,7 @@ Return strictly valid JSON with no markdown wrapping, matching this format:
 
 def _mock_heuristic_evaluation(student_text: str, rubric_json: list) -> Dict[str, Any]:
     text_len = len(student_text.strip())
-    base_score = min(88.0, 65.0 + (text_len / 50.0))
+    base_score = min(8.8, 6.5 + (text_len / 500.0))
     confidence = 0.88 if text_len > 150 else 0.65
     status = "graded" if confidence >= 0.75 else "flagged"
 
@@ -110,13 +113,13 @@ def _mock_heuristic_evaluation(student_text: str, rubric_json: list) -> Dict[str
                 {
                     "question_number": "Q1",
                     "score_awarded": round(base_score * 0.5, 1),
-                    "max_score": 50,
+                    "max_score": 5.0,
                     "reasoning": "Demonstrated sound understanding of core principles."
                 },
                 {
                     "question_number": "Q2",
                     "score_awarded": round(base_score * 0.5, 1),
-                    "max_score": 50,
+                    "max_score": 5.0,
                     "reasoning": "Provided clear logical steps in explanation."
                 }
             ]
@@ -143,22 +146,26 @@ The text is for Question {q_num}.
 Raw Text:
 {text_block}
 
-OUTPUT INSTRUCTIONS:
+RULES & OUTPUT INSTRUCTIONS:
+1. "question": Copy the FULL question text verbatim from the start of the block. Include all scenario paragraphs, reading passages, case studies, and instructions verbatim. Do NOT drop background context!
+2. "rubric": Copy the EXACT marking scheme / model answer verbatim. Preserve multi-line calculations with newline breaks. If no distinct rubric is present, set rubric equal to the question text.
+3. "max_marks": Extract maximum marks if specified (e.g. (6 marks) -> 6.0). Default to 10.0 if not specified.
+
 Return strictly valid JSON with no markdown wrapping, matching this format:
 {{
-  "question": "The extracted question text...",
-  "rubric": "The extracted marking rubric / answer scheme...",
-  "max_marks": 10.0
+  "question": "Full verbatim question text including scenario...",
+  "rubric": "Exact verbatim marking rubric / answer scheme...",
+  "max_marks": 6.0
 }}
-If you cannot find a distinct rubric, put the entire text into both question and rubric. If you cannot find a mark, default to 10.0.
 """
-    if not LLM_API_KEY or not LLM_API_URL:
-        return {}  # Will trigger fallback
+    api_key = LLM_API_KEY or OPENROUTER_API_KEY
+    if not api_key or not LLM_API_URL:
+        return {}
 
     try:
         url = LLM_API_URL
         headers = {
-            "Authorization": f"Bearer {LLM_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://autograde.ai",
             "X-Title": "AutoGrade+"
@@ -166,10 +173,10 @@ If you cannot find a distinct rubric, put the entire text into both question and
         data = {
             "model": LLM_MODEL,
             "messages": [
-                {"role": "system", "content": "You are a precise data extraction engine. Always respond in pure raw JSON format."},
+                {"role": "system", "content": "You are a verbatim academic data extraction engine. Copy all text 100% verbatim as written. Always respond in pure raw JSON format."},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.1
+            "temperature": 0.0
         }
 
         req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
@@ -182,3 +189,129 @@ If you cannot find a distinct rubric, put the entire text into both question and
         print(f"[LLM Service Error] Parsing API call failed: {e}")
         return {}
 
+
+def _find_phrase_range(raw_text: str, phrase: str, start_after: int = 0):
+    if not phrase or not phrase.strip():
+        return -1, -1
+    idx = raw_text.find(phrase, start_after)
+    if idx != -1:
+        return idx, idx + len(phrase)
+    
+    words = [re.escape(w) for w in phrase.strip().split()]
+    if not words:
+        return -1, -1
+    pattern = r'\s+'.join(words)
+    m = re.search(pattern, raw_text[start_after:], re.IGNORECASE)
+    if m:
+        return start_after + m.start(), start_after + m.end()
+        
+    return -1, -1
+
+
+def parse_entire_document_with_llm(raw_text: str) -> List[Dict[str, Any]]:
+    """
+    LLM-Guided Exact Slicing Document Parser.
+    Uses LLM intelligence to identify start & end anchor phrases for questions and answers across ANY document layout,
+    and then performs direct Python string slicing on raw_text to guarantee 100% exact verbatim preservation and zero name redaction.
+    """
+    api_key = LLM_API_KEY or OPENROUTER_API_KEY
+    if not api_key or not LLM_API_URL:
+        return []
+
+    prompt = f"""
+You are an intelligent document structure analyzer.
+Your job is to read the raw document text below and identify all Questions and Answer Schemes/Rubrics regardless of document layout.
+
+Raw Document Text:
+{raw_text}
+
+STRICT INSTRUCTIONS:
+1. "question_start_phrase": Exact 4-8 starting words of the question.
+2. "question_end_phrase": Exact 4-8 ending words of the question prompt.
+3. "answer_start_phrase": Exact 4-8 starting words of the corresponding answer scheme/rubric.
+4. "answer_end_phrase": Exact 4-8 ending words of the answer scheme/rubric.
+5. "max_marks": Extract maximum marks if mentioned (e.g. 6.0, 10.0). Default to 10.0 if not specified.
+
+OUTPUT FORMAT:
+Return strictly valid JSON with no markdown wrapping, matching this array format:
+[
+  {{
+    "question_number": "Q1",
+    "question_start_phrase": "Exact starting 4 to 8 words...",
+    "question_end_phrase": "Exact ending 4 to 8 words...",
+    "answer_start_phrase": "Exact starting 4 to 8 words...",
+    "answer_end_phrase": "Exact ending 4 to 8 words...",
+    "max_marks": 10.0
+  }}
+]
+"""
+    try:
+        url = LLM_API_URL
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://autograde.ai",
+            "X-Title": "AutoGrade+"
+        }
+        data = {
+            "model": LLM_MODEL,
+            "messages": [
+                {"role": "system", "content": "You are a precise document layout analyzer. Return valid JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.0
+        }
+
+        req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            content = body["choices"][0]["message"]["content"]
+            cleaned = content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+            guides = json.loads(cleaned)
+
+            if not isinstance(guides, list):
+                return []
+
+            results = []
+            for idx, g in enumerate(guides):
+                q_num = g.get("question_number", f"Q{idx + 1}")
+                max_mark = float(g.get("max_marks", 10.0))
+
+                q_start_phrase = g.get("question_start_phrase", "")
+                q_end_phrase = g.get("question_end_phrase", "")
+
+                q_s_start, q_s_end = _find_phrase_range(raw_text, q_start_phrase, 0)
+                q_e_start, q_e_end = _find_phrase_range(raw_text, q_end_phrase, max(0, q_s_start))
+
+                if q_s_start != -1 and q_e_end != -1:
+                    prompt_verbatim = raw_text[q_s_start : q_e_end].strip()
+                elif q_s_start != -1:
+                    prompt_verbatim = raw_text[q_s_start:].strip()
+                else:
+                    prompt_verbatim = f"Question {q_num}"
+
+                a_start_phrase = g.get("answer_start_phrase", "")
+                a_end_phrase = g.get("answer_end_phrase", "")
+
+                a_s_start, a_s_end = _find_phrase_range(raw_text, a_start_phrase, 0)
+                a_e_start, a_e_end = _find_phrase_range(raw_text, a_end_phrase, max(0, a_s_start))
+
+                if a_s_start != -1 and a_e_end != -1:
+                    answer_verbatim = raw_text[a_s_start : a_e_end].strip()
+                elif a_s_start != -1:
+                    answer_verbatim = raw_text[a_s_start:].strip()
+                else:
+                    answer_verbatim = prompt_verbatim
+
+                results.append({
+                    "id": idx + 1,
+                    "question_number": q_num if str(q_num).startswith("Q") else f"Q{q_num}",
+                    "text": prompt_verbatim,
+                    "maxMark": max_mark,
+                    "modelAnswer": answer_verbatim
+                })
+
+            return results
+    except Exception as e:
+        print(f"[LLM Service Error] LLM-Guided Slicing failed: {e}")
+        return []

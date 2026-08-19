@@ -55,7 +55,8 @@ async def upload_submission_file(
             created_ids = []
             for idx, item in enumerate(excel_rows):
                 s_id = str(item.get("student_id", f"STU{100 + idx}")).strip()
-                s_name = str(item.get("student_name", f"Student {s_id}")).strip()
+                s_name = str(item.get("student_name", f"Student {s_id}")).strip() or f"Student {s_id}"
+                s_email = str(item.get("student_email", "N/A")).strip() or "N/A"
 
                 # Uniqueness Check: Upsert by (student_id, assignment_id)
                 existing_sub = db.query(Submission).filter(
@@ -66,6 +67,8 @@ async def upload_submission_file(
                 raw_text_content = item.get("text") or ""
                 if existing_sub:
                     existing_sub.batch_id = batch_id
+                    existing_sub.student_name = s_name
+                    existing_sub.student_email = s_email
                     existing_sub.file_name = file.filename
                     existing_sub.file_s3_url = storage_res.get("file_s3_url")
                     existing_sub.file_path = storage_res.get("file_path")
@@ -84,6 +87,7 @@ async def upload_submission_file(
                         batch_id=batch_id,
                         student_id=s_id,
                         student_name=s_name,
+                        student_email=s_email,
                         file_name=file.filename,
                         file_s3_url=storage_res.get("file_s3_url"),
                         file_path=storage_res.get("file_path"),

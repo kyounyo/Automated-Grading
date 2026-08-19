@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { fetchAssignments, fetchSubmissions, fetchSubmissionDetail, gradeSubmission as apiGradeSubmission, gradeAllSubmissions as apiGradeAllSubmissions, overrideScore as apiOverrideScore } from '../api/client';
+import { fetchAssignments, fetchSubmissions, fetchSubmissionDetail, gradeSubmission as apiGradeSubmission, gradeAllSubmissions as apiGradeAllSubmissions, overrideScore as apiOverrideScore, downloadGradesCSV } from '../api/client';
 
 export const AssignmentContext = createContext();
 
@@ -81,16 +81,37 @@ export const AssignmentProvider = ({ children }) => {
     }
   };
 
-  const handleScoreOverride = async (submissionId, newScore, comment) => {
+  const handleScoreOverride = async (submissionId, newScore, comment, updatedBreakdown) => {
     try {
       setLoading(true);
-      const updated = await apiOverrideScore(submissionId, newScore, comment);
+      const payload = { new_score: newScore, comment };
+      if (updatedBreakdown) {
+        payload.updated_breakdown = updatedBreakdown;
+      }
+      const updated = await apiOverrideScore(submissionId, payload);
       setSubmissions(prev => prev.map(s => s.id === submissionId ? updated : s));
       await loadAssignments();
       return updated;
     } catch (err) {
       console.error(`[AssignmentContext] Error overriding score:`, err);
       throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportCSV = async (assignmentId) => {
+    const idToUse = assignmentId || currentAssignmentId;
+    if (!idToUse) {
+      alert("No active assignment selected to export.");
+      return;
+    }
+    try {
+      setLoading(true);
+      await downloadGradesCSV(idToUse);
+    } catch (err) {
+      console.error(`[AssignmentContext] Error exporting CSV:`, err);
+      alert(`Export failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -111,7 +132,8 @@ export const AssignmentProvider = ({ children }) => {
       loadSubmissions,
       triggerGradeSubmission,
       triggerGradeAll,
-      handleScoreOverride
+      handleScoreOverride,
+      handleExportCSV
     }}>
       {children}
     </AssignmentContext.Provider>

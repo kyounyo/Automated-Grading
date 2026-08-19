@@ -104,15 +104,19 @@ def _batch_grade_task(assignment_id: str):
     try:
         pending_subs = db.query(Submission).filter(
             Submission.assignment_id == assignment_id,
-            Submission.status.in_(["pending", "flagged"])
+            Submission.status.in_(["pending", "uploaded", "extracting_answers", "retrieving_rubric", "flagged"])
         ).all()
-        for sub in pending_subs:
+        print(f"[Batch Grading] Started processing {len(pending_subs)} submission(s) for assignment {assignment_id}")
+        for idx, sub in enumerate(pending_subs):
             try:
+                print(f"[Batch Grading] ({idx+1}/{len(pending_subs)}) Grading submission {sub.id} ({sub.student_id})...")
                 run_grading_pipeline(db, sub.id)
             except Exception as e:
                 print(f"[Batch Grading Error] Failed for submission {sub.id}: {e}")
+        print(f"[Batch Grading] Finished batch processing for assignment {assignment_id}")
     finally:
         db.close()
+
 
 
 @router.post("/api/assignments/{assignment_id}/grade-all", status_code=status.HTTP_202_ACCEPTED)
@@ -144,7 +148,16 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
         raise HTTPException(status_code=404, detail="Submission not found")
 
     old_score = sub.score
-    sub.score = payload.new_score
+    
+    if payload.updated_breakdown is not None:
+        fb_dict = dict(sub.feedback) if isinstance(sub.feedback, dict) else {}
+        fb_dict["breakdown"] = payload.updated_breakdown
+        sub.feedback = fb_dict
+        calc_sum = sum(float(item.get("score_awarded", 0.0)) for item in payload.updated_breakdown if isinstance(item, dict))
+        sub.score = round(calc_sum, 1)
+    else:
+        sub.score = payload.new_score
+
     sub.status = "graded"  # Mark as finalized by lecturer override
 
     # Create Audit Log entry
@@ -176,4 +189,11 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
 
     db.commit()
     db.refresh(sub)
+
+    try:
+        from ..services.icc_tracker import record_and_evaluate_submission
+        record_and_evaluate_submission(sub)
+    except Exception as e:
+        print(f"[ICC Tracker Warning] Error updating ICC tracker for override on {sub.id}: {e}")
+
     return sub

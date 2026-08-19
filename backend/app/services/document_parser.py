@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from typing import List, Dict, Any
 
-from .llm_service import call_llm_for_parsing
+from .llm_service import call_llm_for_parsing, parse_entire_document_with_llm
 
 def extract_text_from_file(file_path: str) -> str:
     """
@@ -187,6 +187,68 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
     clean_text = re.sub(r'[\u2060\u200b\ufeff]', '', clean_text)
     clean_text = re.sub(r'\n{3,}', '\n\n', clean_text).strip()
 
+    # 1. Primary Strategy: LLM-Guided Exact Slicing (Handles ANY layout with 100% verbatim text & real names)
+    llm_sliced = parse_entire_document_with_llm(clean_text)
+    if llm_sliced:
+        return llm_sliced
+
+    # 2. Fallback Strategy: Python Two-Section Matcher (Questions-First, Answers-Last layout)
+    split_match = re.search(r'(?:^|\n)\s*(?:Marking\s+(?:Scheme|Rubric)|Answer\s+Key|Model\s+Answers?|Answers|Solutions)\b', clean_text, re.IGNORECASE)
+    
+    if split_match:
+        q_section = clean_text[:split_match.start()].strip()
+        a_section = clean_text[split_match.start():].strip()
+        
+        # Parse Questions from Section 1
+        q_matches = list(re.finditer(r'(?<!for\s)(?<!Rubric\s)(?<!Marking\s)\b(?:Question|Q)\s*(\d+)', q_section, re.IGNORECASE))
+        if not q_matches:
+            q_matches = list(re.finditer(r'(?:^|\n)\s*(\d+)[\.\)]', q_section))
+            
+        questions_dict = {}
+        for i in range(len(q_matches)):
+            q_num = q_matches[i].group(1)
+            start_idx = q_matches[i].start()
+            next_start = len(q_section)
+            for j in range(i + 1, len(q_matches)):
+                if q_matches[j].group(1) != q_num:
+                    next_start = q_matches[j].start()
+                    break
+            questions_dict[q_num] = q_section[start_idx:next_start].strip()
+            
+        # Parse Answers from Section 2
+        a_matches = list(re.finditer(r'\b(?:Question|Q|Answer)\s*(\d+)', a_section, re.IGNORECASE))
+        if not a_matches:
+            a_matches = list(re.finditer(r'(?:^|\n)\s*(\d+)[\.\)]', a_section))
+            
+        answers_dict = {}
+        for i in range(len(a_matches)):
+            a_num = a_matches[i].group(1)
+            start_idx = a_matches[i].start()
+            next_start = len(a_section)
+            for j in range(i + 1, len(a_matches)):
+                if a_matches[j].group(1) != a_num:
+                    next_start = a_matches[j].start()
+                    break
+            answers_dict[a_num] = a_section[start_idx:next_start].strip()
+
+        # Pair Questions and Answers by Question Number
+        parsed = []
+        all_q_nums = sorted(list(set(questions_dict.keys()) | set(answers_dict.keys())), key=lambda x: int(x) if x.isdigit() else x)
+        
+        for q_num in all_q_nums:
+            q_text = questions_dict.get(q_num, f"Question {q_num}")
+            a_text = answers_dict.get(q_num, f"Answer for Question {q_num}")
+            parsed.append({
+                "id": len(parsed) + 1,
+                "question_number": f"Q{q_num}",
+                "text": q_text,
+                "maxMark": calculate_question_max_mark(q_text),
+                "modelAnswer": a_text
+            })
+        if parsed:
+            return parsed
+
+    # 2. Interleaved Layout (Questions + Answers together in sequence)
     q_matches = list(re.finditer(r'(?<!for\s)(?<!Rubric\s)(?<!Marking\s)\b(?:Question|Q)\s*(\d+)', clean_text, re.IGNORECASE))
     if not q_matches:
         q_matches = list(re.finditer(r'(?:^|\n)\s*(\d+)[\.\)]', clean_text))
@@ -212,40 +274,21 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
 
         block = clean_text[start_idx:next_start].strip()
 
-        # Try LLM Parsing first
-        llm_extracted = call_llm_for_parsing(block, q_num)
-
-        if llm_extracted and "question" in llm_extracted and "rubric" in llm_extracted:
-            prompt_text = str(llm_extracted.get("question", block))
-            rubric_text = str(llm_extracted.get("rubric", block))
-            try:
-                total_marks = float(llm_extracted.get("max_marks", 10.0))
-            except (ValueError, TypeError):
-                total_marks = 10.0
+        rubric_match = re.search(r'(?:Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*' + q_num + r'|(?:^|\n)\s*Answers?\:?)', block, re.IGNORECASE)
+        if rubric_match:
+            prompt_text = block[:rubric_match.start()].strip()
+            rubric_text = block[rubric_match.start():].strip()
         else:
-            # Fallback to Regex matching
-            rubric_match = re.search(r'(?:Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*' + q_num + r'|(?:^|\n)\s*Answers?\:?)', block, re.IGNORECASE)
-            if rubric_match:
-                prompt_text = block[:rubric_match.start()].strip()
-                rubric_text = block[rubric_match.start():].strip()
-            else:
-                prompt_text = block
-                rubric_text = block
-            total_marks = calculate_question_max_mark(prompt_text)
-
-
-        prompt_text = re.sub(r'[ \t]+', ' ', prompt_text)
-        prompt_text = re.sub(r'([a-zA-Z0-9,])\s*\n\s*([a-z])', r'\1 \2', prompt_text).strip()
-        
-        rubric_text = re.sub(r'[ \t]+', ' ', rubric_text)
-        rubric_text = re.sub(r'([a-zA-Z0-9,])\s*\n\s*([a-z])', r'\1 \2', rubric_text).strip()
+            prompt_text = block
+            rubric_text = block
+        total_marks = calculate_question_max_mark(prompt_text)
 
         parsed.append({
             "id": len(parsed) + 1,
             "question_number": f"Q{q_num}",
-            "text": prompt_text,
+            "text": prompt_text.strip(),
             "maxMark": total_marks,
-            "modelAnswer": rubric_text
+            "modelAnswer": rubric_text.strip()
         })
 
     return parsed
@@ -267,7 +310,9 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
 
         cols = [str(c).strip().lower() for c in df.columns]
         
-        stu_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_id", "student_no", "student", "stu_id", "id"])), df.columns[0])
+        stu_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_id", "student_no", "stu_id", "student", "id"])), df.columns[0])
+        email_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_gmail", "student_gma", "student_email", "gmail", "email", "gma", "mail"])), None)
+        name_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_name", "student_nam", "name", "nam"])), None)
         q_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["question_no", "question_n", "question", "q_no", "q_num"])), None)
         resp_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["response", "answer", "student_answer", "submission", "text"])), df.columns[-1])
 
@@ -278,6 +323,9 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
                 s_id = str(row[stu_col]).strip() if pd.notna(row[stu_col]) else f"STU{1000 + idx}"
                 if s_id.endswith(".0"): s_id = s_id[:-2]
 
+                s_name = str(row[name_col]).strip() if (name_col and pd.notna(row[name_col]) and str(row[name_col]).strip() and str(row[name_col]).strip() != "nan") else f"Student {s_id}"
+                s_email = str(row[email_col]).strip() if (email_col and pd.notna(row[email_col]) and str(row[email_col]).strip() and str(row[email_col]).strip() != "nan") else "N/A"
+
                 q_num = str(row[q_col]).strip() if pd.notna(row[q_col]) else f"Q{idx + 1}"
                 if q_num.endswith(".0"): q_num = q_num[:-2]
                 q_label = q_num if q_num.lower().startswith("q") else f"Q{q_num}"
@@ -285,32 +333,45 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
                 resp_text = str(row[resp_col]).strip() if pd.notna(row[resp_col]) else ""
 
                 if s_id not in students:
-                    students[s_id] = []
-                students[s_id].append(f"Question {q_label}:\n{resp_text}")
+                    students[s_id] = {
+                        "name": s_name,
+                        "email": s_email,
+                        "responses": []
+                    }
+                else:
+                    if students[s_id]["name"].startswith("Student ") and not s_name.startswith("Student "):
+                        students[s_id]["name"] = s_name
+                    if students[s_id]["email"] == "N/A" and s_email != "N/A":
+                        students[s_id]["email"] = s_email
+
+                students[s_id]["responses"].append(f"Question {q_label}:\n{resp_text}")
 
             rows = []
-            for s_id, resp_list in students.items():
+            for s_id, s_data in students.items():
                 rows.append({
                     "student_id": s_id,
-                    "student_name": f"Student {s_id}",
-                    "text": "\n\n".join(resp_list)
+                    "student_name": s_data["name"],
+                    "student_email": s_data["email"],
+                    "text": "\n\n".join(s_data["responses"])
                 })
             return rows
 
         # Fallback for single-row per student format
         rows = []
         for idx, row in df.iterrows():
-            row_dict = {str(k).strip().lower(): str(v) for k, v in row.items() if pd.notna(v)}
+            row_dict = {str(k).strip().lower(): str(v).strip() for k, v in row.items() if pd.notna(v) and str(v).strip()}
             
             student_id = next((str(row_dict[k]) for k in row_dict if "id" in k or "student" in k or "num" in k), f"STU{1000 + idx}")
-            student_name = next((str(row_dict[k]) for k in row_dict if "name" in k or "student" in k), f"Student {idx + 1}")
+            student_name = next((str(row_dict[k]) for k in row_dict if "name" in k or "nam" in k), "N/A")
+            student_email = next((str(row_dict[k]) for k in row_dict if "email" in k or "gmail" in k or "gma" in k or "mail" in k), "N/A")
             
-            text_parts = [f"{k.capitalize()}: {v}" for k, v in row_dict.items() if k not in ["student_id", "id", "student_name", "name"]]
+            text_parts = [f"{k.capitalize()}: {v}" for k, v in row_dict.items() if not any(x in k for x in ["student_id", "id", "student_name", "name", "email", "gmail", "gma", "mail"])]
             full_text = "\n".join(text_parts) if text_parts else str(row.to_dict())
 
             rows.append({
                 "student_id": student_id,
                 "student_name": student_name,
+                "student_email": student_email,
                 "text": full_text
             })
         return rows

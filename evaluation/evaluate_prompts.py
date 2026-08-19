@@ -32,12 +32,12 @@ client = OpenAI(
     api_key=api_key,
     base_url="https://openrouter.ai/api/v1"
 )
-MODEL_NAME = "google/gemini-3.1-flash-lite"
+MODEL_NAME = "openai/gpt-5.6-sol"
 
 def extract_score(text):
     """Extracts the final score by parsing JSON."""
     try:
-        clean_text = text.strip()
+        clean_text = str(text).strip()
         # Handle DeepSeek <think> reasoning tags
         think_match = re.search(r'<think>.*?</think>', clean_text, flags=re.DOTALL)
         if think_match:
@@ -46,15 +46,37 @@ def extract_score(text):
         if clean_text.startswith("```json"): clean_text = clean_text[7:]
         if clean_text.startswith("```"): clean_text = clean_text[3:]
         if clean_text.endswith("```"): clean_text = clean_text[:-3]
+        clean_text = clean_text.strip()
         
+        start_idx = clean_text.find("{")
+        end_idx = clean_text.rfind("}")
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            clean_text = clean_text[start_idx:end_idx + 1]
+
         data = json.loads(clean_text)
-        return float(data.get("total_score", 0))
+        score = data.get("total_score")
+        if score is None:
+            score = data.get("overall_score")
+        if score is None:
+            score = data.get("score", 0.0)
+        return float(score)
     except Exception as e:
         print(f"JSON parsing error: {e}")
-        return None
+        return 0.0
 
 def grade_submission(rubric, question, max_score, student_answer, prompt_template):
     """Calls the LLM to grade the submission based on the prompt template."""
+    clean_answer = str(student_answer).strip() if pd.notna(student_answer) else ""
+    if not clean_answer or clean_answer in ["-", "N/A", "n/a", "none", "nan"]:
+        blank_json = json.dumps({
+            "reasoning": "The student provided no answer ('-'). 0 points awarded.",
+            "criteria_breakdown": [],
+            "feedback": "No answer submitted.",
+            "total_score": 0.0,
+            "overall_score": 0.0
+        })
+        return 0.0, blank_json
+
     formatted_prompt = prompt_template.format(
         rubric=rubric,
         question=question,
@@ -75,13 +97,14 @@ def grade_submission(rubric, question, max_score, student_answer, prompt_templat
         ai_response_text = response.choices[0].message.content
         if ai_response_text is None:
             print("  [Warning] The model returned an empty response (likely ran out of tokens while reasoning).")
-            return None, ""
+            return 0.0, ""
             
         score = extract_score(ai_response_text)
-        return score, ai_response_text
+        return score if score is not None else 0.0, ai_response_text
     except Exception as e:
         print(f"Error calling API: {e}")
-        return None, str(e)
+        return 0.0, str(e)
+
 
 def main():
     print("Loading datasets...")
@@ -109,16 +132,26 @@ def main():
     json_outputs_data = []
     graded_response_ids = set()
     
-    if os.path.exists(os.path.join(script_dir, "raw_grading_results.csv")):
-        existing_df = pd.read_csv(os.path.join(script_dir, "raw_grading_results.csv"))
-        results_data = existing_df.to_dict('records')
-        graded_response_ids = set(existing_df['response_id'].tolist())
-        print(f"Resuming progress: Found {len(set(existing_df[existing_df['rater'] != 'Human']['response_id']))} already graded AI responses.")
+    raw_csv_path = os.path.join(script_dir, "raw_grading_results.csv")
+    if os.path.exists(raw_csv_path) and os.path.getsize(raw_csv_path) > 0:
+        try:
+            existing_df = pd.read_csv(raw_csv_path)
+            if not existing_df.empty and 'response_id' in existing_df.columns:
+                results_data = existing_df.to_dict('records')
+                graded_ai = existing_df[existing_df['rater'] != 'Human']
+                if not graded_ai.empty:
+                    graded_response_ids = set(graded_ai['response_id'].tolist())
+                    print(f"Resuming progress: Found {len(graded_response_ids)} already graded AI responses.")
+        except Exception as e:
+            print(f"Could not load existing raw_grading_results.csv ({e}). Starting fresh.")
 
     print(f"Evaluating {len(df_responses)} responses with chain_of_thought strategy...")
     
     for index, row in df_responses.iterrows():
         response_id = row['ID Number']
+        if response_id in graded_response_ids:
+            continue
+
         # Convert to string and remove any 'Q' prefix to safely match both dataset styles
         question_no = str(row['question_no']).strip().replace('Q', '')
 
@@ -202,7 +235,7 @@ def main():
 
         # Save raw results continuously to avoid losing data on API crash
         df_results = pd.DataFrame(results_data)
-        df_results.to_csv("raw_grading_results.csv", index=False)
+        df_results.to_csv(raw_csv_path, index=False)
         
     df_results = pd.DataFrame(results_data)
     print("\nSaved raw grades to raw_grading_results.csv")

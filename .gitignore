@@ -10,9 +10,22 @@ frontend/dist/
 __pycache__/
 *.pyc
 .env
+*.env
+*.env.*
+backend/.env
 evaluation/.env
 venv/
 .venv/
+backend/venv/
+
+# Database, Vector Stores & Uploads
+*.db
+*.sqlite3
+*.bin
+chroma_db/
+**/chroma_db/
+uploads/
+**/uploads/
 
 # Logs & Temporary Files
 *.log
@@ -23,3 +36,12 @@ evaluation/.DS_Store
 # IDE & Workspace
 .vscode/
 .idea/
+
+# Local Evaluation Comparison & Results CSVs and Excel files
+evaluation/*.csv
+evaluation/*.xlsx
+evaluation/backend_score_comparison.csv
+evaluation/backend_icc_results.csv
+evaluation/raw_grading_results.csv
+evaluation/icc_summary_results.csv
+evaluation/ai_json_responses*.json
