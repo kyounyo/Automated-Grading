@@ -249,13 +249,15 @@ Return strictly valid JSON with no markdown wrapping, matching this format:
 def call_auditor_verification_agent(
     student_text: str,
     rubric_json: list,
-    primary_eval_result: Dict[str, Any],
+    primary_eval_result: Dict[str, Any] = None,
+    primary_eval: Dict[str, Any] = None,
     model: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """
     Agent 3 (Auditor Verification Agent):
     Independently re-evaluates student text to verify primary grader results and detect score discrepancies.
     """
+    eval_res = primary_eval_result if primary_eval_result is not None else (primary_eval if primary_eval is not None else {})
     prompt = f"""
 You are an independent academic audit agent.
 Verify the primary grader's score for the following student submission:
@@ -267,7 +269,7 @@ Rubric:
 {json.dumps(rubric_json, indent=2)}
 
 Primary AI Grader Result:
-{json.dumps(primary_eval_result, indent=2)}
+{json.dumps(eval_res, indent=2)}
 
 INDEPENDENCE REQUIREMENT:
 Independently evaluate the student text per subquestion first.
