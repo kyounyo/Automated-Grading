@@ -10,6 +10,29 @@ LLM_API_URL = os.getenv("LLM_API_URL", "https://openrouter.ai/api/v1/chat/comple
 LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite")
 
 
+def get_openrouter_api_key() -> str:
+    return LLM_API_KEY or OPENROUTER_API_KEY
+
+
+def call_primary_grading_agent(
+    student_text: str,
+    structured_rubric: dict = None,
+    raw_rubric_json: list = None,
+    model_answer: str = "",
+    rag_context: str = "",
+    total_max_score: float = 10.0,
+    model: str = None
+) -> Dict[str, Any]:
+    rubric = raw_rubric_json or (structured_rubric.get("structured_rules", []) if isinstance(structured_rubric, dict) else [])
+    return call_llm_for_grading(
+        student_text=student_text,
+        rubric_json=rubric,
+        model_answer=model_answer,
+        rag_context=rag_context,
+        total_max_score=total_max_score
+    )
+
+
 def call_llm_for_grading(
     student_text: str,
     rubric_json: list,
