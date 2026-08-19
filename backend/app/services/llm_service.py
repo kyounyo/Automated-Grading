@@ -91,7 +91,9 @@ Return strictly valid JSON with no markdown wrapping, matching this format:
             body = json.loads(resp.read().decode("utf-8"))
             content = body["choices"][0]["message"]["content"]
             cleaned = content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
-            return json.loads(cleaned)
+            res = json.loads(cleaned)
+            _enrich_highlights_with_question_info(res, student_text)
+            return res
     except Exception as e:
         print(f"[LLM Service Error] API call failed: {e}. Utilizing fallback scoring engine.")
         return _mock_heuristic_evaluation(student_text, rubric_json)
@@ -315,3 +317,117 @@ Return strictly valid JSON with no markdown wrapping, matching this array format
     except Exception as e:
         print(f"[LLM Service Error] LLM-Guided Slicing failed: {e}")
         return []
+
+
+def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_text: str) -> None:
+    """
+    Enriches highlight items with specific question number and raw text section location.
+    Matches text quotes against student submission text using fuzzy normalization so frontend highlighting never fails.
+    """
+    highlights = primary_res.get("highlights", [])
+    if not isinstance(highlights, list):
+        return
+
+    feedback = primary_res.get("feedback", {})
+    breakdown = feedback.get("breakdown", []) if isinstance(feedback, dict) else []
+    text_lower = student_text.lower() if student_text else ""
+
+    def clean_str(s: str) -> str:
+        return re.sub(r'[\W_]+', ' ', s).strip().lower()
+
+    for hl in highlights:
+        if not isinstance(hl, dict):
+            continue
+
+        quote = hl.get("text", "").strip()
+        q_num = hl.get("question_number", "")
+
+        if not quote:
+            continue
+
+        pos = student_text.lower().find(quote.lower())
+        exact_len = len(quote)
+
+        if pos == -1 and len(quote) > 10:
+            sub_search = quote.lower()[:min(30, len(quote))]
+            pos = student_text.lower().find(sub_search)
+
+        if pos == -1:
+            quote_words = [w for w in re.split(r'[\W_]+', quote) if len(w) > 2]
+            if quote_words:
+                for m in re.finditer(re.escape(quote_words[0]), student_text, re.IGNORECASE):
+                    start_p = m.start()
+                    snippet_candidate = student_text[start_p:start_p + len(quote) + 40]
+                    if (quote_words[1] in snippet_candidate.lower()) if len(quote_words) > 1 else True:
+                        pos = start_p
+                        exact_len = min(len(quote) + 20, len(student_text) - pos)
+                        break
+
+        if pos != -1:
+            hl["text"] = student_text[pos:pos + exact_len]
+            prefix = student_text[max(0, pos - 350):pos]
+            matches = re.findall(r'(?:Question|Q)\s*([Q0-9A-Za-z\(\)]+)', prefix, re.IGNORECASE)
+            if matches:
+                detected_q = matches[-1]
+                clean_q = f"Q{detected_q}" if not detected_q.startswith("Q") else detected_q
+                if not q_num or q_num in ["Rubric Evidence", "Rubric", "N/A", "General Rubric Evidence"]:
+                    hl["question_number"] = clean_q
+
+            section_match = re.search(r'(?:Question|Q)\s*([Q0-9A-Za-z\(\)]+)', prefix, re.IGNORECASE)
+            sec_name = f"Question {section_match.group(1)} Section" if section_match else "Student Submission Text"
+            hl["location_in_raw_text"] = f"{sec_name} (around char {pos})"
+        else:
+            hl["location_in_raw_text"] = "Student Submission Response"
+
+        if (not hl.get("question_number") or hl.get("question_number") in ["Rubric Evidence", "Rubric", "N/A", "General Rubric Evidence"]) and breakdown:
+            quote_clean = clean_str(quote)
+            for b in breakdown:
+                b_q = b.get("question_number", "")
+                b_reason = clean_str(b.get("reasoning", ""))
+                if any(w in b_reason for w in quote_clean.split()[:4] if len(w) > 3):
+                    hl["question_number"] = b_q
+                    break
+
+        if not hl.get("question_number") or hl.get("question_number") in ["Rubric Evidence", "Rubric", "N/A"]:
+            hl["question_number"] = "General Rubric Evidence"
+
+    existing_q_nums = set(h.get("question_number") for h in highlights if isinstance(h, dict) and h.get("question_number"))
+    
+    for b in breakdown:
+        if not isinstance(b, dict):
+            continue
+        b_q = b.get("question_number", "")
+        if not b_q or b_q in existing_q_nums:
+            continue
+
+        score_aw = b.get("score_awarded", 0.0)
+        max_sc = b.get("max_score", 10.0)
+        reasoning = b.get("reasoning", "Rubric criterion evaluation completed.")
+
+        clean_bq = re.sub(r'[^a-zA-Z0-9]', '', b_q).lower()
+        q_pos = -1
+        if clean_bq:
+            q_pos = text_lower.find(clean_bq)
+        if q_pos == -1 and len(b_q) > 1:
+            m_q = re.search(r'(?:Question|Q)?\s*' + re.escape(b_q), student_text, re.IGNORECASE)
+            if m_q:
+                q_pos = m_q.start()
+
+        if q_pos != -1:
+            snippet = student_text[q_pos:q_pos + 120].strip()
+        else:
+            snippet = student_text[:120].strip() if student_text else f"Answer section for {b_q}"
+
+        new_hl = {
+            "text": snippet,
+            "question_number": b_q,
+            "score_awarded": score_aw,
+            "max_score": max_sc,
+            "type": "strength" if score_aw > 0 else "weakness",
+            "comment": f"Evaluated for {b_q} ({score_aw}/{max_sc} marks). Reasoning: {reasoning}",
+            "location_in_raw_text": f"Question {b_q} Section"
+        }
+        highlights.append(new_hl)
+        existing_q_nums.add(b_q)
+
+    primary_res["highlights"] = highlights
