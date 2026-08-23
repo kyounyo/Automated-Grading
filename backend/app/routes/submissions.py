@@ -148,16 +148,16 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
         raise HTTPException(status_code=404, detail="Submission not found")
 
     old_score = sub.score
-    
-    if payload.updated_breakdown is not None:
-        fb_dict = dict(sub.feedback) if isinstance(sub.feedback, dict) else {}
-        fb_dict["breakdown"] = payload.updated_breakdown
-        sub.feedback = fb_dict
-        calc_sum = sum(float(item.get("score_awarded", 0.0)) for item in payload.updated_breakdown if isinstance(item, dict))
-        sub.score = round(calc_sum, 1)
-    else:
-        sub.score = payload.new_score
+    final_score = float(payload.new_score) if payload.new_score is not None else 0.0
 
+    # Update feedback breakdown if provided
+    fb_dict = dict(sub.feedback) if isinstance(sub.feedback, dict) else {}
+    if payload.updated_breakdown is not None:
+        fb_dict["breakdown"] = payload.updated_breakdown
+        fb_dict["flag_reasons"] = ["Lecturer Manual Override Applied"]
+        sub.feedback = fb_dict
+
+    sub.score = round(final_score, 1)
     sub.status = "graded"  # Mark as finalized by lecturer override
 
     # Create Audit Log entry
@@ -166,7 +166,7 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
         lecturer_name=payload.lecturer_name or "Lecturer",
         action="manual_override",
         old_score=old_score,
-        new_score=payload.new_score,
+        new_score=final_score,
         comment=payload.comment
     )
     db.add(audit)
@@ -174,18 +174,26 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
     # Create EvaluationLog entry for human vs AI delta benchmarking
     eval_log = db.query(EvaluationLog).filter(EvaluationLog.submission_id == sub.id).first()
     if eval_log:
-        eval_log.lecturer_score = payload.new_score
-        eval_log.score_difference = abs((eval_log.ai_score or 0.0) - payload.new_score)
+        eval_log.lecturer_score = final_score
+        eval_log.score_difference = abs((eval_log.ai_score or 0.0) - final_score)
     else:
         eval_log = EvaluationLog(
             submission_id=sub.id,
-            lecturer_score=payload.new_score,
+            lecturer_score=final_score,
             ai_score=old_score,
-            score_difference=abs((old_score or 0.0) - payload.new_score),
+            score_difference=abs((old_score or 0.0) - final_score),
             prompt_version=sub.prompt_version,
             model_used=sub.model_used
         )
         db.add(eval_log)
+
+    # Update assignment average score in database
+    assignment = db.query(Assignment).filter(Assignment.id == sub.assignment_id).first()
+    if assignment:
+        graded_subs = db.query(Submission).filter(Submission.assignment_id == assignment.id, Submission.score.isnot(None)).all()
+        if graded_subs:
+            all_scores = [s.score for s in graded_subs if s.id != sub.id] + [final_score]
+            assignment.average_score = round(sum(all_scores) / len(all_scores), 2)
 
     db.commit()
     db.refresh(sub)

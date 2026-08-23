@@ -45,7 +45,14 @@ MODELS = {
         "model_str": os.getenv("MODEL_B_STR", "nvidia/nemotron-3-super-120b-a12b"),
         "cost_per_1k_in": 0.0002,
         "cost_per_1k_out": 0.0008
-    }
+    },
+    "C": {
+        "id": "C",
+        "name": "Claude 4.6 Sonnet",
+        "file_tag": "Claude_4.6_Sonnet",
+        "model_str": os.getenv("MODEL_C_STR", "anthropic/claude-sonnet-4.6"),
+        "cost_per_1k_in": 0.0030,
+        "cost_per_1k_out": 0.0150}
 }
 
 # ---------------------------------------------------------
@@ -72,7 +79,7 @@ def get_stratified_dataset(samples_per_question=25, seed=42):
 # STATISTICAL METRICS CALCULATOR
 # ---------------------------------------------------------
 def compute_metrics(df_results, pred_col="predicted_score", target_col="human_score"):
-    """Computes ICC(A,1), MAE, Mean Error (Bias), Pearson, Spearman, Exact Match %, and ±1 Mark %."""
+    """Computes ICC(A,1), MAE, Normalized MAE (%), Mean Error (Bias), Pearson, Spearman, Exact Match %, and ±1 Mark %."""
     df_clean = df_results.dropna(subset=[pred_col, target_col]).copy()
     if len(df_clean) < 3:
         return {}
@@ -83,38 +90,52 @@ def compute_metrics(df_results, pred_col="predicted_score", target_col="human_sc
     mae = abs_errors.mean()
     mean_error = diffs.mean()
 
-    exact_match = (abs_errors < 1e-5).sum() / n * 100.0
-    within_1_mark = (abs_errors <= 1.0).sum() / n * 100.0
+    # Scale-normalized MAE (%) if max_score is available
+    if 'max_score' in df_clean and (df_clean['max_score'] > 0).all():
+        norm_mae_pct = (abs_errors / df_clean['max_score'] * 100.0).mean()
+    else:
+        norm_mae_pct = (abs_errors / 10.0 * 100.0).mean()
+
+    exact_match_pct = (abs_errors < 1e-5).sum() / n * 100.0
+    within_1_mark_pct = (abs_errors <= 1.0).sum() / n * 100.0
 
     try:
         pearson_r = df_clean[[pred_col, target_col]].corr().iloc[0, 1]
-    except Exception:
-        pearson_r = 0.0
+    except Exception as e:
+        print(f"  ⚠️ Warning calculating Pearson r: {e}")
+        pearson_r = float("nan")
         
     try:
         spearman_rho = df_clean[[pred_col, target_col]].corr(method="spearman").iloc[0, 1]
-    except Exception:
-        spearman_rho = 0.0
+    except Exception as e:
+        print(f"  ⚠️ Warning calculating Spearman rho: {e}")
+        spearman_rho = float("nan")
+
+    # Construct unique composite target identifier (e.g. Q6_31109578) to avoid collision across questions
+    q_col = df_clean['question_no'].astype(str) if 'question_no' in df_clean else "Q"
+    df_clean['composite_target_id'] = q_col + "_" + df_clean['response_id'].astype(str)
 
     try:
         icc_df_format = pd.concat([
-            pd.DataFrame({'target': df_clean['response_id'], 'rater': 'Human', 'rating': df_clean[target_col]}),
-            pd.DataFrame({'target': df_clean['response_id'], 'rater': 'AI', 'rating': df_clean[pred_col]})
+            pd.DataFrame({'target': df_clean['composite_target_id'], 'rater': 'Human', 'rating': df_clean[target_col]}),
+            pd.DataFrame({'target': df_clean['composite_target_id'], 'rater': 'AI', 'rating': df_clean[pred_col]})
         ], ignore_index=True)
         icc = pg.intraclass_corr(data=icc_df_format, targets='target', raters='rater', ratings='rating')
         icc_val = icc.set_index('Type').loc['ICC(A,1)', 'ICC']
-    except Exception:
-        icc_val = 0.0
+    except Exception as e:
+        print(f"  ⚠️ Warning calculating ICC(A,1): {e}")
+        icc_val = float("nan")
 
     return {
         "N": n,
         "ICC": round(icc_val, 3),
         "MAE": round(mae, 3),
+        "Normalized_MAE_Pct": round(norm_mae_pct, 1),
         "Mean_Error": round(mean_error, 3),
         "Pearson_r": round(pearson_r, 3),
         "Spearman_rho": round(spearman_rho, 3),
-        "Exact_Match_Pct": round(exact_match, 1),
-        "Within_1_Mark_Pct": round(within_1_mark, 1)
+        "Exact_Match_Pct": round(exact_match_pct, 1),
+        "Within_1_Mark_Pct": round(within_1_mark_pct, 1)
     }
 
 # ---------------------------------------------------------
@@ -277,12 +298,15 @@ def save_model_excel(df_model_res, model_name, excel_file):
                 q_metrics = compute_metrics(q_df)
                 q_max = q_df['max_score'].iloc[0] if not q_df.empty else 10.0
                 q_time_s = round(q_df['latency_ms'].sum() / 1000.0, 1) if not q_df.empty else 0.0
+                cost_col = 'estimated_cost_usd' if 'estimated_cost_usd' in q_df else 'cost_usd'
+                q_cost = round(q_df[cost_col].sum(), 4) if not q_df.empty and cost_col in q_df else 0.0
                 summary_rows.append({
                     "Question": q_name,
                     "Max Mark": q_max,
                     "Sample Size (N)": len(q_df),
                     "ICC (A,1)": q_metrics.get("ICC", 0.0),
                     "MAE": q_metrics.get("MAE", 0.0),
+                    "Normalized MAE (%)": f"{q_metrics.get('Normalized_MAE_Pct', 0.0)}%",
                     "Mean Error (Bias)": q_metrics.get("Mean_Error", 0.0),
                     "Exact Match (%)": f"{q_metrics.get('Exact_Match_Pct', 0.0)}%",
                     "±1 Mark (%)": f"{q_metrics.get('Within_1_Mark_Pct', 0.0)}%",
@@ -290,16 +314,19 @@ def save_model_excel(df_model_res, model_name, excel_file):
                     "Spearman ρ": q_metrics.get("Spearman_rho", 0.0),
                     "Avg Latency (s)": round(q_df['latency_ms'].mean() / 1000.0, 2) if not q_df.empty else 0.0,
                     "Section Run Time": f"{int(q_time_s // 60)}m {int(q_time_s % 60)}s",
-                    "Total Cost ($)": round(q_df['estimated_cost_usd'].sum(), 4) if not q_df.empty else 0.0
+                    "Total Cost ($)": q_cost
                 })
 
             overall_metrics = compute_metrics(df_model_res)
+            cost_col_all = 'estimated_cost_usd' if 'estimated_cost_usd' in df_model_res else 'cost_usd'
+            tot_cost_all = round(df_model_res[cost_col_all].sum(), 4) if not df_model_res.empty and cost_col_all in df_model_res else 0.0
             summary_rows.append({
                 "Question": "TOTAL / OVERALL",
                 "Max Mark": "All",
                 "Sample Size (N)": len(df_model_res),
                 "ICC (A,1)": overall_metrics.get("ICC", 0.0),
                 "MAE": overall_metrics.get("MAE", 0.0),
+                "Normalized MAE (%)": f"{overall_metrics.get('Normalized_MAE_Pct', 0.0)}%",
                 "Mean Error (Bias)": overall_metrics.get("Mean_Error", 0.0),
                 "Exact Match (%)": f"{overall_metrics.get('Exact_Match_Pct', 0.0)}%",
                 "±1 Mark (%)": f"{overall_metrics.get('Within_1_Mark_Pct', 0.0)}%",
@@ -307,7 +334,7 @@ def save_model_excel(df_model_res, model_name, excel_file):
                 "Spearman ρ": overall_metrics.get("Spearman_rho", 0.0),
                 "Avg Latency (s)": round(df_model_res['latency_ms'].mean() / 1000.0, 2),
                 "Section Run Time": duration_str,
-                "Total Cost ($)": round(df_model_res['estimated_cost_usd'].sum(), 4)
+                "Total Cost ($)": tot_cost_all
             })
             
             df_summary = pd.DataFrame(summary_rows)
@@ -351,16 +378,19 @@ def generate_master_comparison():
         overall_rows = []
         for m_name, df_m in model_data.items():
             metrics = compute_metrics(df_m)
-            avg_lat = df_m['latency_ms'].mean() / 1000.0 if not df_m.empty else 0.0
-            tot_time_s = round(df_m['latency_ms'].sum() / 1000.0, 1) if not df_m.empty else 0.0
-            tot_cost = df_m['estimated_cost_usd'].sum() if not df_m.empty else 0.0
+            avg_lat = df_m['latency_ms'].mean() / 1000.0 if not df_m.empty and 'latency_ms' in df_m else 0.0
+            tot_time_s = round(df_m['latency_ms'].sum() / 1000.0, 1) if not df_m.empty and 'latency_ms' in df_m else 0.0
+            cost_col = 'estimated_cost_usd' if 'estimated_cost_usd' in df_m else 'cost_usd'
+            tot_cost = df_m[cost_col].sum() if not df_m.empty and cost_col in df_m else 0.0
+            
             overall_rows.append({
                 "Model": m_name,
                 "Overall ICC (A,1)": metrics.get("ICC", 0.0),
                 "Overall MAE": metrics.get("MAE", 0.0),
+                "Normalized MAE (%)": f"{metrics.get('Normalized_MAE_Pct', 0.0)}%",
                 "Mean Error (Bias)": metrics.get("Mean_Error", 0.0),
-                "±1 Mark (%)": f"{metrics.get('Within_1_Mark_Pct', 0.0)}%",
                 "Exact Match (%)": f"{metrics.get('Exact_Match_Pct', 0.0)}%",
+                "±1 Mark (%)": f"{metrics.get('Within_1_Mark_Pct', 0.0)}%",
                 "Pearson r": metrics.get("Pearson_r", 0.0),
                 "Spearman ρ": metrics.get("Spearman_rho", 0.0),
                 "Avg Latency / Response (s)": round(avg_lat, 2),
@@ -377,7 +407,7 @@ def generate_master_comparison():
             q_iccs = []
             for q_name in ["Q6", "Q8", "Q9", "Q22"]:
                 q_df = df_m[df_m['question_no'] == q_name]
-                q_icc = compute_metrics(q_df).get("ICC", 0.0)
+                q_icc = compute_metrics(q_df).get("ICC", 0.0) if not q_df.empty else 0.0
                 row[f"{q_name} ICC"] = q_icc
                 q_iccs.append(q_icc)
             row["Average Question ICC"] = round(sum(q_iccs) / len(q_iccs), 3) if q_iccs else 0.0
@@ -393,7 +423,7 @@ def generate_master_comparison():
             q_maes = []
             for q_name in ["Q6", "Q8", "Q9", "Q22"]:
                 q_df = df_m[df_m['question_no'] == q_name]
-                q_mae = compute_metrics(q_df).get("MAE", 0.0)
+                q_mae = compute_metrics(q_df).get("MAE", 0.0) if not q_df.empty else 0.0
                 row[f"{q_name} MAE"] = q_mae
                 q_maes.append(q_mae)
             row["Average Question MAE"] = round(sum(q_maes) / len(q_maes), 3) if q_maes else 0.0
@@ -413,8 +443,8 @@ def generate_master_comparison():
 # ---------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="Evaluate models individually and generate Excel reports.")
-    parser.add_argument("--model", type=str, choices=["A", "B", "all"], default="all",
-                        help="Choose 'A' for Gemini 3.1 Flash Lite, 'B' for Nemotron 3 Super 120B, or 'all' to run sequentially.")
+    parser.add_argument("--model", type=str, choices=["A", "B", "C", "all"], default="all",
+                        help="Choose 'A' (Gemini 3.1 Flash Lite), 'B' (Nemotron 3 Super 120B), 'C' (Claude 4.6 Sonnet), or 'all'.")
     args = parser.parse_args()
 
     print("Loading datasets...")
@@ -425,6 +455,8 @@ def main():
         run_single_model("A", df_questions, df_sample)
     if args.model in ["B", "all"]:
         run_single_model("B", df_questions, df_sample)
+    if args.model in ["C", "all"]:
+        run_single_model("C", df_questions, df_sample)
 
     generate_master_comparison()
 

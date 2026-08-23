@@ -101,7 +101,7 @@ def get_stratified_dataset(samples_per_question=25, seed=42):
 # STATISTICAL METRICS & F1-SCORE CALCULATOR
 # ---------------------------------------------------------
 def compute_metrics(df_results, pred_col="grader_score", target_col="human_score"):
-    """Computes ICC(A,1), MAE, Mean Error (Bias), Pearson, Spearman, Exact Match %, and ±1 Mark %."""
+    """Computes ICC(A,1), MAE, Normalized MAE (%), Mean Error (Bias), Pearson, Spearman, Exact Match %, and ±1 Mark %."""
     df_clean = df_results.dropna(subset=[pred_col, target_col]).copy()
     if len(df_clean) < 3:
         return {}
@@ -112,38 +112,52 @@ def compute_metrics(df_results, pred_col="grader_score", target_col="human_score
     mae = abs_errors.mean()
     mean_error = diffs.mean()
 
-    exact_match = (abs_errors < 1e-5).sum() / n * 100.0
-    within_1_mark = (abs_errors <= 1.0).sum() / n * 100.0
+    # Scale-normalized MAE (%) if max_score is available
+    if 'max_score' in df_clean and (df_clean['max_score'] > 0).all():
+        norm_mae_pct = (abs_errors / df_clean['max_score'] * 100.0).mean()
+    else:
+        norm_mae_pct = (abs_errors / 10.0 * 100.0).mean()
+
+    exact_match_pct = (abs_errors < 1e-5).sum() / n * 100.0
+    within_1_mark_pct = (abs_errors <= 1.0).sum() / n * 100.0
 
     try:
         pearson_r = df_clean[[pred_col, target_col]].corr().iloc[0, 1]
-    except Exception:
-        pearson_r = 0.0
+    except Exception as e:
+        print(f"  ⚠️ Warning calculating Pearson r: {e}")
+        pearson_r = float("nan")
         
     try:
         spearman_rho = df_clean[[pred_col, target_col]].corr(method="spearman").iloc[0, 1]
-    except Exception:
-        spearman_rho = 0.0
+    except Exception as e:
+        print(f"  ⚠️ Warning calculating Spearman rho: {e}")
+        spearman_rho = float("nan")
+
+    # Construct unique composite target identifier (e.g. Q6_31109578) to avoid collision across questions
+    q_col = df_clean['question_no'].astype(str) if 'question_no' in df_clean else "Q"
+    df_clean['composite_target_id'] = q_col + "_" + df_clean['response_id'].astype(str)
 
     try:
         icc_df_format = pd.concat([
-            pd.DataFrame({'target': df_clean['response_id'], 'rater': 'Human', 'rating': df_clean[target_col]}),
-            pd.DataFrame({'target': df_clean['response_id'], 'rater': 'AI', 'rating': df_clean[pred_col]})
+            pd.DataFrame({'target': df_clean['composite_target_id'], 'rater': 'Human', 'rating': df_clean[target_col]}),
+            pd.DataFrame({'target': df_clean['composite_target_id'], 'rater': 'AI', 'rating': df_clean[pred_col]})
         ], ignore_index=True)
         icc = pg.intraclass_corr(data=icc_df_format, targets='target', raters='rater', ratings='rating')
         icc_val = icc.set_index('Type').loc['ICC(A,1)', 'ICC']
-    except Exception:
-        icc_val = 0.0
+    except Exception as e:
+        print(f"  ⚠️ Warning calculating ICC(A,1): {e}")
+        icc_val = float("nan")
 
     return {
         "N": n,
         "ICC": round(icc_val, 3),
         "MAE": round(mae, 3),
+        "Normalized_MAE_Pct": round(norm_mae_pct, 1),
         "Mean_Error": round(mean_error, 3),
         "Pearson_r": round(pearson_r, 3),
         "Spearman_rho": round(spearman_rho, 3),
-        "Exact_Match_Pct": round(exact_match, 1),
-        "Within_1_Mark_Pct": round(within_1_mark, 1)
+        "Exact_Match_Pct": round(exact_match_pct, 1),
+        "Within_1_Mark_Pct": round(within_1_mark_pct, 1)
     }
 
 def compute_quality_control_metrics(df_res):
@@ -152,8 +166,16 @@ def compute_quality_control_metrics(df_res):
         return {}
 
     total_n = len(df_res)
-    # Ground Truth Error: |Grader - Human| >= 1.0 mark
-    actual_errors = df_res['actual_error_ge_1mark'].values
+    # Ground Truth Error: |Grader - Human| > 1.0 mark (discrepancy exceeding acceptable +/-1 mark tolerance)
+    if 'actual_error_gt_1mark' in df_res:
+        actual_errors = df_res['actual_error_gt_1mark'].values
+    elif 'grader_absolute_error' in df_res:
+        actual_errors = (df_res['grader_absolute_error'] > 1.0 + 1e-5).values
+    elif 'grader_score' in df_res and 'human_score' in df_res:
+        actual_errors = (abs(df_res['grader_score'] - df_res['human_score']) > 1.0 + 1e-5).values
+    else:
+        actual_errors = df_res['actual_error_ge_1mark'].values
+
     flagged = (df_res['status'] == 'flagged').values
     
     tp = int(((flagged) & (actual_errors)).sum())
@@ -167,28 +189,28 @@ def compute_quality_control_metrics(df_res):
     flag_rate = (tp + fp) / total_n * 100.0 if total_n > 0 else 0.0
     automation_rate = 100.0 - flag_rate
 
-    recall = (tp / total_actual_errors * 100.0) if total_actual_errors > 0 else 100.0
-    precision = (tp / (tp + fp) * 100.0) if (tp + fp) > 0 else 0.0
+    recall = (tp / total_actual_errors * 100.0) if total_actual_errors > 0 else float("nan")
+    precision = (tp / (tp + fp) * 100.0) if (tp + fp) > 0 else float("nan")
     
     # Flagging F1-Score
-    if (precision + recall) > 0:
+    if not (pd.isna(precision) or pd.isna(recall)) and (precision + recall) > 0:
         f1_score = (2.0 * precision * recall) / (precision + recall)
     else:
-        f1_score = 0.0
+        f1_score = float("nan")
 
-    fn_leakage_rate = (fn / total_actual_errors * 100.0) if total_actual_errors > 0 else 0.0
-    fp_overflag_rate = (fp / total_clean_grades * 100.0) if total_clean_grades > 0 else 0.0
+    fn_leakage_rate = (fn / total_actual_errors * 100.0) if total_actual_errors > 0 else float("nan")
+    fp_overflag_rate = (fp / total_clean_grades * 100.0) if total_clean_grades > 0 else float("nan")
 
     return {
         "TP": tp, "FP": fp, "TN": tn, "FN": fn,
         "Total_N": total_n,
         "Flag_Rate_Pct": round(flag_rate, 1),
         "Automation_Rate_Pct": round(automation_rate, 1),
-        "Recall_Pct": round(recall, 1),
-        "Precision_Pct": round(precision, 1),
-        "F1_Score_Pct": round(f1_score, 1),
-        "Leakage_FN_Pct": round(fn_leakage_rate, 1),
-        "Overflag_FP_Pct": round(fp_overflag_rate, 1)
+        "Recall_Pct": round(recall, 1) if not pd.isna(recall) else "N/A",
+        "Precision_Pct": round(precision, 1) if not pd.isna(precision) else "N/A",
+        "F1_Score_Pct": round(f1_score, 1) if not pd.isna(f1_score) else "N/A",
+        "Leakage_FN_Pct": round(fn_leakage_rate, 1) if not pd.isna(fn_leakage_rate) else "N/A",
+        "Overflag_FP_Pct": round(fp_overflag_rate, 1) if not pd.isna(fp_overflag_rate) else "N/A"
     }
 
 # ---------------------------------------------------------
@@ -379,8 +401,8 @@ def run_manual_audit_experiment(grader_model_info, auditor_model_info, df_questi
         status = conf_result["status"]  # "graded" or "flagged"
         flag_reasons = "; ".join(conf_result.get("flag_reasons", []))
 
-        # Ground truth error definition: Was there an actual human-AI error (>= 1.0 mark)?
-        actual_error = abs(grader_score - human_score) >= 1.0
+        # Ground truth error definition: Was there an actual human-AI error (> 1.0 mark)?
+        actual_error = abs(grader_score - human_score) > 1.0 + 1e-5
 
         rec = {
             "response_id": resp_id,
@@ -394,7 +416,8 @@ def run_manual_audit_experiment(grader_model_info, auditor_model_info, df_questi
             "confidence_score": confidence_score,
             "status": status,
             "flag_reasons": flag_reasons,
-            "actual_error_ge_1mark": actual_error,
+            "actual_error_gt_1mark": actual_error,
+            "actual_error_ge_1mark": abs(grader_score - human_score) >= 1.0,
             "grader_absolute_error": round(abs(grader_score - human_score), 2),
             "grader_latency_ms": g_lat,
             "auditor_latency_ms": a_lat,

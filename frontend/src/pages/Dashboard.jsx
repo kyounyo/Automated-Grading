@@ -14,7 +14,8 @@ const Dashboard = () => {
 
   const totalSubmissions = submissions.length;
   const gradedApproved = submissions.filter(s => s.status === 'graded' || s.status === 'approved').length;
-  const flaggedPending = submissions.filter(s => s.status === 'flagged' || s.status === 'pending' || s.status === 'uploaded').length;
+  const flaggedCount = submissions.filter(s => s.status === 'flagged').length;
+  const pendingCount = submissions.filter(s => s.status === 'pending' || s.status === 'uploaded').length;
 
   // Separate graded submissions from unassessed submissions
   const gradedSubs = submissions.filter(s => s.score != null && (s.status === 'graded' || s.status === 'approved' || s.status === 'flagged'));
@@ -170,7 +171,25 @@ const Dashboard = () => {
       {/* Metric Cards Grid - 4 Organized Boxes in 1 Single Row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
         {/* Card 1: Total Submissions */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '12px', borderTop: '4px solid var(--primary)', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '125px' }}>
+        <div 
+          className="glass-panel" 
+          onClick={() => navigate('/submissions', { state: { filter: 'all' } })}
+          style={{ 
+            padding: '1.25rem 1.5rem', 
+            borderRadius: '12px', 
+            borderTop: '4px solid var(--primary)', 
+            backgroundColor: '#fff', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'space-between', 
+            minHeight: '130px',
+            cursor: 'pointer',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 96, 156, 0.12)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+          title="Click to view all student submissions"
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Submissions</span>
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -179,12 +198,32 @@ const Dashboard = () => {
           </div>
           <div style={{ marginTop: '0.5rem' }}>
             <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1.1 }}>{totalSubmissions}</div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'block' }}>Saved in PostgreSQL DB</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--primary)', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
+              View All Submissions <ArrowRight size={13} />
+            </span>
           </div>
         </div>
 
         {/* Card 2: Graded / Approved */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '12px', borderTop: '4px solid var(--success)', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '125px' }}>
+        <div 
+          className="glass-panel" 
+          onClick={() => navigate('/submissions', { state: { filter: 'graded' } })}
+          style={{ 
+            padding: '1.25rem 1.5rem', 
+            borderRadius: '12px', 
+            borderTop: '4px solid var(--success)', 
+            backgroundColor: '#fff', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'space-between', 
+            minHeight: '130px',
+            cursor: 'pointer',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.15)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+          title="Click to view graded and approved submissions"
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Graded / Approved</span>
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -193,26 +232,55 @@ const Dashboard = () => {
           </div>
           <div style={{ marginTop: '0.5rem' }}>
             <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--success)', lineHeight: 1.1 }}>{gradedApproved}</div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'block' }}>Ready for release</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--success)', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
+              View Graded ({gradedApproved}) <ArrowRight size={13} />
+            </span>
           </div>
         </div>
 
-        {/* Card 3: Flagged / Pending */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '12px', borderTop: '4px solid var(--warning)', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '125px' }}>
+        {/* Card 3: Flagged for Review (Hyperlink to all flagged papers) */}
+        <div 
+          className="glass-panel" 
+          onClick={() => navigate('/submissions', { state: { filter: 'flagged' } })}
+          style={{ 
+            padding: '1.25rem 1.5rem', 
+            borderRadius: '12px', 
+            borderTop: '4px solid var(--warning)', 
+            backgroundColor: flaggedCount > 0 ? '#fffdf7' : '#fff', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            justifyContent: 'space-between', 
+            minHeight: '130px',
+            cursor: 'pointer',
+            border: flaggedCount > 0 ? '1.5px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--border)',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.2)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+          title="Click to review all flagged submissions requiring lecturer audit"
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Flagged / Unassessed</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'rgba(245, 158, 11, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: flaggedCount > 0 ? '#b45309' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Flagged for Review
+            </span>
+            <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <AlertTriangle size={18} color="var(--warning)" />
             </div>
           </div>
           <div style={{ marginTop: '0.5rem' }}>
-            <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--warning)', lineHeight: 1.1 }}>{flaggedPending}</div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'block' }}>Requires review / AI grade</span>
+            <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#b45309', lineHeight: 1.1 }}>{flaggedCount}</div>
+            <span style={{ fontSize: '0.78rem', color: '#b45309', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 700 }}>
+              {flaggedCount > 0 ? (
+                <>Review Flagged Papers ({flaggedCount}) <ArrowRight size={13} /></>
+              ) : (
+                <>No flagged papers pending</>
+              )}
+            </span>
           </div>
         </div>
 
         {/* Card 4: Class Average Score */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '12px', borderTop: '4px solid var(--primary-dark)', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '125px' }}>
+        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '12px', borderTop: '4px solid var(--primary-dark)', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Class Average</span>
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'rgba(0, 96, 156, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

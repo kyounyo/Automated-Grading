@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, RefreshCw, Download, ShieldAlert } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
 const SubmissionsList = () => {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState('all');
+  const location = useLocation();
+  const [filter, setFilter] = useState(location.state?.filter || 'all');
   const [searchTerm, setSearchTerm] = useState('');
   const [gradingBatch, setGradingBatch] = useState(false);
   const [qcSettings, setQcSettings] = useState({ enable_random_qc: false, qc_audit_rate: 0.05 });
   const { currentAssignmentId, currentAssignment, submissions, triggerGradeSubmission, triggerGradeAll, loadSubmissions, handleExportCSV } = useAssignment();
+
+  useEffect(() => {
+    if (location.state?.filter) {
+      setFilter(location.state.filter);
+    }
+  }, [location.state?.filter]);
 
   useEffect(() => {
     fetch('/api/assignments/qc-settings')
@@ -84,7 +91,7 @@ const SubmissionsList = () => {
       case 'graded':
         return (
           <span className="status-badge" style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)', padding: '0.25rem 0.6rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center' }}>
-            <CheckCircle size={14} style={{ marginRight: '4px' }} /> Graded ({sub.confidence_score ? Math.round(sub.confidence_score * 100) : 90}% Conf)
+            <CheckCircle size={14} style={{ marginRight: '4px' }} /> Graded
           </span>
         );
       case 'flagged':

@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import time
 import urllib.request
 from typing import Dict, Any, Optional
 from .confidence import evaluate_confidence_and_status
@@ -94,40 +95,57 @@ def _clean_json_response(content: str) -> Dict[str, Any]:
         raise ValueError(f"Failed to parse LLM JSON: {parse_err}")
 
 
-def _call_openrouter_api(messages: list, model: str, temperature: float = 0.1) -> Optional[Dict[str, Any]]:
+def _call_openrouter_api(messages: list, model: str, temperature: float = 0.1, max_retries: int = 3) -> Optional[Dict[str, Any]]:
     """
-    Executes HTTP POST request to OpenRouter API endpoint.
+    Executes HTTP POST request to OpenRouter API endpoint with automatic retries and reasoning token fallbacks.
     """
     api_key = get_openrouter_api_key()
     if not api_key:
         return None
 
-    try:
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://autograde.ai",
-            "X-Title": "AutoGrade+"
-        }
-        data = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "response_format": {"type": "json_object"}
-        }
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://autograde.ai",
+        "X-Title": "AutoGrade+"
+    }
+    data = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "response_format": {"type": "json_object"}
+    }
 
-        req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
-        with urllib.request.urlopen(req, timeout=35) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-            content = body["choices"][0]["message"]["content"]
-            parsed = _clean_json_response(content)
-            if isinstance(parsed, dict):
-                parsed["_usage"] = body.get("usage", {})
-            return parsed
-    except Exception as e:
-        print(f"[OpenRouter API Warning] Call failed for model {model}: {e}")
-        return None
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
+            with urllib.request.urlopen(req, timeout=75) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                choice = body.get("choices", [{}])[0]
+                msg = choice.get("message", {})
+                content = msg.get("content") or ""
+
+                # Fallback for reasoning models (e.g. Nemotron / R1) that place output in reasoning tokens
+                if not content.strip():
+                    content = msg.get("reasoning") or msg.get("reasoning_content") or ""
+
+                if not content.strip():
+                    raise ValueError("Empty response string received from LLM.")
+
+                parsed = _clean_json_response(content)
+                if isinstance(parsed, dict):
+                    parsed["_usage"] = body.get("usage", {})
+                return parsed
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries:
+                time.sleep(2 * attempt)
+            else:
+                print(f"[OpenRouter API Warning] Call failed for model {model} after {max_retries} attempts: {e}")
+                
+    return None
 
 
 def call_rubric_context_parser_agent(rubric_json: list, model_answer: str, rag_context: str, model: Optional[str] = None) -> Optional[Dict[str, Any]]:

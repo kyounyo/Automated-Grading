@@ -96,42 +96,71 @@ def evaluate_confidence_and_status(
     # Component 3: Audit Factor (1.0 if audit passed and no material conflicts, else 0.5)
     audit_factor = 1.0 if (auditor_passed and len(material_conflicting_qs) == 0) else 0.5
 
-    # Deterministic Final Confidence Formula
-    deterministic_confidence = round(
-        (0.40 * score_agreement) + (0.40 * question_agreement) + (0.20 * audit_factor),
-        2
-    )
-    final_confidence = max(0.05, min(1.0, deterministic_confidence))
+    # Component 4: Answer Evidence & Completeness Factor (0.0 to 1.0)
+    word_count = len(re.findall(r'\b\w+\b', raw_text or ""))
+    # Terse answers (< 30 words) carry higher grading ambiguity
+    if word_count >= 60:
+        evidence_factor = 1.0
+    elif word_count >= 30:
+        evidence_factor = 0.85
+    elif word_count >= 15:
+        evidence_factor = 0.65
+    else:
+        evidence_factor = 0.45
 
-    # Multi-Factor Flagging Rules (Pragmatic 15% threshold & material conflicts only)
+    # Deterministic Final Confidence Formula (Calibrated & Realistic)
+    # Agreement: 70%, Audit: 15%, Evidence/Completeness: 15%
+    raw_confidence = (
+        (0.35 * score_agreement) +
+        (0.35 * question_agreement) +
+        (0.15 * audit_factor) +
+        (0.15 * evidence_factor)
+    )
+
+    # Uncertainty penalty on partial scores (middle scores carry more subjectivity than 0% or 100%)
+    score_pct = (primary_score / max_sc) * 100.0
+    if 30.0 <= score_pct <= 70.0 and (score_agreement < 0.95 or question_agreement < 0.95):
+        raw_confidence -= 0.05
+
+    # Calibrate ceiling so AI grading isn't deceptively 100% (max 0.95 for perfect responses)
+    calibrated_confidence = round(min(0.95, max(0.20, raw_confidence)), 2)
+
+    # Multi-Factor Flagging Rules (Aligned with Frontend 75% threshold & realistic QA)
     flag_reasons: List[str] = []
 
     q_str = f" on {', '.join(material_conflicting_qs)}" if material_conflicting_qs else ""
     discrepancy_pct = (score_discrepancy / max_sc) * 100.0
 
     if len(material_conflicting_qs) > 0:
-        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: Material subquestion score discrepancy (>= 1.0 mark)")
+        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: Subquestion score discrepancy")
     elif discrepancy_pct > (AUDIT_DISCREPANCY_THRESHOLD * 100.0):
-        flag_reasons.append(f"🤖 Multi-Agent Conflict: Overall score discrepancy of {score_discrepancy:.1f} points ({discrepancy_pct:.1f}%)")
+        flag_reasons.append(f"🤖 Multi-Agent Conflict: Score discrepancy of {score_discrepancy:.1f} pts ({discrepancy_pct:.1f}%)")
 
-    if final_confidence < 0.65:
-        flag_reasons.append(f"📉 Low System Confidence ({final_confidence * 100:.0f}% < 65%)")
+    # Flag low confidence when below 75% (matching frontend default safeguard)
+    if calibrated_confidence < 0.75:
+        flag_reasons.append(f"📉 Low System Confidence ({calibrated_confidence * 100:.0f}% < 75%)")
 
-    score_pct = (primary_score / max_sc) * 100.0
-    if 48.0 <= score_pct <= 52.0:
-        flag_reasons.append("⚖️ Borderline Pass/Fail Grade: Human verification recommended")
+    # Flag borderline pass/fail grades (45% - 55%)
+    if 45.0 <= score_pct <= 55.0:
+        flag_reasons.append("⚖️ Borderline Pass/Fail Grade (45-55%): Human verification recommended")
+
+    # Flag terse answers
+    if word_count < 20 and max_sc >= 5.0:
+        flag_reasons.append(f"⚠️ Terse Answer ({word_count} words): Verify student explanation depth")
 
     status = "flagged" if len(flag_reasons) > 0 else "graded"
 
     return {
-        "confidence_score": final_confidence,
+        "confidence_score": calibrated_confidence,
         "status": status,
         "flag_reasons": flag_reasons,
-        "is_borderline": (48.0 <= score_pct <= 52.0),
+        "is_borderline": (45.0 <= score_pct <= 55.0),
         "is_audit_flagged": len(flag_reasons) > 0,
         "confidence_components": {
             "score_agreement": round(score_agreement, 2),
             "question_agreement": round(question_agreement, 2),
-            "audit_factor": audit_factor
+            "audit_factor": audit_factor,
+            "evidence_factor": round(evidence_factor, 2)
         }
     }
+
