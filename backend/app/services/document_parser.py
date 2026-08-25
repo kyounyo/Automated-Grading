@@ -125,53 +125,28 @@ def parse_separate_question_and_rubric_docs(q_doc: str, r_doc: str) -> List[Dict
     """
     Pairs a Question Paper document with a separate Marking Rubric document for DOCX & PDF files.
     """
-    q_matches = list(re.finditer(r"(?:^|\n|\s{2,})(?:Question|Q)?\s*(\d+)[\.\s]", q_doc, re.IGNORECASE))
-    if not q_matches:
-        q_matches = list(re.finditer(r"(?:Question|Q)\s*(\d+)", q_doc, re.IGNORECASE))
+    q_parsed = smart_parse_rubric_text(q_doc)
+    r_parsed = smart_parse_rubric_text(r_doc)
+    
+    r_dict = {item["question_number"]: item for item in r_parsed}
+    
+    merged_parsed = []
+    
+    for q_item in q_parsed:
+        q_num = q_item["question_number"]
         
-    parsed = []
-    seen = set()
+        if q_num in r_dict:
+            r_item = r_dict[q_num]
+            
+            if r_item.get("modelAnswer"):
+                q_item["modelAnswer"] = r_item["modelAnswer"]
+                
+            if r_item.get("maxMark") and r_item.get("maxMark") != 10.0:
+                q_item["maxMark"] = r_item["maxMark"]
+                
+        merged_parsed.append(q_item)
 
-    for i in range(len(q_matches)):
-        q_num = q_matches[i].group(1)
-        if q_num in seen:
-            continue
-        seen.add(q_num)
-
-        start = q_matches[i].start()
-        next_start = len(q_doc)
-        for j in range(i + 1, len(q_matches)):
-            if q_matches[j].group(1) != q_num:
-                next_start = q_matches[j].start()
-                break
-
-        prompt_text = q_doc[start:next_start].strip()
-
-        # Find exact "Marking Rubric for Question X" section in r_doc
-        m_rubric = re.search(r"Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*" + q_num, r_doc, re.IGNORECASE)
-        if m_rubric:
-            r_start = m_rubric.start()
-            r_all = list(re.finditer(r"Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*\d+", r_doc, re.IGNORECASE))
-            r_end = len(r_doc)
-            for rm in r_all:
-                if rm.start() > r_start:
-                    r_end = rm.start()
-                    break
-            rubric_text = r_doc[r_start:r_end].strip()
-        else:
-            rubric_text = prompt_text
-
-        total_marks = calculate_question_max_mark(prompt_text)
-
-        parsed.append({
-            "id": len(parsed) + 1,
-            "question_number": f"Q{q_num}",
-            "text": prompt_text,
-            "maxMark": total_marks,
-            "modelAnswer": rubric_text
-        })
-
-    return parsed
+    return merged_parsed
 
 
 def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
@@ -182,56 +157,62 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
     clean_text = re.sub(r'[\u2060\u200b\ufeff]', '', clean_text)
     clean_text = re.sub(r'\n{3,}', '\n\n', clean_text).strip()
 
-    q_num_keys = ["question_no", "question_n", "q_num", "q_no", "num"]
     q_text_keys = ["question_text", "question", "prompt", "criteria"] 
     ans_keys = ["model_answer", "answer", "rubric", "marking", "solution"]
     mark_keys = ["max_score", "max_mark", "mark", "score", "points"]
 
     def _build_pattern(keys):
-        sorted_keys = sorted(keys, key=len, reverse=True)
-        # format eg.(?:question_text|question|prompt|criteria)\s*:
-        return r"(?:" + "|".join(sorted_keys) + r")\s*:"
+        expanded = set()
+        for k in keys:
+            expanded.add(k)
+            expanded.add(k.replace('_', ' '))
+            expanded.add(k.replace('_', ''))
+        sorted_keys = sorted(list(expanded), key=len, reverse=True)
+        joined_keys = "|".join(sorted_keys)
+        
+    
+        return rf"(?:\b(?:{joined_keys})\b\s*[:\-]+\s*|(?:^|\n)\s*(?:{joined_keys})\s*(?=\n|\d|$)\s*)"
 
-    q_num_regex = _build_pattern(q_num_keys)
     q_text_regex = _build_pattern(q_text_keys)
     ans_regex = _build_pattern(ans_keys)
     mark_regex = _build_pattern(mark_keys)
 
-    if re.search(q_num_regex, raw_text, re.IGNORECASE) and re.search(q_text_regex, raw_text, re.IGNORECASE):
-        parsed = []
-        
-        blocks = re.split(q_num_regex, raw_text, flags=re.IGNORECASE)
-        
-        for block in blocks:
-            if not block.strip():
-                continue
+    q_num_split_pattern = r"((?:question_no|question_n|q_num|q_no|num|question|q)\s*(?:no\.?|number)?\s*[:\.\-]?\s*\d+)"
+
+    parsed = []
+    blocks = re.split(q_num_split_pattern, clean_text, flags=re.IGNORECASE)
+
+    if len(blocks) > 1:
+        for i in range(1, len(blocks), 2):
+            delimiter = blocks[i]
+            content = blocks[i+1] if (i + 1) < len(blocks) else ""
             
-            # 1. Extract the question number (when block starts with a number)
-            q_num_match = re.search(r'(\d+)', block.strip())
+            q_num_match = re.search(r'(\d+)', delimiter)
             q_num = q_num_match.group(1) if q_num_match else str(len(parsed) + 1)
             
-            # 2. Extract the question text (stop when encountering any answer label, mark label, or end of block)
             q_text = ""
-            q_text_pattern = f"{q_text_regex}\\s*(.*?)(?={ans_regex}|{mark_regex}|$)"
-            q_text_match = re.search(q_text_pattern, block, flags=re.IGNORECASE | re.DOTALL)
+            q_text_pattern = rf"{q_text_regex}(.*?)(?={ans_regex}|{mark_regex}|$)"
+            q_text_match = re.search(q_text_pattern, content, flags=re.IGNORECASE | re.DOTALL)
             if q_text_match:
                 q_text = q_text_match.group(1).strip()
-                
-            # 3. Extract the model answer (stop when encountering any mark label or end of block)
+            else:
+                fallback_pattern = rf"^(.*?)(?={ans_regex}|{mark_regex}|$)"
+                fallback_match = re.search(fallback_pattern, content, flags=re.IGNORECASE | re.DOTALL)
+                if fallback_match:
+                    q_text = fallback_match.group(1).strip()
+                    
             ans_text = ""
             ans_text_pattern = f"{ans_regex}\\s*(.*?)(?={mark_regex}|$)"
-            ans_text_match = re.search(ans_text_pattern, block, flags=re.IGNORECASE | re.DOTALL)
+            ans_text_match = re.search(ans_text_pattern, content, flags=re.IGNORECASE | re.DOTALL)
             if ans_text_match:
                 ans_text = ans_text_match.group(1).strip()
                 
-            # 4. Extract the max mark
             mark_val = 10.0
-            mark_pattern = f"{mark_regex}\\s*(\\d+(\\.\\d+)?)"
-            mark_match = re.search(mark_pattern, block, flags=re.IGNORECASE)
+            mark_pattern = rf"{mark_regex}(\d+(?:\.\d+)?)"
+            mark_match = re.search(mark_pattern, content, flags=re.IGNORECASE)
             if mark_match:
                 mark_val = float(mark_match.group(1))
                 
-            # Exclude faulty parses caused by empty blocks at the beginning of the document
             if not q_text and not ans_text:
                 continue
                 
@@ -242,9 +223,8 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
                 "maxMark": mark_val,
                 "modelAnswer": ans_text
             })
-        
-        if parsed:
-            return parsed
+
+    return parsed
 
 
 def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
