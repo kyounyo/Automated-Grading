@@ -1,0 +1,824 @@
+[
+  {
+    "response_id": 30720842,
+    "question_no": "Q6",
+    "human_score": 0.0,
+    "grader_result": {
+      "total_score": 0.0,
+      "reasoning": "Blank answer."
+    },
+    "auditor_result": {
+      "auditor_score": 0.0,
+      "audit_passed": true,
+      "discrepancy_note": "Blank answer."
+    }
+  },
+  {
+    "response_id": 30881447,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "grader_result": {
+      "reasoning": "For part (a), the student correctly identified prolonged plasma half\u2011life (matching rubric point 2), acidic degradation affecting acid\u2011labile drugs (point 5), and expensive complex manufacture (point 7). They missed biodegradability/no removal, injectable without surgery, aesthetics, and need for skilled worker. For part (b), the student noted injection as a liquid and rapid solidification, which corresponds to temperature\u2011sensitive/polymer solvent systems (point 8). They did not address biodegradable polymer, drug solubility, solvent diffusion, erosion\u2011based release, cost/sterility advantages, or needle\u2011blocking avoidance. Thus 4 marks were awarded out of a possible 10.",
+      "criteria_breakdown": [
+        {
+          "criterion": "May be biodegradable - do not need removal",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Provides a longer duration than lipid systems, reducing frequency of administration",
+          "evidence": "Prolonged the plasma half-lives which improve the patient compliance",
+          "score": 1
+        },
+        {
+          "criterion": "Injectable system, does not require surgical implantation",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Aesthetics \u2013 no physical lump where the implant is injected",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Limited to non-acid labile drugs \u2013 patient may need alternative system in this case",
+          "evidence": "During degradation, can create an acidic environment inside the polymer particles or mass which then rapidly degrade the acid-labile drugs causing ineffective drug delivery",
+          "score": 1
+        },
+        {
+          "criterion": "Need skilled health worker to administer \u2013 may exclude remote patients",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Complex manufacture - expensive",
+          "evidence": "Expensive as complex manufacture that can cause patient unaffordable",
+          "score": 1
+        },
+        {
+          "criterion": "Systems contain a solvent, or polymers that are temperature sensitive",
+          "evidence": "\"Injected as a liquid\" (Discovery) \\n\"Rapidly solidifies in tissues\" (Discovery)",
+          "score": 1
+        },
+        {
+          "criterion": "Generally prepared using a biodegradable polymer",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Drug must be soluble with polymer in solvent",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "On administration solvent diffuses away",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Drug released by degradation and erosion of the polymer matrix",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "No clinical benefit, may be cheaper",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Easier to manufacture, easier to sterilise",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Avoids needle blocking",
+          "evidence": "None",
+          "score": 0
+        }
+      ],
+      "feedback": "Include more specific rubric points such as biodegradability, surgical implantation avoidance, aesthetics, need for skilled administrator, and for in situ gelling mention biodegradable polymer, drug solubility, solvent diffusion, erosion release, cost/sterility advantages, and needle\u2011blocking avoidance.",
+      "total_score": 4
+    },
+    "auditor_result": {
+      "audit_passed": true,
+      "auditor_score": 4,
+      "discrepancy_note": "Independent assessment aligns with the primary grader's score of 4/10. For part (a): The student correctly identified (1) prolonged plasma half-life improving patient compliance \u2014 matching the 'longer duration/reduced frequency' rubric point; (2) acidic degradation environment affecting acid-labile drugs \u2014 matching the 'limited to non-acid labile drugs' disadvantage; and (3) expensive complex manufacture \u2014 matching the 'complex manufacture - expensive' disadvantage. The student also mentioned enabling delivery of poorly soluble drugs, which is not explicitly in the rubric and does not clearly earn a mark. The student missed biodegradability/no removal, injectable without surgery, aesthetics, and need for skilled worker. For part (b): The student's points about 'injected as a liquid' and 'rapidly solidifies in tissues' reasonably correspond to the rubric point about solvent-containing or temperature-sensitive polymer systems, earning 1 mark. However, the student's claim of a clinical benefit (longer duration, 30 days, improved compliance) contradicts the rubric which states 'No clinical benefit,' so no mark is awarded for the clinical benefit question. The student missed biodegradable polymer, drug solubility, solvent diffusion, erosion-based release, cost/sterility advantages, and needle-blocking avoidance. Total: 3 marks for part (a) + 1 mark for part (b) = 4 marks total, consistent with the primary grader's assessment."
+    }
+  },
+  {
+    "response_id": 30883350,
+    "question_no": "Q6",
+    "human_score": 2.0,
+    "grader_result": {
+      "reasoning": "For part (a), the student mentioned 'provide constant and prolonge therapeutic effect,' which matches the rubric advantage of providing a longer duration than lipid systems, reducing administration frequency (1 mark). None of the other student points correspond to the listed advantages or disadvantages. For part (b), the student described sol-to-gel transition under physiological conditions, aligning with the rubric attribute of systems containing a solvent or temperature-sensitive polymers (1 mark). No other student statements matched the remaining attributes. Thus, the student earned 1 mark for each section, totaling 2 marks.",
+      "criteria_breakdown": [
+        {
+          "criterion": "May be biodegradable - do not need removal",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Provides a longer duration than lipid systems, reducing frequency of administration",
+          "evidence": "provide constant and prolonge therapeutic effect",
+          "score": 1
+        },
+        {
+          "criterion": "Injectable system, does not require surgical implantation",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Aesthetics \u2013 no physical lump where the implant is injected",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Limited to non-acid labile drugs \u2013 patient may need alternative system in this case",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Need skilled health worker to administer \u2013 may exclude remote patients",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Complex manufacture - expensive",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Systems contain a solvent, or polymers that are temperature sensitive",
+          "evidence": "polymeric formulations that are in sol forms before entering in the body, but change to gel forms under the physiological conditions",
+          "score": 1
+        },
+        {
+          "criterion": "Generally prepared using a biodegradable polymer",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "drug must be soluble with polymer in solvent",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "on administration solvent diffuses away ",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "drug released by degradation and erosion of the polymer matrix",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "No clinical benefit, may be cheaper, ",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "easier to manufacture, easier to sterilise",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Avoids needle blocking",
+          "evidence": "None",
+          "score": 0
+        }
+      ],
+      "feedback": "Focus on the specific advantages/disadvantages of polymer microspheres and the defined attributes of in situ gelling systems as outlined in the rubric.",
+      "total_score": 2
+    },
+    "auditor_result": {
+      "audit_passed": true,
+      "auditor_score": 2,
+      "discrepancy_note": "Independent assessment aligns with the primary grader's score of 2/10. For part (a), the student's mention of 'provide constant and prolonged therapeutic effect' reasonably maps to the rubric point about longer duration reducing administration frequency (1 mark). The other student points ('particle size reduction for enhancing solubility' and 'decrease dose and toxicity') do not correspond to listed rubric advantages, and 'non-uniform structure' and 'requires long time for the reaction' do not match any listed disadvantages. For part (b), the student's description of sol-to-gel transition under physiological conditions maps to the rubric attribute about temperature-sensitive polymers or solvent-based systems (1 mark). The student's mention of 'control delivery' is too vague to award additional marks, and no other rubric attributes (biodegradable polymer, solvent diffusion, erosion/degradation release, clinical benefit discussion, manufacturing ease, needle blocking) were addressed. Total: 2/10, consistent with the primary grader."
+    }
+  },
+  {
+    "response_id": 30884772,
+    "question_no": "Q6",
+    "human_score": 2.0,
+    "grader_result": {
+      "reasoning": "For part (a), the student mentioned 'long half live' which matches the advantage of longer duration (1 mark). They also described an acidic environment causing degradation of acid-labile drugs, which corresponds to the disadvantage of being limited to non-acid labile drugs (1 mark). No other advantages or disadvantages from the rubric were addressed. For part (b), the student provided no answer, so none of the attributes or clinical benefit points were scored.",
+      "criteria_breakdown": [
+        {
+          "criterion": "May be biodegradable - do not need removal",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Provides a longer duration than lipid systems, reducing frequency of administration",
+          "evidence": "long half live",
+          "score": 1
+        },
+        {
+          "criterion": "Injectable system, does not require surgical implantation",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Aesthetics \u2013 no physical lump where the implant is injected",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Limited to non-acid labile drugs \u2013 patient may need alternative system in this case",
+          "evidence": "creation of an acidic environment in the polymer particles or during mass degradation which will lead to a rapid degradation of acid-labile drugs.",
+          "score": 1
+        },
+        {
+          "criterion": "Need skilled health worker to administer \u2013 may exclude remote patients",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Complex manufacture - expensive",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Systems contain a solvent, or polymers that are temperature sensitive",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Generally prepared using a biodegradable polymer",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "drug must be soluble with polymer in solvent",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "on administration solvent diffuses away",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "drug released by degradation and erosion of the polymer matrix",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "No clinical benefit, may be cheaper, easier to manufacture, easier to sterilise",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Avoids needle blocking",
+          "evidence": "None",
+          "score": 0
+        }
+      ],
+      "feedback": "You need to address more of the listed advantages and disadvantages for microspheres and describe the attributes of in situ gelling systems to earn marks.",
+      "total_score": 2
+    },
+    "auditor_result": {
+      "audit_passed": true,
+      "auditor_score": 2,
+      "discrepancy_note": "I independently agree with the primary grader's assessment. The student earned 1 mark for mentioning 'long half life' which corresponds to the advantage of longer duration/reduced frequency of administration. The student earned 1 mark for describing the acidic environment causing degradation of acid-labile drugs, which corresponds to the disadvantage of being limited to non-acid labile drugs. The student's repeated mention of 'degradation of polymers produce an acidic environment' is redundant and does not earn additional marks as it restates the same point already credited. Part (b) was entirely blank, earning 0 marks. The total of 2/10 is correct. The primary grader's score of 10.0 listed in the header appears to be a data entry error in the context field, as the grader's own evaluation clearly states total_score: 2, which is the score I independently arrived at as well."
+    }
+  },
+  {
+    "response_id": 30897181,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 2,
+      "discrepancy_note": "The primary grader awarded 0.0/10, but the student's answer contains some partial credit-worthy content. For part (a), the student correctly identifies needle clogging as a disadvantage of microspheres (matching the rubric point 'Avoids needle blocking' listed under in situ gelling attributes, implying microspheres have this issue), and mentions sterility as a concern - these are relevant points worth approximately 1 mark. For part (b), the student correctly describes that in situ gelling involves a solvent that diffuses away after injection and that the polymer crystallizes/solidifies around the drug, which aligns with rubric points about solvent diffusion and polymer matrix formation - worth approximately 1 mark. The student also correctly contrasts microspheres as small polymer-based particles with drug encapsulated within them. While the answer is poorly structured, lacks depth, misses many rubric points (biodegradability, duration of action, manufacturing complexity, temperature sensitivity, clinical benefit discussion), and contains some inaccuracies (liquid crystal description is not standard for these systems), it is not entirely without merit. A score of 2/10 is more appropriate than 0/10, representing partial credit for the few correct concepts identified."
+    }
+  },
+  {
+    "response_id": 30897254,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 4,
+      "discrepancy_note": "The primary grader awarded 0/10, but the student answer contains several valid points that merit marks under the rubric. For part (a): The student correctly identifies biodegradability/breakdown into natural molecules (1 mark - matches 'May be biodegradable - do not need removal'); correctly identifies reduced frequency of administration and links it to patient compliance (1 mark - matches 'Provides a longer duration...reducing frequency of administration'); correctly identifies the disadvantage of acidic environment degrading acid-labile drugs (1 mark - matches 'Limited to non-acid labile drugs'); the point about 'invasive' is too vague and does not clearly match any rubric disadvantage point (0 marks). The point about consistent plasma concentration reducing side effects is a reasonable pharmacokinetic benefit but is not explicitly listed in the rubric - borderline, but could be considered a valid advantage point (0-1 mark, I will not award this as it is not in the rubric). Total for (a): 3 marks. For part (b): The student mentions that it does not need to be reconstituted (not in rubric), and mentions NMP as a solvent (partially matches 'Systems contain a solvent'). The mention of solvent/NMP earns 1 mark for identifying the solvent-based nature of the system. The student does not address clinical benefit, ease of manufacture, sterilisation, or needle blocking. Total for (b): 1 mark. Overall auditor score: 4/10. The primary grader's score of 0 is significantly lower than warranted and fails to credit clearly correct rubric-matching content."
+    }
+  },
+  {
+    "response_id": 31062377,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 4,
+      "discrepancy_note": "The primary grader awarded 0/10, but the student answer contains several valid points that merit partial credit. For part (a): 'sustained drug release characteristics' and 'prolonged duration of therapeutic effect' maps to the rubric point about longer duration reducing frequency of administration (1 mark); 'biocompatibility' is a reasonable advantage though not explicitly listed in the rubric, it is a legitimate pharmaceutical science point; 'expensive' as a disadvantage with the patient implication 'not all patients can afford it' directly matches the rubric point about complex manufacture being expensive (1 mark). That gives approximately 2 marks for part (a). For part (b): The student correctly identifies that the system is an injectable polymer+drug+solvent solution that forms a solid polymer phase and degrades (maps to 'solvent diffuses away' and 'drug released by degradation and erosion' - 1 mark); correctly identifies NMP as the solvent (1 mark); mentions ~30 days release duration which is consistent with the system description (partial credit); mentions 'lower risk for side effects' which loosely relates to clinical attributes. The student does not clearly address 'no clinical benefit' or 'easier to manufacture/sterilise' or 'avoids needle blocking' explicitly. I would award approximately 2 marks for part (b). Total estimated score: 4/10. The primary grader's score of 0 is unjustifiably harsh given the student demonstrated partial but genuine understanding of both systems."
+    }
+  },
+  {
+    "response_id": 31106897,
+    "question_no": "Q6",
+    "human_score": 3.0,
+    "grader_result": {
+      "reasoning": "Part (a): The student correctly identified the longer duration/reduced frequency advantage (1 mark), noted biodegradability implicitly but omitted explicit 'no removal' (0.5 marks), missed the injectable\u2011no\u2011surgery and aesthetics advantages (0 each), and correctly identified the need for skilled staff (1 mark) and high cost/complex manufacture (1 mark). They did not mention the acid\u2011labile drug limitation (0). Part (b): The student noted the use of PLGA, a biodegradable polymer (1 mark), and hinted at drug\u2011polymer solubility in solution form (0.5 marks). They did not address solvent/temperature sensitivity, solvent diffusion, drug release by degradation/erosion, cost/manufacturing/sterilisation benefits, or needle\u2011blocking avoidance (0 each). Total score is 3.5 + 1.5 = 5.0.",
+      "criteria_breakdown": [
+        {
+          "criterion": "May be biodegradable - do not need removal",
+          "evidence": "Micropheres which is from PLGA can degrade around 30-90 days",
+          "score": 0.5
+        },
+        {
+          "criterion": "Provides a longer duration than lipid systems, reducing frequency of administration",
+          "evidence": "only one injection is needed for around 1- 3 months, so this can increase patient compliance",
+          "score": 1
+        },
+        {
+          "criterion": "Injectable system, does not require surgical implantation",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Aesthetics \u2013 no physical lump where the implant is injected",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Limited to non-acid labile drugs \u2013 patient may need alternative system in this case",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Need skilled health worker to administer \u2013 may exclude remote patients",
+          "evidence": "Need special care form health professionals to administer and monitor, so patient may need to travel to healthcare facilities",
+          "score": 1
+        },
+        {
+          "criterion": "Complex manufacture - expensive",
+          "evidence": "May need high cost so that the injection is formulated with quality materials, so patient may need to spend more",
+          "score": 1
+        },
+        {
+          "criterion": "Systems contain a solvent, or polymers that are temperature sensitive",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Generally prepared using a biodegradable polymer",
+          "evidence": "In-situ gelling system also uses PLGA approach",
+          "score": 1
+        },
+        {
+          "criterion": "drug must be soluble with polymer in solvent",
+          "evidence": "it is available in the solution forms which incorporate polymer and drugs in it",
+          "score": 0.5
+        },
+        {
+          "criterion": "on administration solvent diffuses away",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "drug released by degradation and erosion of the polymer matrix",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "No clinical benefit, may be cheaper, easier to manufacture, easier to sterilise",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Avoids needle blocking",
+          "evidence": "None",
+          "score": 0
+        }
+      ],
+      "feedback": "You missed several key points such as aesthetics, avoidance of surgical implantation, acid\u2011labile drug limitation, and the specific attributes of in\u2011situ gelling systems (solvent diffusion, needle\u2011blocking avoidance, cost/manufacturing benefits).",
+      "total_score": 5.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 4.0,
+      "discrepancy_note": "I disagree with the primary grader's partial credit awards. For the biodegradability criterion (0.5 marks awarded): the student mentions PLGA degradation over 30-90 days, which does implicitly capture biodegradability, but does not explicitly state 'no removal needed' as the patient benefit. The rubric criterion is specifically about not needing removal \u2014 the student's answer is incomplete on this point. I would award 0 rather than 0.5 here. For Part (b), the drug solubility criterion (0.5 marks awarded): the student says the solution 'incorporates polymer and drugs in it,' which is a very vague statement about the solution form and does not specifically address drug solubility with polymer in solvent as a formulation requirement. I would award 0 rather than 0.5 here. The student's Part (b) answer is also largely superficial \u2014 noting PLGA is used (1 mark for biodegradable polymer) but failing to address solvent/temperature sensitivity, solvent diffusion on administration, drug release mechanism, clinical benefit assessment, manufacturing/sterilisation advantages, or needle-blocking avoidance. The primary grader awarded 1.5 for Part (b); I would award 1.0. For Part (a), I agree with 1 mark each for reduced frequency/compliance and skilled worker disadvantage, and 1 mark for cost/manufacture disadvantage, totaling 3 marks for Part (a). Overall: Part (a) = 3.0, Part (b) = 1.0, Total = 4.0. This differs from the primary grader's 5.0 by 1.0 mark, triggering a failed audit."
+    }
+  },
+  {
+    "response_id": 31106951,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 6,
+      "discrepancy_note": "The primary grader awarded 0/10, which is clearly incorrect. The student answer contains substantial relevant content that maps to multiple rubric criteria. For part (a): The student correctly identifies (1) biodegradable/no removal needed, (2) prolonged duration reducing dosing frequency with patient compliance benefit, (3) needle clogging as a disadvantage (though this is listed under microspheres rather than in situ systems in the rubric, it is a valid disadvantage), (4) acid-labile drug limitation with patient impact explanation, and (5) sterility/pain concerns. This earns approximately 4 marks for part (a). For part (b): The student correctly identifies (1) the system contains a solvent (NMP), (2) biodegradable polymer (PLGA), (3) drug must be soluble with polymer in solvent, (4) sustained/controlled release mechanism. The student incorrectly claims there IS a clinical benefit (self-administration, longer duration than microspheres), whereas the rubric states 'No clinical benefit.' However, the student does identify easier manufacture attributes and some correct system attributes. The student earns approximately 2 marks for part (b) for correctly describing system attributes. Total estimated score: 6/10. The primary grader's score of 0 is a significant error \u2014 the student clearly demonstrates knowledge of the topic and hits multiple rubric points."
+    }
+  },
+  {
+    "response_id": 31107125,
+    "question_no": "Q6",
+    "human_score": 9.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 6,
+      "discrepancy_note": "The primary grader awarded 0/10, which is clearly incorrect. The student answer contains multiple valid points that align with the rubric criteria. For part (a), the student correctly identifies: (1) biodegradable polymer (PLGA) so no accumulation - matches 'May be biodegradable - do not need removal'; (2) sustained/slow release reducing frequency of administration - matches 'Provides a longer duration, reducing frequency of administration'; (3) improved compliance - a reasonable patient-relevant point; (4) acidic environment degrading drug particles - matches 'Limited to non-acid labile drugs'; (5) expensive - matches 'Complex manufacture - expensive'. That gives approximately 4-5 marks for part (a). Pain is a minor point not explicitly in the rubric but not unreasonable. For part (b), the student correctly identifies: (1) requires a solvent system - matches 'Systems contain a solvent'; (2) drug released by degradation/erosion of polymer - matches rubric point; (3) degrades over about 1 month - relevant attribute; (4) reduces frequency of administration and more consistent plasma concentration - valid attributes; (5) clinical benefit noted as avoiding needle clogging - matches 'Avoids needle blocking' in rubric. That gives approximately 4-5 marks for part (b). However, the student misses some nuances: no mention of temperature-sensitive polymers, no explicit mention of sterilization ease or manufacturing simplicity, and the clinical benefit section is somewhat thin. I estimate approximately 4 marks for part (a) and 4 marks for part (b), totaling approximately 6-7 out of 10. The primary grader's score of 0 is unjustifiable and represents a significant error."
+    }
+  },
+  {
+    "response_id": 31107494,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 3,
+      "discrepancy_note": "The primary grader awarded 0/10, but the student answer contains several valid points that merit partial credit. For part (a): The student correctly identifies sustained release/longer therapeutic effect and reduced dosing frequency as an advantage (1 mark), and correctly identifies the acidic degradation environment causing drug degradation as a disadvantage (1 mark) - this maps to 'Limited to non-acid labile drugs' in the rubric. That gives 2 marks for part (a). For part (b): The student correctly identifies that the system is administered as a solution that forms a solid/gel polymer matrix in situ (1 mark), correctly identifies PLGA as the polymer used (partially maps to 'biodegradable polymer' point, 1 mark), and mentions sustained release over ~30 days. The student also attempts to address clinical benefit by noting it avoids the acidic environment issue (1 mark, though imprecise). The description of 'diffusing through skin layers' is incorrect for an injectable system, but the core concept of in situ gelation is present. I award approximately 3/10 total. The primary grader's score of 0 is unjustifiably harsh given the student demonstrates partial understanding of both topics with several rubric-aligned points."
+    }
+  },
+  {
+    "response_id": 31107834,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 4,
+      "discrepancy_note": "The primary grader awarded 0/10, but the student answer contains several valid points that merit partial credit. For part (a): The student correctly identifies biodegradability/safe degradation into natural molecules (1 mark), and correctly identifies extended release reducing frequency of administration/improving compliance (1 mark). The student also correctly identifies the acid-labile drug limitation as a disadvantage (1 mark). That gives 3 marks for part (a). For part (b): The student correctly describes the system as containing a polymer (PLGA) and solvent (NMP) that is injected as a solution (1 mark), and notes it is injectable in liquid form requiring only small needles - touching on the 'avoids needle blocking' attribute (1 mark). The student attempts to address clinical benefit but incorrectly claims rapid degradation is a benefit over microspheres (the rubric states 'no clinical benefit'). However, the description of the system attributes earns partial credit. Total: approximately 4 marks. The primary grader's score of 0 is clearly incorrect given the student demonstrates meaningful understanding of both microsphere properties and in situ gelling systems."
+    }
+  },
+  {
+    "response_id": 31107990,
+    "question_no": "Q6",
+    "human_score": 8.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 6,
+      "discrepancy_note": "The primary grader awarded 0/10, which is clearly incorrect. The student provided substantive, relevant answers for both parts. For part (a), the student correctly identified: (1) biodegradable/no accumulation/safe for patient - maps to 'biodegradable, do not need removal' advantage (1 mark); (2) slow drug release reducing frequency of administration improving compliance - maps to 'longer duration reducing frequency of administration' advantage (1 mark); (3) complex manufacture being expensive adding financial burden - maps to 'complex manufacture - expensive' disadvantage (1 mark); (4) acid-labile drug limitation - maps directly to 'limited to non-acid labile drugs' disadvantage (1 mark). That gives 4 marks for part (a). For part (b), the student described: (1) injectable liquid that solidifies in tissue forming a solid polymer depot - partially maps to solvent diffusing away and polymer matrix formation (1 mark); (2) polymer degrades over time to release drug - maps to 'drug released by degradation and erosion of polymer matrix' (1 mark); (3) reduces frequency of administration for peptide drugs - partially relevant. However, the student did NOT correctly address whether there is a clinical benefit over microspheres (the rubric states 'No clinical benefit' but the student claimed there IS a benefit), and missed key attributes like temperature sensitivity, solvent systems, easier manufacture/sterilization, and avoiding needle blocking. I award approximately 2 marks for part (b). Total: approximately 6/10. The primary grader's score of 0 is a significant error and the audit fails."
+    }
+  },
+  {
+    "response_id": 31108083,
+    "question_no": "Q6",
+    "human_score": 8.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 5,
+      "discrepancy_note": "The primary grader awarded 0/10, which appears to be an error or system failure rather than a genuine evaluation. Independent assessment of the student answer against the rubric yields approximately 5 marks. For part (a): The student correctly identifies biodegradable/hydrolysis degradation (1 mark), reduced frequency of administration/once monthly injection (1 mark), and disadvantages including needle clogging (1 mark), sterility filtration issues/aseptic manufacture (1 mark), and costly manufacturing (1 mark). However, the student does not clearly distinguish advantages from disadvantages in a structured way, and some rubric points (surgical implantation not required, aesthetics, limited to non-acid labile drugs, skilled worker needed) are missing or not clearly stated. For part (b): The student correctly describes solvent diffusion away with polymer crystallizing/solidifying around drug (1 mark), biodegradable/complete bio-absorption (1 mark), small needle and low injection volume/avoids needle blocking (1 mark), easier to sterilize (1 mark). The student does not clearly address whether there is a clinical benefit or explicitly state no clinical benefit, and does not mention temperature-sensitive polymers or drug solubility requirements. Estimated score: approximately 5/10. The primary grader's score of 0.0 is clearly incorrect and represents a significant discrepancy of 5 marks, so audit_passed is FALSE."
+    }
+  },
+  {
+    "response_id": 31108490,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 6,
+      "discrepancy_note": "The primary grader awarded 0/10, which is clearly incorrect. The student provided substantive, relevant answers for both parts.\n\nFor part (a): The student correctly identified (1) biodegradability/slow degradation reducing injection frequency - worth 1 mark for the advantage of longer duration/reduced frequency; (2) PLGA degrades into natural molecules (lactic acid, glycolic acid) with no toxic accumulation - this maps to the biodegradable/no removal advantage; (3) acid-labile drug limitation with patient impact (needing alternative treatment, with specific examples like penicillin) - worth 1 mark. That gives approximately 3 marks for part (a), though the student missed some points (no mention of no surgical implantation, no mention of aesthetics, no mention of skilled worker requirement or complex manufacture/cost).\n\nFor part (b): The student described (1) sustained release over 30 days; (2) injected as liquid and solidifies in tissue; (3) administered subcutaneously with syringe; (4) small needle/low injection volume (avoids needle blocking - matches rubric point). For clinical benefit discussion, the student mentioned prefilled syringe convenience vs reconstitution, reduced embolism risk (particulate vs non-particulate), and manufacturing/administration advantages. The student also noted shorter period of action allowing flexible dosing. These points map to rubric items about easier manufacture, avoids needle blocking, and clinical considerations. This is worth approximately 3 marks for part (b).\n\nTotal estimated score: approximately 5-6/10. The primary grader's score of 0 is unjustifiable given the clear relevant content provided by the student. A score of 0 would imply the student wrote nothing relevant, which is demonstrably false."
+    }
+  },
+  {
+    "response_id": 31108547,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 4,
+      "discrepancy_note": "The primary grader awarded 0/10, but the student answer contains several valid points that merit marks according to the rubric. For part (a): The student correctly identifies that polymer microspheres prolong duration of action and reduce frequency of administration (1 mark - matches rubric advantage). The student correctly identifies that acid-labile drugs are not favoured due to acidic degradation environment and reduced efficacy/bioavailability (1 mark - matches rubric disadvantage). The student also identifies the side effects persistence issue, which while not explicitly in the rubric, is a reasonable disadvantage with patient impact explanation. This could merit 1 mark as a valid disadvantage point. Total for (a): approximately 2-3 marks. For part (b): The student correctly describes that in situ gelling systems consist of polymer + drug + solvent that forms a solid polymer phase and degrades over ~30 days (1 mark for describing the system attributes). The student notes that only a small needle and low injection volume is required, which relates to the 'avoids needle blocking' attribute in the rubric (1 mark). The student attempts to address clinical benefit, though the answer is somewhat confused (suggesting benefit for patients needing <1 month action rather than correctly stating no clinical benefit but easier manufacture/cheaper). This part is largely incorrect per rubric. Total for (b): approximately 1-2 marks. Overall, I estimate the student deserves approximately 3-4 marks out of 10, not 0. The primary grader's score of 0 is unjustifiably low and represents a significant discrepancy."
+    }
+  },
+  {
+    "response_id": 31109462,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 5,
+      "discrepancy_note": "The primary grader awarded 0/10, but the student answer contains several valid points that merit marks according to the rubric. For part (a): The student correctly identifies that PLGA is biodegradable and degrades via hydrolysis (implying no removal needed - 1 mark), correctly states that microspheres provide extended release over several months reducing frequency of administration (1 mark), and correctly identifies that acid-labile drugs are degraded by the acidic microenvironment inside the polymer matrix as a disadvantage (1 mark). The mention of injection being unfavourable to patients is a minor point but relates to the need for skilled administration. That gives approximately 3 marks for part (a). For part (b): The student correctly identifies that in situ gelling systems are injectable polymers containing drug and solvent (1 mark), correctly identifies PLGA as the polymer used (biodegradable - 1 mark), and correctly identifies NMP (N-methyl-2-pyrrolidone, though called 'pyrrolidine' - minor error) as the solvent that diffuses away causing the polymer to solidify (1 mark). The student does not explicitly address clinical benefit comparison or manufacturing advantages. That gives approximately 2 marks for part (b). Total estimated score: 5/10. The primary grader's score of 0 appears to be an error or system failure, as the student clearly demonstrates relevant knowledge across both parts of the question."
+    }
+  },
+  {
+    "response_id": 31109551,
+    "question_no": "Q6",
+    "human_score": 6.0,
+    "grader_result": {
+      "reasoning": "Part (a): Awarded 1 mark for biodegradability/no removal (student noted PLGA degrades to natural acids, no removal needed). 1 mark for longer duration reducing dosing frequency (student said lasts many months, less dose frequency). 0 marks for injectable/no surgical implantation and aesthetics (not mentioned). 0 marks for acid-labile drug limitation and need for skilled worker (not addressed). 1 mark for complex manufacture/expensive (student cited difficult manufacture and sterility costs). Part (b): Awarded 1 mark for solvent presence (student mentioned polymer+drug+solvent). 1 mark for biodegradable polymer (degradation over 30 days implies biodegradability). 0 marks for drug solubility in solvent (not mentioned). 0 marks for solvent diffusion away (not mentioned). 0.5 marks for drug release via degradation/erosion (student noted degradation but did not explicitly link to drug release or erosion). 0.5 marks for cost/manufacturing advantages (student noted cheaper and easier manufacture, though missed sterilisation and incorrectly claimed clinical benefit). 0 marks for needle block avoidance (not mentioned). Total marks = 3 (a) + 3 (b) = 6.",
+      "criteria_breakdown": [
+        {
+          "criterion": "May be biodegradable - do not need removal",
+          "evidence": "Microspheres with polymer PLGA are biodegradable (over several months) * Turns back to glycolic acid and lactic acid which are natural molecules found in the body (No removal needed, patient compliance improved)",
+          "score": 1
+        },
+        {
+          "criterion": "Provides a longer duration than lipid systems, reducing frequency of administration",
+          "evidence": "Since it lasts many months, less dose frequency = better for patient",
+          "score": 1
+        },
+        {
+          "criterion": "Injectable system, does not require surgical implantation",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Aesthetics \u2013 no physical lump where the implant is injected",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Limited to non-acid labile drugs \u2013 patient may need alternative system in this case",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Need skilled health worker to administer \u2013 may exclude remote patients",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Complex manufacture - expensive",
+          "evidence": "Difficult to manufacture; Constant need for sterility = expensive medicines",
+          "score": 1
+        },
+        {
+          "criterion": "Systems contain a solvent, or polymers that are temperature sensitive",
+          "evidence": "injectable polymer+drug+solvent solution",
+          "score": 1
+        },
+        {
+          "criterion": "Generally prepared using a biodegradable polymer",
+          "evidence": "forms solid polymer phase rapidly and degrades over 30 days",
+          "score": 1
+        },
+        {
+          "criterion": "drug must be soluble with polymer in solvent",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "on administration solvent diffuses away ",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "drug released by degradation and erosion of the polymer matrix",
+          "evidence": "degrades over 30 days",
+          "score": 0.5
+        },
+        {
+          "criterion": "No clinical benefit, may be cheaper, easier to manufacture, easier to sterilise",
+          "evidence": "May be cheaper to manufacture yet still provide stability and long lasting effect of a microsphere. May be easier to produce.",
+          "score": 0.5
+        },
+        {
+          "criterion": "Avoids needle blocking",
+          "evidence": "None",
+          "score": 0
+        }
+      ],
+      "feedback": "Student should explicitly address injectable nature, aesthetics, and specific disadvantages like acid\u2011labile drug limitation and need for skilled administration, and clarify drug release mechanisms and sterilisation aspects for in situ gelling systems.",
+      "total_score": 6
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 4,
+      "discrepancy_note": "The primary grader awarded 6/10, but I independently score this at 4/10. Key discrepancies: (1) Part (a) disadvantages: The student's listed disadvantages (1-5) are almost entirely about LIPOSOMES, not polymer microspheres \u2014 they mention 'leakage from liposome,' 'anti-PEG antibodies,' 'bacteria likes lipid medications,' etc. These are irrelevant to microspheres and should not receive credit. The primary grader awarded 1 mark for 'complex manufacture/expensive' based on points 6 and 5, but point 5 ('sterility = expensive') is framed in the context of lipid/liposome systems, not microspheres specifically. I would award 0 marks for the disadvantages section since the student has clearly confused microspheres with liposomes. This reduces part (a) from 3 to 2 marks. (2) Part (b): The primary grader awarded 0.5 for drug release by degradation/erosion and 0.5 for cost/manufacturing. I agree with 1 mark for solvent mention, 1 mark for biodegradable polymer, 0 for drug solubility, 0 for solvent diffusion. For drug release, the student only says 'degrades over 30 days' without linking to drug release mechanism \u2014 I would award 0 rather than 0.5. For clinical benefit/cost, the student incorrectly claims there IS a clinical benefit (contradicting the rubric which states 'No clinical benefit') and mentions cheaper/easier manufacture \u2014 partial credit of 0.5 seems generous but acceptable; I would award 0.5. The student does not mention needle blocking. So part (b) = 1 + 1 + 0 + 0 + 0 + 0.5 = 2.5, which I round to 2. Total: 2 (part a) + 2 (part b) = 4. The primary grader's failure to penalize the student for providing entirely wrong disadvantages (liposome-related rather than microsphere-related) is a significant scoring error that inflates the grade."
+    }
+  },
+  {
+    "response_id": 31109578,
+    "question_no": "Q6",
+    "human_score": 3.0,
+    "grader_result": {
+      "total_score": 0.0
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 5,
+      "discrepancy_note": "The primary grader awarded 0/10, which is clearly incorrect. The student demonstrates meaningful knowledge across both parts. For part (a): The student correctly identifies that microspheres increase half-life/reduce administration frequency (1 mark - matches 'longer duration, reducing frequency of administration'). The student correctly identifies the acid-labile drug degradation disadvantage and its patient impact (1 mark - matches 'Limited to non-acid labile drugs'). The student mentions dose dumping as a disadvantage with patient risk explanation (1 mark - this is a valid pharmacological disadvantage even if not explicitly listed in the rubric; the rubric says '1 mark each point up to 5' and dose dumping is a legitimate disadvantage of microspheres). That gives approximately 3 marks for part (a). For part (b): The student describes in-situ gelling systems as PLGA-based, supplied in prefilled syringe, formulated in solvent system with sustained release (partial credit for attributes - matches 'Systems contain a solvent' and 'Generally prepared using a biodegradable polymer'). The student mentions reduced dose dumping risk, biodegradable/complete bioabsorption, small needles and low injection volume (partially matching 'Avoids needle blocking' and ease of use attributes). The student does not clearly state 'no clinical benefit' - in fact they claim there IS a clinical benefit (reduced dose dumping), which contradicts the rubric answer. However, they do identify several attributes. I would award approximately 2 marks for part (b) attributes described. Total estimated score: approximately 4-5 marks. The primary grader's score of 0 is unjustifiable given the student clearly demonstrates relevant knowledge matching multiple rubric points."
+    }
+  },
+  {
+    "response_id": 31109675,
+    "question_no": "Q6",
+    "human_score": 6.0,
+    "grader_result": {
+      "reasoning": "Part a: Student earned 1 mark for biodegradability/no removal, 1 mark for longer duration reducing frequency, and 1 mark for acid-labile drug limitation. Missed points on injectable/no surgical implantation, aesthetics, need for skilled worker, and complex manufacture. Part b: Student earned 1 mark for containing solvent/polymer, 1 mark for biodegradable polymer, 1 mark for drug solubility in solvent, and 1 mark for drug release via polymer degradation/erosion. Missed points on solvent diffusion on administration, lack of clinical benefit/cheaper manufacture/easier sterilisation, and needle blocking. Total marks = 7.",
+      "criteria_breakdown": [
+        {
+          "criterion": "May be biodegradable - do not need removal",
+          "evidence": "The advantage for polymer microsphere is it contains PLGA which is a degradable polymer which produce lactic acid and glycolic acid. This means there is no need for removal from the patient's body",
+          "score": 1
+        },
+        {
+          "criterion": "Provides a longer duration than lipid systems, reducing frequency of administration",
+          "evidence": "Another advantage of polymer microsphere is takes one to two months to degrade. This slow degradation will allow the sustained release of drug molecules. Hence, the drug will be released in a sustained manner where the plasma concentration is above the minimum effective concentration for 1-2 months period. This will reduce the frequency of injection for the patient",
+          "score": 1
+        },
+        {
+          "criterion": "Injectable system, does not require surgical implantation",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Aesthetics \u2013 no physical lump where the implant is injected",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Limited to non-acid labile drugs \u2013 patient may need alternative system in this case",
+          "evidence": "Another disadvantage of polymer microsphere is during degradation, PLGA will produce an acidic environment. This will affect acid labile drug causing stability problems. Therefore, the patient may not receive effective treatment of the drug.",
+          "score": 1
+        },
+        {
+          "criterion": "Need skilled health worker to administer \u2013 may exclude remote patients",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Complex manufacture - expensive",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Systems contain a solvent, or polymers that are temperature sensitive",
+          "evidence": "It contains the drug, solvent and the polymer (PLGA).",
+          "score": 1
+        },
+        {
+          "criterion": "Generally prepared using a biodegradable polymer",
+          "evidence": "It contains the drug, solvent and the polymer (PLGA).",
+          "score": 1
+        },
+        {
+          "criterion": "drug must be soluble with polymer in solvent",
+          "evidence": "It contains the drug, solvent and the polymer (PLGA). It is usually injected subcutaneously. When it is in contact with bodily fluids, it will undergo gelation",
+          "score": 1
+        },
+        {
+          "criterion": "on administration solvent diffuses away",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "drug released by degradation and erosion of the polymer matrix",
+          "evidence": "The polymer will slowly degrades and releasing the drug in the process allowing drug absorption into the blood circulation.",
+          "score": 1
+        },
+        {
+          "criterion": "No clinical benefit, may be cheaper, easier to manufacture, easier to sterilise",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Avoids needle blocking",
+          "evidence": "None",
+          "score": 0
+        }
+      ],
+      "feedback": "Include all listed advantages/disadvantages (e.g., no surgical implantation, aesthetics, need for skilled worker, complex manufacture) and all in\u2011situ gelling attributes (solvent diffusion, clinical benefit/needle blocking) to capture full marks.",
+      "total_score": 7
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 6,
+      "discrepancy_note": "I disagree with the primary grader on two criteria. First, for 'drug must be soluble with polymer in solvent': the student's answer does not explicitly state that the drug must be soluble with the polymer in the solvent \u2014 they merely list the components (drug, solvent, polymer). Listing components is not the same as describing the solubility requirement, so this point should not be awarded. Second, for 'Generally prepared using a biodegradable polymer': the student does mention PLGA as the polymer, which is biodegradable, so this point is reasonably awarded. However, the student's description of in situ gelling is partially inaccurate (they conflate it with an ocular pH-triggered system rather than the solvent-diffusion/PLGA precipitation mechanism described in the rubric), and the solubility criterion is not explicitly addressed. Removing the solubility mark brings the total to 6. Additionally, the student's point 3 in part (a) \u2014 that the patient 'may need to be injected every 1-2 months' \u2014 is actually a restatement of the advantage (reduced frequency) rather than a genuine disadvantage, so it does not earn a separate mark. The primary grader did not award a mark for this point, which is correct. Overall, my independent score is 6/10, differing from the primary grader's 7/10 by 1 mark, so audit_passed is FALSE."
+    }
+  },
+  {
+    "response_id": 31110185,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "grader_result": {
+      "total_score": 8.0,
+      "reasoning": "Extracted via robust JSON fallback parser.",
+      "parse_fallback": true
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 5,
+      "discrepancy_note": "The primary grader awarded 8/10, which appears significantly inflated relative to the rubric. Independent assessment: Part (a) - The student correctly identifies biodegradability/no surgical removal (1 mark), reduced frequency of administration/improved compliance (1 mark). The 'invasive/painful' and 'needle fear/compliance' points are essentially the same point restated and do not appear in the rubric as distinct disadvantages. 'Expensive' is a valid rubric point (complex manufacture - expensive) earning 1 mark. Total for (a): approximately 3/5. Part (b) - The student correctly identifies that the system contains PLGA, drug and solvent (1 mark), that it solidifies/gels in tissue with polymer degradation controlling release (1 mark), and correctly identifies needle blocking avoidance (1 mark) and ease of sterile filtration (1 mark). However, the student incorrectly states 'There IS a clinical benefit' when the rubric states 'No clinical benefit.' This is a factual error that should not earn the clinical benefit mark. Total for (b): approximately 4/5 minus the incorrect clinical benefit claim, so roughly 3-4/5. Overall independent score: approximately 5-6/10. The primary grader's score of 8/10 is too generous, particularly for part (a) where the student's disadvantages are largely repetitive (needle fear/invasive are essentially the same point) and miss key rubric points like 'limited to non-acid labile drugs' and 'need skilled health worker.' The discrepancy of 2-3 marks warrants a failed audit."
+    }
+  },
+  {
+    "response_id": 31172091,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "grader_result": {
+      "reasoning": "Part a: The student identified three advantages matching biodegradability, long duration, and no surgery, but missed aesthetics and all three disadvantages. Part b: The student covered solvent presence, biodegradable polymer, drug solubility, solvent diffusion, and degradation\u2011based release, which correspond to five rubric points; they incorrectly claimed a clinical benefit and omitted the other listed attributes, so only those five points earned marks.",
+      "criteria_breakdown": [
+        {
+          "criterion": "May be biodegradable - do not need removal",
+          "evidence": "Degrades over time",
+          "score": 1
+        },
+        {
+          "criterion": "Provides a longer duration than lipid systems, reducing frequency of administration",
+          "evidence": "Can last up to 30-90 days",
+          "score": 1
+        },
+        {
+          "criterion": "Injectable system, does not require surgical implantation",
+          "evidence": "Do not require surgery for any implant",
+          "score": 1
+        },
+        {
+          "criterion": "Aesthetics \u2013 no physical lump where the implant is injected",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Limited to non-acid labile drugs \u2013 patient may need alternative system in this case",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Need skilled health worker to administer \u2013 may exclude remote patients",
+          "evidence": "patient compliance, scared of needles",
+          "score": 0
+        },
+        {
+          "criterion": "Complex manufacture - expensive",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Systems contain a solvent, or polymers that are temperature sensitive",
+          "evidence": "an injectable polymer with drug with solvent solution",
+          "score": 1
+        },
+        {
+          "criterion": "Generally prepared using a biodegradable polymer",
+          "evidence": "degrades over 30 days",
+          "score": 1
+        },
+        {
+          "criterion": "drug must be soluble with polymer in solvent",
+          "evidence": "an injectable polymer with drug with solvent solution",
+          "score": 1
+        },
+        {
+          "criterion": "on administration solvent diffuses away ",
+          "evidence": "forms solid polymer phase rapidly",
+          "score": 1
+        },
+        {
+          "criterion": "drug released by degradation and erosion of the polymer matrix",
+          "evidence": "degrades over 30 days",
+          "score": 1
+        },
+        {
+          "criterion": "No clinical benefit, may be cheaper, ",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "easier to manufacture, easier to sterilise",
+          "evidence": "None",
+          "score": 0
+        },
+        {
+          "criterion": "Avoids needle blocking",
+          "evidence": "None",
+          "score": 0
+        }
+      ],
+      "feedback": "You need to address all listed advantages and disadvantages, especially aesthetics and drug\u2011specific limitations, and correctly state the clinical benefit (or lack thereof) for in\u2011situ gelling systems.",
+      "total_score": 8
+    },
+    "auditor_result": {
+      "audit_passed": false,
+      "auditor_score": 5,
+      "discrepancy_note": "The primary grader awarded 8/10, which appears significantly inflated. For Part (a), I agree with 3/5 marks: biodegradability, long duration, and no surgery. However, the student's 'scared of needles' does not match the rubric criterion of 'need skilled health worker to administer - may exclude remote patients'; these are fundamentally different concepts. The student's 'cause an acidic environment' is a property of the system but is not framed as a disadvantage with patient impact as required. So Part (a) earns 3/5. For Part (b), the primary grader awarded 5 marks, but this is overcounting. The rubric lists distinct points: (1) solvent/temperature-sensitive polymers, (2) biodegradable polymer, (3) drug soluble with polymer in solvent, (4) solvent diffuses away on administration, (5) drug released by degradation/erosion, (6) no clinical benefit/cheaper, (7) easier to manufacture/sterilise, (8) avoids needle blocking. The student's answer 'an injectable polymer with drug with solvent solution' covers point 1 (solvent present) and arguably point 3 (drug with polymer in solvent) - but awarding two separate marks for one sentence is generous. 'Forms solid polymer phase rapidly' maps to solvent diffusing away (point 4). 'Degrades over 30 days' maps to biodegradable polymer (point 2) and drug release by degradation (point 5) - again, one statement earning two marks is questionable. The student incorrectly claimed a clinical benefit ('helps patient avoid multiple injections') when the rubric states 'no clinical benefit.' This should not earn a mark and arguably contradicts the rubric. Awarding 5 marks for Part (b) by double-counting single statements is not justified. A fair assessment for Part (b) is 2/5: solvent-based system and degradation/release mechanism, with the clinical benefit claim being incorrect. Total: 3 + 2 = 5/10. The primary grader's score of 8/10 overstates the student's performance by awarding double marks for single statements and ignoring the incorrect clinical benefit claim."
+    }
+  }
+]

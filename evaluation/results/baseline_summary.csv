@@ -1,0 +1,3 @@
+n,icc_a1,mae,mean_error_bias,exact_match_pct,within_1_mark_pct,pearson_r,spearman_rho,model_key,model_id,total_cost_usd,avg_latency_s
+100,0.7105,0.9,-0.3,34.0,78.0,0.7231,0.6907,gemini,google/gemini-3.1-flash-lite,0.1574,4.02
+100,0.6737,0.92,-0.41,30.0,77.0,0.6961,0.6678,claude,anthropic/claude-sonnet-4.6,3.5859,33.29

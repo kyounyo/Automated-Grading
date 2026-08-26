@@ -1,0 +1,4 @@
+n,icc_a1,mae,mean_error_bias,exact_match_pct,within_1_mark_pct,pearson_r,spearman_rho,model_key,model_id,total_cost_usd,avg_latency_s
+100,0.6418,0.995,-0.165,34.0,72.0,0.6424,0.5783,gemini,google/gemini-3.1-flash-lite,0.0841,4.64
+100,0.7498,0.855,-0.395,34.0,70.0,0.7676,0.7217,claude,anthropic/claude-sonnet-4.6,2.0826,22.73
+100,0.6512,0.915,-0.205,38.0,77.0,0.6567,0.6766,nemotron,nvidia/nemotron-3-super-120b-a12b,0.0999,53.74

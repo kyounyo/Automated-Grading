@@ -1,0 +1,4 @@
+combo_name,parser_model,grader_model,auditor_model,n,icc_a1,mae,mean_error_bias,exact_match_pct,within_1_mark_pct,pearson_r,spearman_rho,automation_rate_pct,flag_rate_pct,flagging_recall_pct,flagging_precision_pct,flagging_f1_pct,leakage_fn_rate_pct,overflag_fp_rate_pct,auto_approved_icc,auto_approved_mae,auto_approved_n,total_cost_usd,avg_latency_s
+G-claude_A-gemini,(none),claude,gemini,100,0.6782,0.92,-0.37,31.0,76.0,0.6949,0.6655,55.0,45.0,50.0,57.78,53.61,50.0,39.58,0.7697,0.8636,55,3.747,35.86
+G-claude_A-claude,(none),claude,claude,100,0.6766,0.915,-0.375,31.0,76.0,0.6944,0.6635,51.0,49.0,49.02,51.02,50.0,50.98,48.98,0.8235,0.8137,51,5.5156,46.87
+G-claude_A-nemotron,(none),claude,nemotron,100,0.6812,0.91,-0.39,32.0,76.0,0.7,0.6695,42.0,58.0,74.51,65.52,69.72,25.49,40.82,0.8819,0.5714,42,3.736,76.47

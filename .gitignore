@@ -23,3 +23,14 @@ evaluation/.DS_Store
 # IDE & Workspace
 .vscode/
 .idea/
+evaluation/ai_json_responses32(M).json
+evaluation/ai_json_responses32(Gemini3.1FlashLite).json
+evaluation/ai_json_responses32(G).json
+evaluation/ai_json_responses3.json
+evaluation/baseline_claude.log
+evaluation/baseline_gemini.log
+evaluation/baseline_nemotron_retry.log
+evaluation/baseline_nemotron_retry2.log
+evaluation/baseline_nemotron_retry3.log
+evaluation/baseline_nemotron.log
+evaluation/baseline_run.log

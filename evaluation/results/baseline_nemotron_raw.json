@@ -1,0 +1,3193 @@
+[
+  {
+    "response_id": 31109578,
+    "question_no": "Q6",
+    "human_score": 3.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'error code: 502\\n', 'code': 502}"
+    }
+  },
+  {
+    "response_id": 31862160,
+    "question_no": "Q6",
+    "human_score": 3.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'error code: 502\\n', 'code': 502}"
+    }
+  },
+  {
+    "response_id": 31860737,
+    "question_no": "Q6",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.88,
+      "status": "graded",
+      "reasoning": "Part (a) rubric awards 1 mark each for: biodegradability/no removal, longer duration vs lipid systems reducing frequency, injectable no surgical implantation, aesthetics (no lump), disadvantage: limited to non-acid labile drugs, disadvantage: need skilled health worker, disadvantage: complex manufacture/expensive. Student identified longer duration (reduce frequency), acid-labile limitation, and complex manufacture/cost increase \u2013 3 marks. Missed biodegradability, injectable/no surgery, aesthetics, and need for skilled worker. Part (b) rubric awards 1 mark each for: solvent/temperature-sensitive polymers, biodegradable polymer, drug solubility in solvent, solvent diffusion on administration, drug release by degradation/erosion, no clinical benefit (cheaper/easier manufacture/sterilisation), avoids needle blocking. Student noted solvent presence, biodegradable PLGA polymer, and degradation over ~30 days \u2013 3 marks. Did not address solubility, solvent diffusion, lack of clinical benefit/cost/manufacturing/sterilisation advantages, or needle blocking avoidance. Total = 6/10.",
+      "feedback": {
+        "summary": "Submission shows correct grasp of several key points but omits multiple rubric\u2011specified advantages and disadvantages for both microspheres and in\u2011situ gelling systems.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 3.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for reduced frequency of administration, 1 mark for acid\u2011labile drug limitation, and 1 mark for complex manufacture/cost increase. Missed biodegradability, injectable/no surgery, aesthetics, and need for skilled health worker."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 3.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for mentioning solvent, 1 mark for biodegradable PLGA polymer, and 1 mark for drug release via degradation. Missed drug solubility in solvent, solvent diffusion on administration, lack of clinical benefit/cost/manufacturing/sterilisation advantages, and needle\u2011blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "-reduce frequency of administration since drug is slowly released over 30-90 days",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning prolonged therapeutic effect (reduced frequency of administration) matching rubric advantage."
+        },
+        {
+          "text": "-drug degrade in acidic condition",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for identifying limitation to acid\u2011labile drugs, matching rubric disadvantage."
+        },
+        {
+          "text": "-use heat sterilization to prepare, prepared in aseptic environment, hence cost increase",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting complex manufacture leading to higher cost, matching rubric disadvantage."
+        },
+        {
+          "text": "injectable polymer+drug+solvent solution",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting presence of solvent, matching rubric attribute."
+        },
+        {
+          "text": "prepared from poly(lactide-co-glycolide)",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting biodegradable polymer (PLGA), matching rubric attribute."
+        },
+        {
+          "text": "degrades over time at around 30 days",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting drug released by degradation of polymer matrix, matching rubric attribute."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32025238,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "ai_evaluation": {
+      "overall_score": 9.0,
+      "confidence_score": 0.93,
+      "status": "graded",
+      "reasoning": "Part (a) awarded 4 marks: student identified biodegradability (via hydrolysis mention), longer duration reducing frequency, complex manufacture expense, and acid-labile limitation; missed injectable/no surgical implantation, aesthetics, and need for skilled health worker. Part (b) awarded 5 marks: student covered solvent/biodegradable polymer, solubility implication, solvent diffusion (solidification), drug release via degradation/erosion, and clinical benefit of avoiding needle blocking (less painful administration). All rubric concepts addressed; no points exceed allocated maxima.",
+      "feedback": {
+        "summary": "Strong submission demonstrating good understanding of both microsphere and in situ gelling systems, with minor omissions in part (a).",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 4.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for biodegradable concept (degradation via hydrolysis), 1 mark for longer duration reducing frequency, 1 mark for complex manufacture expense, 1 mark for acid-labile drug limitation. Missed injectable/no surgical implantation, aesthetics, and need for skilled health worker."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 5.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded marks for solvent/biodegradable polymer (PLGA), drug solubility implied, solvent diffusion away (rapid solidification), drug release by degradation/erosion, and clinical benefit of avoiding needle blocking (less painful administration). All rubric points adequately covered."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Polymer microsphere release the drug from formulation slowly by degradation via hydrolysis.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning biodegradability concept (hydrolysis degradation) in (a)."
+        },
+        {
+          "text": "In situ gelling polymer system is manufactured in solution form, containing the drugs, polymer PLGA and solvent.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for identifying solvent and biodegradable polymer (PLGA) in (b)."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32022271,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 7,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Part (a) addressed five of the rubric points: biodegradability/no removal, injectable/no surgical implantation, aesthetics (no lump), acidic environment limitation (non-acid labile drugs), and need for skilled health worker. The longer duration advantage over lipid systems and complex manufacture cost were omitted, but the five matched points earn the full 5 marks. Part (b) only touched on biodegradable polymer (PLGA) and degradation/erosion mechanism, earning 2 marks. It missed the solvent/temperature sensitivity, drug solubility in solvent, solvent diffusion on administration, lack of clinical benefit/cost/sterility advantages, and needle\u2011blocking avoidance, leaving 3 points unawarded.",
+      "feedback": {
+        "summary": "Strong understanding of polymer microsphere advantages/disadvantages; limited detail on in situ gelling system attributes.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 5,
+            "max_score": 5,
+            "reasoning": "Covered biodegradability/no removal, injectable/no surgical implantation, aesthetics (no lump), acidic environment disadvantage, and need for skilled health worker \u2014 five distinct rubric points. Missed longer duration vs lipid systems and complex manufacture cost."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 2,
+            "max_score": 5,
+            "reasoning": "Identified biodegradable polymer (PLGA) and drug release via degradation/erosion. Did not address solvent/temperature sensitivity, drug solubility in solvent, solvent diffusion on administration, lack of clinical benefit/cost/sterility advantages, or needle blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Microspeheres are degraded by hydrolysis over a month to slowly release drug. Also, it is small enough to be injected but do not form a big implant. Do not have to be taken out from the body as it is degradable.",
+          "question_number": "Q6(a)",
+          "score_awarded": 5,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 5 points for covering biodegradability (no removal), injectable/no surgical implantation, aesthetics (no lump), acidic environment disadvantage (non-acid labile drugs), and need for skilled health worker. Missed longer duration vs lipid systems and complex manufacture cost."
+        },
+        {
+          "text": "It can speed up the degradation by changing the concentration of glycolic acid and lactic acid in PLGA thus to make the drug to release in one week.",
+          "question_number": "Q6(b)",
+          "score_awarded": 2,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 2 points for noting biodegradable polymer (PLGA) and drug release via degradation/erosion. Missed solvent/temperature sensitivity, drug solubility in solvent, solvent diffusion on administration, lack of clinical benefit/cost/sterility advantages, and needle blocking avoidance."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32227787,
+    "question_no": "Q6",
+    "human_score": 8.0,
+    "ai_evaluation": {
+      "overall_score": 9.0,
+      "confidence_score": 0.93,
+      "status": "graded",
+      "reasoning": "Part (a) awarded 4 marks for covering biodegradability, prolonged duration/reduced frequency, no surgical implantation, and acid-labile disadvantage. Missed aesthetics, need for skilled health worker, and complex manufacture. Part (b) awarded 5 marks for addressing solvent use, biodegradable polymer, implied drug solubility, solvent diffusion, drug release via degradation/erosion, and cheaper/easier manufacture. Missed explicit temperature sensitivity, easier sterilisation, and needle blocking avoidance. Total does not exceed the maximum of 10 marks.",
+      "feedback": {
+        "summary": "Strong submission demonstrating clear understanding of core concepts with minor omissions.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 4.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 4 marks for mentioning biodegradability, prolonged therapeutic effect reducing frequency, no surgical implantation, and acid-labile disadvantage. Omitted aesthetics, need for skilled health worker, and complex manufacture."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 5.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 5 marks for covering solvent use, biodegradable polymer, implied drug solubility, solvent diffusion, drug release via degradation/erosion, and cheaper/easier manufacture. Did not explicitly mention temperature sensitivity, easier sterilisation, or needle blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Polymer microsphere is degradable and will slowly degrade to release drugs upon injection. This helps to prevent invasive surgical procedure to insert and remove the system from the body such as that for surgical implants system.",
+          "question_number": "Q6(a)",
+          "score_awarded": 4.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 4 marks for mentioning biodegradability, prolonged duration/reduced frequency, and no surgical implantation. Missed aesthetics, need for skilled health worker, and complex manufacture."
+        },
+        {
+          "text": "The \u2018in situ gelling\u2019 polymer systems also utilise polymers such as poly(lactide-co-glycolide) - PLGA, together with drug and a solvent, to form a prefilled syringe solution. It is injected subcutaneously as a liquid and rapidly solidifies in the tissue. This allow prolonged releasee of drugs from weeks to months such as around 30 days. \u2018In situ gelling\u2019 polymer systems have advantages such as simpler manufacturing process and reduced cost.",
+          "question_number": "Q6(b)",
+          "score_awarded": 5.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 5 marks for covering solvent use, biodegradable polymer, implied drug solubility, solvent diffusion, drug release via degradation/erosion, and cheaper/easier manufacture. Missed explicit temperature sensitivity, easier sterilisation, and needle blocking avoidance."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32022735,
+    "question_no": "Q6",
+    "human_score": 8.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider returned error', 'code': 429}"
+    }
+  },
+  {
+    "response_id": 32629796,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider returned error', 'code': 429}"
+    }
+  },
+  {
+    "response_id": 32228872,
+    "question_no": "Q6",
+    "human_score": 8.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider returned error', 'code': 429}"
+    }
+  },
+  {
+    "response_id": 30897181,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 1.0,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Part (a) asked for advantages and disadvantages of polymer microspheres with patient implications. The student mentioned clogging needle, larger particle size, preference for solution-based systems, and sterility issues, none of which correspond to the rubric points (biodegradability, longer duration, no surgical implantation, aesthetics, acid-labile drug limitation, need for skilled worker, complex manufacture). Therefore no marks were awarded for (a). Part (b) required attributes of in situ gelling systems and their clinical/manufacturing relevance. The student correctly noted that 'the solvent diffuses away' upon injection, matching one rubric point. They omitted biodegradable polymer requirement, drug solubility, degradation/erosion release mechanism, lack of clinical benefit, cost/manufacturing/sterilization advantages, and needle-blocking avoidance. Hence 1 mark was awarded for (b).",
+      "feedback": {
+        "summary": "The response shows limited understanding of the rubric expectations, capturing only a single correct point about solvent diffusion in part (b).",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 0,
+            "max_score": 5,
+            "reasoning": "No advantages or disadvantages matching the rubric were provided; the student discussed clogging, particle size, solution preference, and sterility, which are not listed criteria."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 1,
+            "max_score": 5,
+            "reasoning": "Awarded 1 mark for correctly stating that the solvent diffuses away on administration. Missed biodegradable polymer, drug solubility, degradation/erosion release, lack of clinical benefit, cost/ease of manufacture/sterilization, and needle-blocking advantage."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "they\u00a0have issue clogging the needle, they have slightly larger particle",
+          "question_number": "Q6(a)",
+          "score_awarded": 0,
+          "max_score": 5,
+          "type": "weakness",
+          "comment": "Awarded 0 marks for (a). The quoted text mentions clogging and particle size, which do not correspond to any rubric advantage or disadvantage (biodegradability, duration, injection benefit, aesthetics, acid-labile limitation, skilled worker need, manufacture cost)."
+        },
+        {
+          "text": "When in situ solvent is injected the solvent diffuses away",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for (b). The quote correctly captures the rubric point that on administration the solvent diffuses away. Other required attributes (biodegradable polymer, drug solubility, degradation/erosion release, lack of clinical benefit, cost/manufacturing/sterilization benefits, needle-blocking avoidance) were not addressed."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31858996,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 4.0,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Part (a) asked for advantages and disadvantages of polymer microspheres (5 marks). The student mentioned sustained drug release and reduced dosing frequency, which matches the rubric point 'Provides a longer duration than lipid systems, reducing frequency of administration' (1 mark). No correct advantages (biodegradable, injectable no surgical implantation, aesthetics) or disadvantages (limited to non-acid labile drugs, need skilled worker, complex manufacture) were provided, so no further marks. Part (b) asked for attributes of in situ gelling systems (5 marks). The student noted easy sterilization, solvent diffusion after injection, and degradation/erosion of the polymer matrix, matching three rubric points: 'easier to sterilise', 'on administration solvent diffuses away', and 'drug released by degradation and erosion of the polymer matrix' (3 marks). Missing attributes: solvent/temperature sensitivity, biodegradable polymer, drug solubility, lack of clinical benefit/cost/manufacturing advantages, and needle blocking avoidance. Total score = 1 + 3 = 4 out of 10.",
+      "feedback": {
+        "summary": "The response shows basic understanding of sustained release and some attributes of in situ gelling systems but misses many key advantages/disadvantages required by the rubric.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 1,
+            "max_score": 5,
+            "reasoning": "Awarded 1 mark for mentioning prolonged therapeutic effect and reduced frequency (advantage). Failed to address biodegradability, injectable non-surgical implantation, aesthetics advantages and any correct disadvantages."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 3,
+            "max_score": 5,
+            "reasoning": "Awarded 3 marks for mentioning easy sterilization, solvent diffusion, and polymer degradation/erosion. Missed attributes: solvent/temperature sensitivity, biodegradable polymer, drug solubility, no clinical benefit/cost/manufacturing advantages, and needle blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "* releases drug slowly for delayed and sustained therapeutic effect * reduce the frequency of administration for better patient compliances over extended period of time.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning prolonged therapeutic effect and reduced frequency (advantage). The response failed to address specific advantages (biodegradability, non-surgical injection, aesthetics) and disadvantages required by the rubric."
+        },
+        {
+          "text": "can be easily sterilized for injection, the solvent injected and diffuses out of polymer, it crystallizes to form a gelling systems which degrades over 30 days.",
+          "question_number": "Q6(b)",
+          "score_awarded": 3,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 3 marks for mentioning easy sterilization, solvent diffusion, and degradation/erosion. Missed attributes: solvent/temperature sensitivity, biodegradable polymer, drug solubility, no clinical benefit/cost/manufacturing advantages, and needle blocking avoidance."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32557590,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.88,
+      "status": "graded",
+      "reasoning": "Part (a) addresses four of the rubric points: longer duration reducing injection frequency (advantage), injectable nature implying no surgical implantation (advantage), acidic degradation affecting acid-labile drugs (disadvantage), and need for trained healthcare workers (disadvantage). It omits biodegradability, aesthetics, and complex manufacture/expense disadvantages. Part (b) identifies the presence of a solvent/polymer mixture that solidifies after injection (attribute) and notes degradation over ~30 days (related to drug release via degradation/erosion). It misses biodegradability requirement, drug solubility in solvent, solvent diffusion, lack of clinical benefit, cost/manufacturing/sterilization advantages, and needle\u2011blocking avoidance.",
+      "feedback": {
+        "summary": "Solid understanding of key concepts but misses several specific rubric points, particularly in part (b).",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 4.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for prolonged therapeutic effect (longer duration), 1 mark for injectable advantage (no surgical implantation implied), 1 mark for acidic degradation limiting acid\u2011labile drugs, and 1 mark for need for skilled health worker. Missed biodegradability, aesthetics, and complex manufacture/expense points."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 2.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for mentioning a solvent/polymer mixture that solidifies after injection (solvent present), and 1 mark for noting degradation over ~30 days (drug release via degradation/erosion). Missed biodegradable polymer, drug solubility in solvent, solvent diffusion, lack of clinical benefit, cost/manufacturing/sterilization advantages, and needle\u2011blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Able to produce therapeutic effect for up to 30-90 days. This means that the patient can reduce the amount of times they have to be injected.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning prolonged therapeutic effect reducing injection frequency, matching rubric advantage 'Provides a longer duration than lipid systems, reducing frequency of administration'."
+        },
+        {
+          "text": "Drug is encapsulated into small polymers that are able to be injected. This is advantage for patients that need to take poorly water soluble drugs that do not come in tablet form or for patients who are unable to swallow oral formulations following a surgery or due to other factors.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting injectable advantage (no surgical implantation implied), aligning with rubric advantage 'Injectable system, does not require surgical implantation'."
+        },
+        {
+          "text": "When this polymer microsphere degrades, it produces an acidic environment which causes drugs to be degraded. For the patient, this decreases the effect of drug.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for identifying acidic degradation affecting acid\u2011labile drugs, corresponding to rubric disadvantage 'Limited to non-acid labile drugs \u2013 patient may need alternative system in this case'."
+        },
+        {
+          "text": "Polymer microspheres need to be injected by trained healthcare professionals. This can be a disadvantage as it means the patient needs to be present at the hospital or clinic to be able to use this dose form.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting need for skilled health worker, matching rubric disadvantage 'Need skilled health worker to administer \u2013 may exclude remote patients'."
+        },
+        {
+          "text": "It is a injectable solution containing the drug, solvent, and polymer which forms a solid once injected.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for referencing solvent/polymer mixture that solidifies after injection, satisfying rubric point 'Systems contain a solvent, or polymers that are temperature sensitive'."
+        },
+        {
+          "text": "Degrades over an estimate of 30 days",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting degradation over ~30 days, which relates to rubric point 'Drug released by degradation and erosion of the polymer matrix'."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31920918,
+    "question_no": "Q6",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Part (a) awarded 3 marks for correctly identifying reduced frequency of administration (advantage), acid-labile drug limitation (disadvantage), and higher cost (disadvantage). Missed biodegradability, non-surgical injection benefit, aesthetics, and need for skilled worker. Part (b) awarded 4 marks for noting solvent presence, biodegradable polymer, drug release via degradation/erosion, and avoidance of needle blocking via pre-filled syringe. Missed drug solubility in solvent, solvent diffusion away, and points about clinical benefit, cost, manufacture ease, and sterilisation. Total score sums to 7.0 out of 10.0.",
+      "feedback": {
+        "summary": "Solid understanding of key concepts; missed several rubric-specific points in both parts.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 3.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for reduced frequency of administration (advantage), 1 mark for acid-labile drug degradation issue (disadvantage), and 1 mark for higher cost (disadvantage). Omitted biodegradability, non-surgical injection benefit, aesthetics, and need for skilled health worker."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 4.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for solvent/system containing solvent, 1 mark for biodegradable polymer, 1 mark for drug release via degradation/erosion of polymer matrix, and 1 mark for avoiding needle blocking (pre-filled syringe). Missed drug solubility in solvent, solvent diffusion away, and points about clinical benefit, cost reduction, easier manufacture, and easier sterilisation."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "- reduce frequency of administration, so the patient would not have to be injected for so many times",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning reduced frequency of administration (advantage). The response missed biodegradability, non-surgical benefit, aesthetics, and need for skilled worker."
+        },
+        {
+          "text": "In situ gelling system includes an injectable polymer, the active drug and the solvent solution. It is normally being injected as a solution into the body and rapidly solidifies in the tissues. The polymer is degradable and will slowly degrade and release the drug slowly.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting solvent presence and biodegradable polymer. The response missed drug solubility in solvent, solvent diffusion away, and points about clinical benefit, cost, manufacture ease, and sterilisation."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32233167,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 12182ms', 'code': 504}"
+    }
+  },
+  {
+    "response_id": 31109675,
+    "question_no": "Q6",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Part (a) addresses three of the rubric points: biodegradability/no removal, longer duration reducing frequency, and acid\u2011labile limitation. It does not mention injectable non\u2011surgical implantation, aesthetics, need for skilled worker, or complex manufacture. Thus 3 marks out of 5 are awarded. Part (b) captures solvent presence, biodegradable polymer, drug release via degradation/erosion, and implies drug solubility. It omits explicit mention of solvent diffusion away, lack of clinical benefit, cost/manufacturing/sterilisation advantages, and needle\u2011blocking avoidance. Hence 4 marks out of 5 are awarded. Total score = 3 + 4 = 7.0.",
+      "feedback": {
+        "summary": "Good demonstration of core concepts; missing several specific rubric points especially regarding practical considerations and comparative benefits.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 3.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for biodegradability/no removal, 1 mark for longer duration reducing frequency, and 1 mark for acid\u2011labile limitation. Missed injectable non\u2011surgical, aesthetics, skilled worker requirement, and manufacture complexity."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 4.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for solvent/polymer presence, 1 mark for biodegradable polymer, 1 mark for drug release via degradation/erosion, and 1 mark for implied drug solubility. Missed solvent diffusion away, lack of clinical benefit, cost/manufacturing/sterilisation advantages, and needle\u2011blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "The advantage for polymer microsphere is it contains PLGA which is a degradable polymer which produce lactic acid and glycolic acid. This means there is no need for removal from the patient's body",
+          "question_number": "Q6(a)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning biodegradability and no need for removal in (a). The response did not cover injectable non\u2011surgical, aesthetics, skilled worker, or manufacture points."
+        },
+        {
+          "text": "In situ gelling polymer comes with a syringe which is prefilled with solution. It contains the drug, solvent and the polymer (PLGA).",
+          "question_number": "Q6(b)",
+          "score_awarded": 1.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting the presence of solvent and biodegradable polymer (PLGA) in (b). The answer omitted solvent diffusion, lack of clinical benefit, cost/manufacturing/sterilisation advantages, and needle\u2011blocking avoidance."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32025289,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 6,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Part (a) awarded 2 marks: student correctly identified reduced frequency of administration (matches longer duration advantage) and costly due to complex manufacturing process (matches disadvantage). Missed biodegradability, no surgical implantation, aesthetics, limited to non-acid labile drugs, and need for skilled health worker. Part (b) awarded 4 marks: student identified biodegradable polymer (PLGA), presence of solvent in a prefilled syringe, temperature-sensitive rapid solidification, and attractive cost of goods sold (cheaper/easier manufacture). Did not explicitly mention solvent diffusion away, drug release by degradation/erosion, or avoidance of needle blocking; claimed clinical benefit which contradicts rubric but did not detract from awarded points.",
+      "feedback": {
+        "summary": "Solid understanding of key concepts but missed several specific rubric points in both sections.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 2,
+            "max_score": 5,
+            "reasoning": "Awarded 1 mark for reduced frequency of administration (longer duration advantage) and 1 mark for costly due to complex manufacturing (disadvantage). Omitted biodegradability, no surgical implantation, aesthetics, limited to non-acid labile drugs, and need for skilled health worker."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 4,
+            "max_score": 5,
+            "reasoning": "Awarded 1 mark each for biodegradable polymer (PLGA), solvent-containing solution, temperature-sensitive rapid solidification, and lower cost/easier manufacture. Did not explicitly address solvent diffusion away, release by degradation/erosion, or needle blocking; incorrectly asserted clinical benefit over microspheres."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "* Reduced frequency of administration, hence improving patient's compliance over extended periods of time\u00a0",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for matching rubric advantage: longer duration reduces frequency of administration."
+        },
+        {
+          "text": "* Costly due to complex manufacturing process and may increase financial burden of the patient\u00a0",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for matching rubric disadvantage: complex manufacture - expensive."
+        },
+        {
+          "text": "* prepared from\u00a0poly(lactide-co-glycolide) which is a degradable polymer\u00a0",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for matching rubric attribute: generally prepared using a biodegradable polymer."
+        },
+        {
+          "text": "* not particulate and are\u00a0usually supplied as a prefilled syringe with the three components as a solution (PLGA, drug and solvent)\u00a0",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for matching rubric attribute: systems contain a solvent; drug must be soluble with polymer in solvent."
+        },
+        {
+          "text": "* safe to inject normally via subcutaneous injection and rapidly solidifies in tissues\u00a0",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for matching rubric attribute: polymers that are temperature sensitive (solidify on administration)."
+        },
+        {
+          "text": "* Attractive cost of goods sold\u00a0",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for matching rubric attribute: may be cheaper, easier to manufacture."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31107494,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Part (a) earned 2 marks: one for the sustained\u2011release advantage (longer duration, reduced dosing frequency) and one for noting the acidic environment that degrades acid\u2011labile drugs, which maps to the rubric\u2019s disadvantage about non\u2011acid\u2011labile drugs. Key advantages (biodegradable, injectable no surgery, aesthetics) and disadvantages (need for skilled worker, complex manufacture) were omitted. Part (b) earned 4 marks: credit for mentioning solvent, biodegradable polymer (PLGA), drug\u2011polymer\u2011solvent solubility, and the claimed clinical benefit of avoiding acidic degradation. Missed rubric points about temperature sensitivity, solvent diffusion away, drug release by degradation/erosion, cost/manufacturing/sterilization advantages, and needle\u2011blocking avoidance.",
+      "feedback": {
+        "summary": "Submission shows understanding of sustained release and acid\u2011labile issue, but misses several key advantages/disadvantages and attributes.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 2.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for mentioning sustained release leading to longer duration and reduced dosing frequency (matches advantage of longer duration). Awarded 1 mark for noting acidic environment causing drug degradation, addressing disadvantage related to acid\u2011labile drugs. Missed biodegradability, injectable no surgery, aesthetics, need skilled worker, complex manufacture."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 4.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for mentioning solvent (PLGA, drug, solvent). Awarded 1 mark for biodegradable polymer (PLGA). Awarded 1 mark for drug solubility with polymer in solvent. Awarded 1 mark for clinical benefit claim (no acidic environment). Missed points: temperature sensitivity, solvent diffusion away, drug release by degradation/erosion, cost/manufacturing/sterilization advantages, needle blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Able to provide a sustained release of drug and hence provide longer therapeutic effect. This enable lesser dosing frequency that the patient need to take and hence increase adherence to the drug.",
+          "question_number": "Q6(a)",
+          "score_awarded": 2.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning sustained release leading to longer duration and reduced dosing frequency in (a)."
+        },
+        {
+          "text": "It contain poly(lactide-co-glycolide) (PLGA), drug and solvent.",
+          "question_number": "Q6(b)",
+          "score_awarded": 4.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning solvent, 1 mark for biodegradable polymer (PLGA), 1 mark for drug solubility with polymer in solvent, and 1 mark for clinical benefit claim (no acidic environment) in (b)."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32270232,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 12086ms', 'code': 504}"
+    }
+  },
+  {
+    "response_id": 31107834,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "ai_evaluation": {
+      "overall_score": 8.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Part (a) awarded 3 marks: student identified biodegradability (natural molecules), extended duration/reduced frequency, and acid-labile drug limitation. Missed advantages of no surgical implantation and aesthetics, and disadvantages of needing skilled worker and complex manufacture. Part (b) awarded full 5 marks: student covered solvent presence, drug solubility in solvent, biodegradable polymer (PLGA), drug release via degradation/erosion, and avoidance of needle blocking (small needles). All rubric points for (b) were addressed, meeting the 5-mark maximum.",
+      "feedback": {
+        "summary": "Solid understanding of microsphere advantages/disadvantages and in situ gelling system attributes; missed a few microsphere points but excelled on the rival technology.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 3,
+            "max_score": 5,
+            "reasoning": "Awarded 1 mark for biodegradability, 1 mark for prolonged duration reducing dosing frequency, and 1 mark for acid-labile drug disadvantage. Omitted points on non-surgical implantation, aesthetics, need for skilled administrator, and manufacturing complexity."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 5,
+            "max_score": 5,
+            "reasoning": "Awarded marks for: solvent presence and solubility, biodegradable polymer (PLGA), drug release via degradation/erosion, and needle blocking avoidance (small needles). All five rubric concepts were covered."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Polymer microspheres degrade into natural molecules into the body. This is safe for the patient in the long run.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for mentioning biodegradability advantage (do not need removal)."
+        },
+        {
+          "text": "Polymer microspheres when injected, slowly degraded through hydrolysis to release drugs over an extended period of time. This can aid in patient compliance and reduce the frequency of administration.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting prolonged duration reducing administration frequency."
+        },
+        {
+          "text": "The creation of an acidic environment inside the polymer particles or mass during degradation which can rapidly degrade acid-labile drugs.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for identifying disadvantage related to acid-labile drugs."
+        },
+        {
+          "text": "Injectable, in situ forming gel systems prepared from PGLA and supplied with a prefilled syringe with the three components as a solution (PLGA, drug and solvent). The solvent is safe to inject and is usually n-methyl pyrrolidone (NMP).",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting the system contains a solvent and drug solubility in solvent."
+        },
+        {
+          "text": "PLGA",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for indicating use of a biodegradable polymer (PLGA)."
+        },
+        {
+          "text": "The benefits is that it can rapid degrade and release drugs for around 30 days while microspheres might take 30 to 90 days for degradation.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for describing drug release by degradation and erosion of the polymer matrix."
+        },
+        {
+          "text": "It is also injectable in liquid form and only requires small needles and volume.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for highlighting avoidance of needle blocking (small needles)."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32422296,
+    "question_no": "Q6",
+    "human_score": 8.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 12365ms', 'code': 504}"
+    }
+  },
+  {
+    "response_id": 31986862,
+    "question_no": "Q6",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 11993ms', 'code': 504}"
+    }
+  },
+  {
+    "response_id": 32025351,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "For Q6(a), the student identified three rubric points: sustained/reduced frequency of administration (advantage), acid-labile drug limitation (disadvantage), and high cost/complex manufacture (disadvantage). They missed the biodegradability/no removal advantage, injectable non-surgical advantage, aesthetics advantage, and need for skilled worker disadvantage. For Q6(b), the student identified three rubric points: presence of solvent, use of biodegradable polymer, and avoidance of needle blocking. They did not explicitly mention drug solubility in solvent, solvent diffusion on administration, or drug release via degradation/erosion, and they incorrectly asserted a clinical benefit where the rubric states none. Each correct point earns 1 mark, capped at 5 per part, yielding 3+3 = 6 marks total.",
+      "feedback": {
+        "summary": "The response demonstrates understanding of core concepts but omits several key rubric points and includes some inaccuracies.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 3.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for sustained release/reduced frequency, 1 mark for acid-labile drug limitation, and 1 mark for high cost/complex manufacture. Missed biodegradability/no removal, injectable non-surgical, aesthetics, and need for skilled worker points."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 3.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for solvent-containing system, 1 mark for biodegradable polymer use, and 1 mark for needle blocking avoidance. Missed drug solubility in solvent, solvent diffusion on administration, and drug release via degradation/erosion; also incorrectly claimed clinical benefit."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "(a)\u00a0 Advantages of polymer microspheres - Promote sustain release and require less frequent administration. This helps to improve patient compliance. - Promote high bioavailability. Patient can take a lower dose of medicine to achieve therapeutic effect.\u00a0 Disadvantages of polymer microspheres - Degradation of polymer will produce an acidic environment which destroy acid-labile drugs. This results in ineffective treatment to the patient. - Expensive. Patient may not prefer to have this dosage form as it is more costly compare to the immediate release tablets. - Invasive method. Patient will have pain during injection.",
+          "question_number": "Q6(a)",
+          "score_awarded": 3.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 3 marks for mentioning sustained release (advantage), acid-labile drug limitation (disadvantage), and high cost/complex manufacture (disadvantage). The response omitted biodegradability/no removal, injectable non-surgical, aesthetics, and need for skilled worker points."
+        },
+        {
+          "text": "(b)\u00a0 - This system consists of poly (lactide-co-glycolide) PLGA polymer, drug and solvent which form into a solution.\u00a0 - n-methyl pyrrolidone (NMP) is mostly to be used as the solvent. - It promotes sustain release of medicine which result in less frequent administration. - This system is administered via injection. It will solidify within the subcutaneous tissue and slowly release the drug. It does have a clinical benefit over microspheres as it is a solution and does not consists of small particles. These small particles may aggregate in the needle which is unfavorable.\u00a0 'in site gelling' polymer systems are of interest as they promote sustain release of drug and require less frequent administration which improves patient compliance. The polymers used are degradable and safe as they are natural molecules found within the body.\u00a0 ",
+          "question_number": "Q6(b)",
+          "score_awarded": 3.0,
+          "max_score": 5.0,
+          "type": "strength",
+          "comment": "Awarded 3 marks for noting solvent use, biodegradable polymer, and needle blocking avoidance. Missed drug solubility in solvent, solvent diffusion on administration, drug release via degradation/erosion, and incorrectly asserted clinical benefit."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 30720842,
+    "question_no": "Q6",
+    "human_score": 0.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "confidence_score": 1.0,
+      "status": "graded",
+      "reasoning": "Blank answer provided. 0 marks awarded.",
+      "feedback": {
+        "summary": "No response provided.",
+        "breakdown": []
+      },
+      "highlights": []
+    }
+  },
+  {
+    "response_id": 31858929,
+    "question_no": "Q6",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 5.0,
+      "confidence_score": 0.88,
+      "status": "graded",
+      "reasoning": "Part (a) awarded 2 marks: 1 for noting PLGA biodegradability (natural acid breakdown) matching the 'May be biodegradable \u2013 do not need removal' advantage, and 1 for acknowledging the injectable nature ('Inject by needles') which corresponds to the 'Injectable system, does not require surgical implantation' advantage. Other advantages (longer duration vs lipid systems, aesthetics) and all three disadvantages were not addressed. Part (b) awarded 3 marks: 1 for mentioning the solvent component ('injectable polymer, active drug and solvent solution'), 1 for describing drug release via degradation/erosion of the polymer matrix ('forms solid polymer phase... degrades over ~30 days... drug slowly dissolved'), and 1 for stating there is no clinical benefit over PLGA microspheres. The remaining attributes (temperature sensitivity, biodegradable polymer requirement, drug solubility in solvent, solvent diffusion on administration, cost/manufacturing/sterilisation advantages, and needle\u2011blocking avoidance) were not covered.",
+      "feedback": {
+        "summary": "The response shows partial understanding of polymer microsphere advantages and in\u2011situ gelling system attributes but omits several key points required by the rubric.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 2,
+            "max_score": 5,
+            "reasoning": "Awarded 1 mark for biodegradability (PLGA degrades to natural acids) and 1 mark for injectable nature. Missed advantages of longer duration vs lipid systems, aesthetics, and all three disadvantages (acid\u2011labile drug limitation, need for skilled worker, complex/expensive manufacture)."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 3,
+            "max_score": 5,
+            "reasoning": "Awarded 1 mark for solvent presence, 1 mark for drug release via polymer degradation/erosion, and 1 mark for noting lack of clinical benefit. Missed temperature sensitivity, biodegradable polymer requirement, drug solubility in solvent, solvent diffusion on administration, cost/manufacturing/sterilisation benefits, and needle\u2011blocking avoidance."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "-PLGA degrades back to glycolic acid and lactic acid (which are natural molecules found in the body) after several months, so it is less harmful to human body after receiving treatment.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for recognizing biodegradability (natural acid breakdown) which matches the 'May be biodegradable \u2013 do not need removal' advantage."
+        },
+        {
+          "text": "-Inject by needles, may cause pain and only limited to small volume of syringe.",
+          "question_number": "Q6(a)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for noting the injectable nature, corresponding to the 'Injectable system, does not require surgical implantation' advantage."
+        },
+        {
+          "text": "In situ gelling system is combination of injectable polymer, active drug and solvent solution that forms solid polymer phase rapidly and degrades over ~30 days.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for identifying the solvent component, matching the 'Systems contain a solvent, or polymers that are temperature sensitive' attribute."
+        },
+        {
+          "text": "After that this solid polymer system will degrade.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for describing drug release via degradation/erosion of the polymer matrix, matching the 'drug released by degradation and erosion of the polymer matrix' attribute."
+        },
+        {
+          "text": "It does not have clinical benefit over PLGA microspheres because PLGA degrades back to natural molecule of body but in situ gelling system does not, and safety of the gel (solvent system) is questionable.",
+          "question_number": "Q6(b)",
+          "score_awarded": 1,
+          "max_score": 5,
+          "type": "strength",
+          "comment": "Awarded 1 mark for stating there is no clinical benefit over microspheres, corresponding to the 'No clinical benefit' point."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31860192,
+    "question_no": "Q6",
+    "human_score": 7.0,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.86,
+      "status": "graded",
+      "reasoning": "Part (a) awarded 4 marks: student identified extended drug release/reduced dosing frequency, biodegradation via hydrolysis, acid-labile drug limitation, and high cost as disadvantages. Missed advantages of injectable non-surgical administration and aesthetics, and disadvantage of needing skilled health worker. Part (b) awarded 3 marks: student noted solvent compatibility with drug/polymer, rapid solidification in tissue after administration, and degradation over months; also addressed clinical benefit (lesser side effects). Omitted temperature-sensitive polymers, explicit biodegradable polymer mention, needle-blocking avoidance, and details about sterilisation/manufacturing ease. Total score does not exceed the maximum of 10 marks.",
+      "feedback": {
+        "summary": "Solid understanding of key concepts; could improve by covering all rubric-listed points and using terminology matching the marking scheme.",
+        "breakdown": [
+          {
+            "question_number": "Q6(a)",
+            "score_awarded": 4.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for extended duration/reduced frequency, 1 mark for biodegradable hydrolysis, 1 mark for acid-labile drug disadvantage, 1 mark for high cost. Missed injectable non-surgical advantage, aesthetics advantage, and need for skilled health worker disadvantage."
+          },
+          {
+            "question_number": "Q6(b)",
+            "score_awarded": 3.0,
+            "max_score": 5.0,
+            "reasoning": "Awarded 1 mark for solvent/drug-polymer compatibility, 1 mark for rapid solidification upon administration (solvent diffusion), 1 mark for degradation over months. Missed temperature-sensitive polymers, explicit biodegradable polymer, needle-blocking avoidance, and details on cost/manufacturing/sterilisation."
+          }
+        ],
+        "highlights": [
+          {
+            "text": "Release the drug for a extended period of time",
+            "question_number": "Q6(a)",
+            "score_awarded": 1.0,
+            "max_score": 5.0,
+            "type": "strength",
+            "comment": "Awarded 1 mark for mentioning prolonged therapeutic effect (extended duration) in (a)."
+          },
+          {
+            "text": "Slowly degrade by hydrolysis to release the drug",
+            "question_number": "Q6(a)",
+            "score_awarded": 1.0,
+            "max_score": 5.0,
+            "type": "strength",
+            "comment": "Awarded 1 mark for noting biodegradability via hydrolysis in (a)."
+          },
+          {
+            "text": "The solvent must be compatible to the drug and solvent.",
+            "question_number": "Q6(b)",
+            "score_awarded": 1.0,
+            "max_score": 5.0,
+            "type": "strength",
+            "comment": "Awarded 1 mark for addressing drug-polymer-solvent solubility requirement in (b)."
+          },
+          {
+            "text": "It will rapidly solidifies in tissue and usually applied by subcutaneous injection.",
+            "question_number": "Q6(b)",
+            "score_awarded": 1.0,
+            "max_score": 5.0,
+            "type": "strength",
+            "comment": "Awarded 1 mark for describing solvent diffusion leading to solidification/gelling in (b)."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "response_id": 31109578,
+    "question_no": "Q8",
+    "human_score": 4.5,
+    "ai_evaluation": {
+      "overall_score": 5.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Each subpart of Q8 was evaluated against the rubric: 1 mark for correct agree/disagree judgment, 1 mark for a reason matching the rubric intent. (a) Disagree was correct; reason about alternative formulation (injectable in\u2011situ gel, solvent system) aligns with 'not necessary if drug is stable in solution', earning both marks. (b) Agree was correct; reason referencing conformational structures leading to instability matches the rubric point about tertiary structure disruption, earning both marks. (c) Agree was incorrect (should be disagree); although the student noted that antibodies direct the drug to the target, the reason cannot be awarded because the stance was wrong, resulting in 0 marks. (d) Disagree was correct; the response noted light sensitivity and need for protection but did not mention amber vials, so only the disagree mark was earned. (e) No answer was provided, triggering the zero\u2011mark rule for blank/missing responses.",
+      "feedback": {
+        "summary": "The student demonstrated solid understanding of lyophilization alternatives and protein/peptide instability, but missed key points on antibody\u2011directed conjugates, light\u2011protection specifics, and omitted the co\u2011solvent question.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct disagree and 1 mark for reason referencing alternative formulation (injectable in\u2011situ gel, solvent system) which matches the rubric's 'not necessary if drug is stable in solution'."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct agree and 1 mark for reason noting conformational structures leading to instability, which aligns with the rubric point about tertiary structure disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No marks awarded: disagree was required but student answered agree; although the reason about antibody directing drug is conceptually correct, it cannot be credited without the correct stance."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct disagree; reason missed the specific rubric point of mentioning amber vials for light protection."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No answer provided; per zero\u2011mark rule, blank/missing response receives 0 marks."
+          }
+        ],
+        "highlights": [
+          {
+            "text": "Disagree. Peptide can also be manufacture through injectable in-situ forming gel system that does not requires drug to be lyophilized. The peptide is formulated in a solvent system.",
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "type": "strength",
+            "comment": "Awarded 1 mark for correct disagree and 1 mark for reason referencing alternative formulation (injectable in\u2011situ gel, solvent system) matching rubric's 'not necessary if drug is stable in solution'."
+          },
+          {
+            "text": "Agree. Peptides are generally smaller ~5000 Da while proteins are larger with different conformational structures ~20000Da hence are susceptible to more instability.",
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "type": "strength",
+            "comment": "Awarded 1 mark for correct agree and 1 mark for reason noting conformational structures leading to instability, aligning with rubric point about tertiary structure disruption."
+          },
+          {
+            "text": "Agree. Antibody-drug conjugate use the natural affinity of antibodies to target and transport drug to the specific cell.",
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "type": "weakness",
+            "comment": "No marks: disagree required but student answered agree; reason about antibody directing drug cannot be credited without correct stance."
+          },
+          {
+            "text": "Disagree. Some proteins and peptides are light sensitive, hence the medicines need to be stored in a way that protects them from light as to not reduce the drug efficacy.",
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "type": "weakness",
+            "comment": "Awarded 1 mark for correct disagree; reason missed rubric requirement to mention amber vials for light protection."
+          },
+          {
+            "text": "",
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "type": "weakness",
+            "comment": "No answer provided; per zero\u2011mark rule, blank/missing response receives 0 marks."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "response_id": 31862160,
+    "question_no": "Q8",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 11957ms', 'code': 504}"
+    }
+  },
+  {
+    "response_id": 31860737,
+    "question_no": "Q8",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 12104ms', 'code': 504}"
+    }
+  },
+  {
+    "response_id": 32025238,
+    "question_no": "Q8",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.98,
+      "status": "graded",
+      "reasoning": "The student correctly disagreed with statements (a), (b), and (c) and provided appropriate reasons that matched the rubric, earning full marks for each. For statement (d), the student agreed instead of disagreeing and did not mention amber vials, resulting in zero marks. For statement (e), the student disagreed instead of agreeing and did not give either of the accepted reasons (unsafe if not fully dissolved or acceptability of injectable co\u2011solvents in small amounts), also earning zero marks.",
+      "feedback": {
+        "summary": "Strong understanding of lyophilization, protein instability, and antibody\u2011drug conjugate concepts; missed the light\u2011sensitivity and co\u2011solvent points.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for noting that solution preparation is acceptable when drug stability is maintained (e.g., buffer, antioxidant, salt)."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing and 1 mark for linking disulfide linkages and tertiary structure changes to denaturation/aggregation, matching the rubric's allowed reason."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for stating that the antibody directs the drug to the target (affinity to antigen) rather than the drug's natural distribution."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks: missed the required disagree stance and did not mention amber vials as light\u2011protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks: missed the required agree stance and did not provide either reason about unsafe injection if not fully dissolved or acceptability of injectable co\u2011solvents in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. Peptides can also be prepared in solution ready to be injected as long as the formulation has its stability being maintained by for example, addition of buffer, antioxidant and salt.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 mark for disagreeing, 1 mark for noting that solution preparation is acceptable if drug stability is maintained (buffer, antioxidant, salt)."
+        },
+        {
+          "text": "Agree. Protein structure often has more disulfide linkage which confer the protein a secondary & tertiary structure. Any changes to the crosslinking & folding to the structure will causes protein denaturation & aggregation (physical instability).",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 mark for agreeing, 1 mark for linking disulfide linkages and tertiary structure changes to denaturation/aggregation, matching the rubric's allowed reason."
+        },
+        {
+          "text": "Disagree. Antibody-drug conjugates bind selectively to the target antigen because of the affinity modality of antibody towards the antigen on the target cell surface instead of the natural distribution of the drug.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 mark for disagreeing, 1 mark for stating that the antibody directs the drug to the target (affinity to antigen) rather than the drug's natural distribution."
+        },
+        {
+          "text": "Agree. Protein and peptides do not require an amber packaging, they are more susceptible to chemical degradation (oxidation/reduction or hydrolysis) or physical instability (protein aggregation).",
+          "question_number": "Q8(d)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: missed the required disagree stance and did not mention amber vials as light\u2011protective packaging."
+        },
+        {
+          "text": "Disagree. Co-solvent may not be required to dissolve peptides into solution, because peptide is often hydrophilic and water soluble, enabling a formation of clear solution for safe injection.",
+          "question_number": "Q8(e)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: missed the required agree stance and did not provide either reason about unsafe injection if not fully dissolved or acceptability of injectable co\u2011solvents in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32022271,
+    "question_no": "Q8",
+    "human_score": 5.5,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 12075ms', 'code': 504}"
+    }
+  },
+  {
+    "response_id": 32227787,
+    "question_no": "Q8",
+    "human_score": 9.0,
+    "ai_evaluation": {
+      "overall_score": 8.0,
+      "confidence_score": 0.98,
+      "status": "graded",
+      "reasoning": "Each subpart was evaluated against the rubric: (a) Disagree with correct justification about soluble stabilized peptides earned both marks. (b) Agree with justification about tertiary structure/bond disruption earned both marks. (c) Disagree with explanation that antibody directs drug to target earned both marks. (d) Disagree earned 1 mark but missed the requirement to mention amber vials for light protection. (e) Agree earned 1 mark but omitted the specific safety points about incomplete dissolution or acceptable small amounts of co-solvents.",
+      "feedback": {
+        "summary": "Strong understanding of most concepts; missed specific examples in two parts.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for disagreeing and noting that solutions ready for injection stabilized with excipients show lyophilization is not necessary if drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for agreeing and noting that alterations to tertiary structure/bonds can inactivate protein, matching rubric point about tertiary structure disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for disagreeing and explaining that antibody directs drug to target, not vice versa."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing; missed second mark for not mentioning amber vials as example of light-protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing; missed second mark for not stating that unsafe if not completely dissolved or that injectable co-solvents are OK in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. There are also peptides preparations such as solutions ready for injection that are stablilised using many different excipients.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for disagreeing and noting that solutions ready for injection stabilized with excipients show lyophilization is not necessary if drug is stable in solution."
+        },
+        {
+          "text": "Agree. This is because any alterations to the folding of protein, secondary or tertiary structure, and the bonds/cross-linking in the protein structure can lead to partial or complete inactivation of the protein.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for agreeing and noting that alterations to tertiary structure/bonds can inactivate protein, matching rubric point about tertiary structure disruption."
+        },
+        {
+          "text": "Disagree. Antibody-drug conjugates will target specific cells using the selectivity of antibodies to recognise the specific receptors expressed on the cells. After endocytosis, the drug will only then be released into the cell to result in therapeutic effects.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for disagreeing and explaining that antibody directs drug to target, not vice versa."
+        },
+        {
+          "text": "Disagree. Some proteins and peptides are prone to degradation when exposed to light such as UV light (Du et al., 2018). Hence packaging to protect the drug from light is used to protect these proteins.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for disagreeing; missed second mark for not mentioning amber vials as example of light-protective packaging."
+        },
+        {
+          "text": "Agree. Co-solvent can be used to increase the solubility of peptides inside the solvent to enable safe injection.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for agreeing; missed second mark for not stating that unsafe if not completely dissolved or that injectable co-solvents are OK in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32022735,
+    "question_no": "Q8",
+    "human_score": 7.5,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.93,
+      "status": "graded",
+      "reasoning": "Each subpart was evaluated against the rubric: (a) earned 1 mark for disagreeing but missed the stability\u2011in\u2011solution justification; (b) earned full marks for agreeing and citing protein folding instability; (c) earned full marks for disagreeing and correctly stating that the antibody directs the drug; (d) earned 1 mark for disagreeing but omitted the amber\u2011vial packaging point; (e) earned 1 mark for agreeing but did not address safety of co\u2011solvent use or completeness of dissolution.",
+      "feedback": {
+        "summary": "Solid understanding of most concepts; missed specific justifications in parts (a), (d), and (e).",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing with the statement. Missed the rubric point about drug stability in solution as justification."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing and 1 mark for noting that a slight change in protein folding causes instability, which matches the rubric\u2019s tertiary\u2011structure disruption point."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for explaining that the antibody\u2019s affinity directs the drug to target cells, satisfying the rubric\u2019s directionality requirement."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing. Missed the rubric\u2011specific point about using amber vials (or similar light\u2011protective packaging)."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing. Missed the rubric\u2011required justification about safety when peptides are not fully dissolved or the acceptability of injectable co\u2011solvents in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. Peptides can also be supplied as a solution in a prefilled syringe, which is an injectable in situ forming gel system.",
+          "question_number": "Q8(a)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing with the statement. The response did not provide the rubric\u2011required justification that lyophilization is unnecessary if the drug is stable in solution."
+        },
+        {
+          "text": "Agree. Protein structure is bigger and more complex, and a slight change in the protein folding will cause instability",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agreeing and 1 mark for linking protein folding changes to instability, which satisfies the rubric point about tertiary structure disruption."
+        },
+        {
+          "text": "Disagree. The drug is chemically linked to the antibody by formation of labile bonds, and uses the affinity modality of the antibody to bind to the target cells.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing and 1 mark for explaining that the antibody directs the drug to the target, matching the rubric\u2019s directionality requirement."
+        },
+        {
+          "text": "Disagree. Light is associated with heat, therefore will cause degradation of protein and peptides.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing. The response omitted the rubric\u2011specific point about using amber vials or similar light\u2011protective packaging."
+        },
+        {
+          "text": "Agree. Co solvents can help to dissolve hydrophobic molecules such as peptides.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agreeing. The response did not address the rubric\u2011required justification concerning safety when peptides are not fully dissolved or the acceptability of injectable co\u2011solvents in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32629796,
+    "question_no": "Q8",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: (a) Disagree correct; reason given (alternative insitu gelling) shows lyophilization not sole option, satisfying both marks. (b) Agree correct; reason about hydrophobic aggregation matches rubric point, earning both marks. (c) Incorrectly agreed; should disagree and note antibody directs drug, so zero marks. (d) Disagree correct; reason mentions light-induced degradation but omits amber vials, earning only the disagree mark. (e) Agree correct; reason only states enhanced solubility without addressing safety or amount, earning only the agree mark. Total = 2+2+0+1+1 = 6.",
+      "feedback": {
+        "summary": "Solid understanding of protein/peptide instability and formulation concepts, but missed key directional concept in antibody-drug conjugates and omitted specific protective packaging and co-solvent safety details.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree and 1 mark for providing a valid alternative (insitu gelling system) showing lyophilization is not the only option."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree and 1 mark for noting hydrophobic sections cause aggregation, matching the rubric's hydrophobic association point."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Incorrectly agreed; should disagree. No mention that antibody directs the drug to target, so both marks missed."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree. Reason cites light-induced chemical degradation but fails to mention amber vials or other light-protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree. Reason only states enhanced solubility without addressing safety concerns (unsafe if not fully dissolved) or acceptable small amounts of injectable co-solvents."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. We have insitu gelling system which make into PLGA+drug+solvent and supplied as prefilled syringe.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagree and 1 mark for providing an alternative formulation (insitu gelling) showing lyophilization is not the only option."
+        },
+        {
+          "text": "Agree. Protein tend to aggregate when expose to hydrophobic sections compare with peptides",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agree and 1 mark for linking hydrophobic sections to protein aggregation, matching the rubric's hydrophobic association point."
+        },
+        {
+          "text": "Agree. To kill cancer cells.",
+          "question_number": "Q8(c)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: incorrect agreement (should disagree) and no mention that antibody directs drug to target, missing both rubric points."
+        },
+        {
+          "text": "Disagree.It may have some chemical degradation when expose to light.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagree. Reason cites light-induced degradation but omits amber vials, missing the second mark."
+        },
+        {
+          "text": "Agree. To enhance solubility.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agree. Reason only mentions enhanced solubility without addressing safety (unsafe if not fully dissolved) or acceptable small amounts, missing the second mark."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32228872,
+    "question_no": "Q8",
+    "human_score": 6.5,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "For each sub\u2011part, the student\u2019s response was evaluated against the rubric: awarding 1 mark for the correct agree/disagree stance and a second mark only when the justification matched the rubric\u2019s specific reasoning points (or an equivalent concept). Sub\u2011part (a) earned the disagree mark but the reason given (in situ gelling system) did not address the rubric\u2019s \u2018not necessary if drug is stable in solution\u2019 point. Sub\u2011part (b) earned the agree mark but the reason focused on disulfide bonds and glycosylation rather than the rubric\u2019s points about hydrophobic surface association or tertiary\u2011structure disruption by unwanted chemical reactions. Sub\u2011part (c) earned both marks: the disagree stance was correct and the justification correctly noted that the antibody directs the drug to the target, not vice\u2011versa. Sub\u2011part (d) earned the disagree mark but omitted the required mention of amber vials as an example of light\u2011protective packaging. Sub\u2011part (e) earned the agree mark but the reason (enhanced solubility and stability) did not cover the rubric\u2019s safety\u2011related points about incomplete dissolution or acceptable small\u2011amount use of injectable co\u2011solvents.",
+      "feedback": {
+        "summary": "The student correctly identified the agree/disagree direction for all five statements, earning half the available marks. Justifications often missed the specific rubric\u2011points, resulting in lost reasoning marks.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly disagreeing. The reason given (in situ gelling system) did not address the rubric\u2019s point about the drug being stable in solution, so no second mark."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly agreeing. The reason discussed disulfide bonds and glycosylation, which does not match the rubric\u2019s required points about hydrophobic surface association or tertiary\u2011structure disruption by unwanted chemical reactions."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for correct disagree and a justification that correctly stated the antibody directs the drug to the target, matching the rubric\u2019s point."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly disagreeing. The reason mentioned light\u2011sensitivity but omitted the required reference to amber vials (or similar light\u2011protective packaging)."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly agreeing. The reason focused on solubility and stability, missing the rubric\u2019s safety\u2011related points about incomplete dissolution or acceptable small\u2011amount use of injectable co\u2011solvents."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "a) disagree. in situ gelling system does not use the lyophilisation method.",
+          "question_number": "Q8(a)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly disagreeing. The response failed to address the rubric\u2019s reason point: \u2018not necessary if drug is stable in solution\u2019."
+        },
+        {
+          "text": "b)agree. the protein structure have Crosslinkage via disulphide bond, as it confers tertiary structure and glycosylation while peptide limited to cyclization and only 1-3 disulphide crosslink.",
+          "question_number": "Q8(b)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly agreeing. The response missed the rubric\u2019s reason points: hydrophobic parts associating with surfaces or tertiary structure disrupted by unwanted chemical reactions."
+        },
+        {
+          "text": "c) disagree. it does not use the natural distribution of the drug to allow the anbtibody to bind to its target. the structure of the antibody itself which allow it to bind to the target cell.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for correct disagree and a justification that correctly stated the antibody directs the drug to the target, matching the rubric\u2019s point."
+        },
+        {
+          "text": "d) disagree. the protein and peptides is sensitive to light as it may cause degradation of the secondary or tertiary structure and denature. this may destabilised the protein or peptide structure",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly disagreeing. The response omitted the rubric\u2019s required mention of amber vials (or similar light\u2011protective packaging)."
+        },
+        {
+          "text": "e) agree. the co solvent used able to enhance the solubility and stability of the peptide drug",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly agreeing. The response missed the rubric\u2019s reason points: unsafe if proteins/peptides not completely dissolved, or injectable co\u2011solvents are OK to use in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 30897181,
+    "question_no": "Q8",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 4.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Submitted answers were evaluated against the rubric for Q8. For each sub\u2011part, 1 mark was awarded for the correct agree/disagree stance where applicable, and additional marks were only given when the provided reason matched the rubric\u2011specified concepts. Sub\u2011part a) received 1 mark for correct disagreement but no reason. Sub\u2011part b) received 1 mark for correct agreement but the reason did not mention hydrophobic surface association or tertiary structure disruption. Sub\u2011part c) received 0 marks because the stance was incorrect (should be disagree) and no reason was given. Sub\u2011part d) received 1 mark for correct disagreement but the reason did not explicitly mention amber vials. Sub\u2011part e) received 1 mark for correct agreement but lacked the required reason about dissolution safety or co\u2011solvent acceptability. Summing the marks yields 4 out of 10.",
+      "feedback": {
+        "summary": "The response shows basic understanding of agree/disagree judgments but largely lacks the specific justifications required by the rubric.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct disagreement. No reason provided, so missed the mark for noting that lyophilization is unnecessary if the drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct agreement. Reason given (larger conformation) does not match rubric points about hydrophobic parts sticking to surfaces or tertiary structure disruption, so missed the second mark."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No marks awarded because the stance was incorrect (should be disagree) and no reason was provided to support the correct view that the antibody directs the drug to the target."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct disagreement. Reason given mentions need to protect from light but does not specify amber vials, thus missing the second mark."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct agreement. No reason provided about unsafe injection if not fully dissolved or acceptability of co\u2011solvents in small amounts, so missed the second mark."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree.",
+          "question_number": "Q8(a)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct disagreement. The response failed to provide the required reason (not necessary if drug is stable in solution)."
+        },
+        {
+          "text": "Agree. Proteins are a more complex structure than peptides with larger conformation",
+          "question_number": "Q8(b)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct agreement. The reason given does not mention hydrophobic parts associating with surfaces or tertiary structure disruption, so the second mark was missed."
+        },
+        {
+          "text": "Agree.",
+          "question_number": "Q8(c)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "No marks awarded because the stance was incorrect (should be disagree) and no reason was provided to justify the correct view that the antibody directs the drug to the target."
+        },
+        {
+          "text": "Disagree. We need to protect the drug from light to ensure its stability.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct disagreement. The reason does not explicitly mention amber vials, so the second mark was missed."
+        },
+        {
+          "text": "Agree.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct agreement. No reason given about dissolution safety or acceptability of co\u2011solvents in small amounts, so the second mark was missed."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31858996,
+    "question_no": "Q8",
+    "human_score": 3.0,
+    "ai_evaluation": {
+      "overall_score": 3.0,
+      "confidence_score": 0.98,
+      "status": "graded",
+      "reasoning": "The student answered five sub-questions (Q8a-e). For each, marks were allocated according to the rubric: (a) required disagree and a reason about stability in solution; student agreed and gave an unrelated reason \u2192 0/2. (b) required agree and a reason about hydrophobic surfaces or tertiary disruption; student agreed and mentioned tertiary structure susceptibility \u2192 2/2. (c) required disagree and correction that antibody directs drug; student agreed and gave unrelated ADC description \u2192 0/2. (d) required disagree and mention of amber vials; student disagreed correctly but did not mention amber vials \u2192 1/2. (e) required agree and a note about incomplete dissolution or safe co-solvent use; student disagreed and spoke of other excipients \u2192 0/2. Summing yields 3.0 out of 10.0.",
+      "feedback": {
+        "summary": "The student demonstrated understanding of protein complexity but missed key concepts in most statements, resulting in a low total score.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks: student agreed (should disagree) and gave a reason about peptide size/injectability, not addressing the rubric point that lyophilization is not necessary if the drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks: student agreed (correct) and referenced tertiary characteristic structures and susceptibility to instability, satisfying the rubric's requirement for a reason about tertiary structure disruption or hydrophobic association."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks: student agreed (should disagree) and described ADC composition/linker chemistry, failing to state that the antibody directs the drug to the target, not vice\u2011versa."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correct disagreement; missed the second mark because the response did not mention amber vials or any specific light\u2011protective packaging as required by the rubric."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks: student disagreed (should agree) and discussed alternative excipients, omitting the required points that co\u2011solvents are used to dissolve peptides and that either incomplete dissolution is unsafe or small amounts of injectable co\u2011solvents are acceptable."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Lyophilization is the only option for preparation of peptides for injectable administration. (2 marks)\u00a0 Yes, as peptides are large molecules that can only be administered into the body via injection.",
+          "question_number": "Q8(a)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: student agreed (should disagree) and gave a reason about peptide size/injectability, missing the rubric point that lyophilization is unnecessary if the drug is stable in solution."
+        },
+        {
+          "text": "Protein structure is more complex than peptides, meaning instability is often a greater issue. (2 marks)\u00a0 Yes, as protein structures are more complex than peptides due to having tertiary characteristic structures, are more susceptible to instability.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: student agreed (correct) and cited tertiary characteristic structures and increased susceptibility, satisfying the rubric's requirement for a reason about tertiary structure disruption or hydrophobic association."
+        },
+        {
+          "text": "Antibody-drug conjugates use the natural distribution of a drug to get the antibody to bind to its target on cells to deliver a therapeutic effect. (2 marks)\u00a0 Yes, as antibody-drug conjugates (ADC) can combine the monoclonal antibodies (mAbs) with drug which are linked by a chemical linker with labile bonds.",
+          "question_number": "Q8(c)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: student agreed (should disagree) and described ADC linker chemistry, failing to state that the antibody directs the drug to the target, not the other way around."
+        },
+        {
+          "text": "Proteins and peptides are not light sensitive, so packaging to protect the drug from light is never used. (2 marks)\u00a0 No, as there may be some light sensitive substances contained in the products with proteins and peptides, packing for light protection may be required.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for correct disagreement; missed the second mark because the response did not mention amber vials or any specific light\u2011protective packaging as required by the rubric."
+        },
+        {
+          "text": "Co-solvents are used to dissolve peptides to enable safe injection. (2 marks)\u00a0 No, co-solvents are not used to dissolve peptides to enable safe injection. Other excipients such as antioxidants may be used to overcome chemical stability issues of peptide injections.",
+          "question_number": "Q8(e)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: student disagreed (should agree) and discussed alternative excipients, omitting the required points that co\u2011solvents are used to dissolve peptides and that either incomplete dissolution is unsafe or small amounts of injectable co\u2011solvents are acceptable."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32557590,
+    "question_no": "Q8",
+    "human_score": 6.5,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart of Q8 against the rubric. For (a) student disagreed and gave a valid reason (solution form not needing lyophilization) earning both marks. For (b) student agreed and correctly noted susceptibility to denaturation via sulphide bonds, matching the rubric's point about tertiary structure disruption, earning both marks. For (c) student agreed with the incorrect statement, missing the required disagree mark and the concept that the antibody directs the drug, earning zero. For (d) student disagreed correctly but omitted the specific example of amber vials, earning one mark. For (e) student agreed and explained that co-solvents ensure dissolution for safe injection, satisfying both marks.",
+      "feedback": {
+        "summary": "Solid understanding of most concepts; missed the directional relationship in antibody-drug conjugates and the specific packaging example for light protection.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for disagreeing and stating that lyophilization is not necessary when drug is stable in solution (in situ gelling polymer systems)."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for agreeing and noting proteins' higher susceptibility to denaturation via sulphide bonds, which aligns with tertiary structure disruption by unwanted chemical reactions."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks because student agreed with the statement, missing the required disagree mark and the concept that the antibody directs the drug to the target, not vice\u2011versa."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing correctly; missed the second mark for not mentioning amber vials as an example of light\u2011protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for agreeing and explaining that co-solvents ensure complete dissolution for safe injection, covering the rubric's point about unsafe if not fully dissolved."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. Peptides can be administered via in situ gelling polymer systems which come in a solution form prior to administration, hence lyophilization is not needed.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for disagreeing and providing a valid reason (solution form not needing lyophilization)."
+        },
+        {
+          "text": "Agree. Proteins have more sulphide bonds which makes them more susceptible to denaturation, hence they are more unstable then peptides.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for agreeing and linking sulphide bonds to denaturation, matching the rubric's point about tertiary structure disruption."
+        },
+        {
+          "text": "Agree. After intravenous administration, the antibody-drug complex binds selectively to target antigens on the surface of tumour cells.",
+          "question_number": "Q8(c)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks because student agreed with the statement, missing the required disagree mark and the concept that the antibody directs the drug to the target."
+        },
+        {
+          "text": "Disagree. Proteins and peptides are light sensitive as they are susceptible to denaturation.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing correctly; missed the second mark for not citing amber vials as an example of light\u2011protective packaging."
+        },
+        {
+          "text": "Agree. Since injections need to be in a solution form, co-solvents are added to ensure all particles are dissolved and in solution to enable safe injection.",
+          "question_number": "Q8(e)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for agreeing and explaining that co-solvents ensure dissolution for safe injection, satisfying both rubric points."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31920918,
+    "question_no": "Q8",
+    "human_score": 9.0,
+    "ai_evaluation": {
+      "overall_score": 8.0,
+      "confidence_score": 0.98,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: awarded marks for correct agree/disagree and for reasons that matched the rubric intent. Subparts (a), (b), (c) received full 2 marks each; (d) received 1 mark for disagree but missed the amber vials reason; (e) received 1 mark for agree but missed the specific reason about unsafe undissolved peptides or acceptable co-solvent use.",
+      "feedback": {
+        "summary": "Solid understanding demonstrated; most correct judgments with appropriate reasoning, minor gaps in specific justifications for parts (d) and (e).",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree and 1 mark for noting that peptides can be in solution (prefilled syringe), matching 'not necessary if drug is stable in solution'."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree and 1 mark for citing physical instability due to complex protein structure, which aligns with the rubric's intent of hydrophobic association or tertiary disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree and 1 mark for explaining that the antibody directs the drug to the target (cancer cell receptors), satisfying the rubric reason."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree; missed the reason mark because the response did not mention amber vials or equivalent light\u2011protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree; missed the reason mark as the answer did not state that undissolved peptides are unsafe or that injectable co\u2011solvents are acceptable in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree, they also come as a prefilled syringe (solution form) in the case of in situ gelling system.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagree and 1 mark for noting solution form (prefilled syringe), matching 'not necessary if drug is stable in solution'. No rubric points missed."
+        },
+        {
+          "text": "Agree, protein is more unstable. A complex structure of proteins make them prone to physical instability other than chemical instability alone.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agree and 1 mark for citing physical instability from complex structure, which satisfies the rubric intent (hydrophobic association/tertiary disruption). No rubric points missed."
+        },
+        {
+          "text": "Disagree, the antibody has the ability to recognise the receptors that are over-expressed by the cancer cell. Thus, they will target mainly the cancer cell and result in accumulation at the diseased site.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagree and 1 mark for explaining antibody directs drug to target (cancer receptors), fulfilling the rubric reason. No rubric points missed."
+        },
+        {
+          "text": "Disagree, though it is true that they are generally not light sensitive. But sometimes a packaging that helps to protect the drug from light might be needed as some excipients in the formulation might be light-sensitive.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for disagree; missed the reason mark because response did not mention amber vials or equivalent light\u2011protective packaging as required by rubric."
+        },
+        {
+          "text": "Agree, peptide are usually, but not always water soluble and hydrophilic. A co-solvent can help to solubilise the peptide in the injection solution.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for agree; missed the reason mark as answer did not state that undissolved peptides are unsafe or that injectable co\u2011solvents are acceptable in small amounts per rubric."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32233167,
+    "question_no": "Q8",
+    "human_score": 4.5,
+    "ai_evaluation": {
+      "overall_score": 5.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: (a) Disagree + reason about solution form matches 'not necessary if drug is stable in solution' \u2192 2/2. (b) Agree + reason about more amino acids causing greater instability aligns with rubric intent \u2192 2/2. (c) Incorrectly agreed; reason did not state that antibody directs drug to target \u2192 0/2. (d) Correctly disagreed but reason omitted mention of amber vials \u2192 1/2. (e) Incorrectly disagreed; reason did not address unsafe if not dissolved or acceptability of co-solvents \u2192 0/2. Sum = 5/10.",
+      "feedback": {
+        "summary": "Student demonstrated correct understanding of lyophilization alternatives and protein complexity but missed key concepts regarding antibody-drug conjugates, light protection, and co-solvent use.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for providing a reason that aligns with 'not necessary if drug is stable in solution' (solution form via prefilled syringe)."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing and 1 mark for stating that more amino acids increase susceptibility to chemical/physical instability, which matches the rubric's intent regarding greater instability."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks: incorrect agreement (should disagree) and reason did not mention that the antibody directs the drug to the target rather than vice versa."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly disagreeing; missed the reason mark because response did not mention amber vials as protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 0 marks: incorrect disagreement (should agree) and reason did not address either unsafe if peptides not fully dissolved or acceptability of injectable co-solvents in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree, peptides can also be supplied as a prefilled syringe with injectable polymer, drug and solvent in solution form. This is done in 'in situ gelling' system.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for disagreeing, 1 for reason about solution form (implies drug stable in solution). No rubric points missed."
+        },
+        {
+          "text": "Agree, protein have more amino acids and this causes them to be more susceptible to chemical and physical instability.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for agreeing, 1 for reason linking greater amino acid count to increased instability (matches rubric intent). No rubric points missed."
+        },
+        {
+          "text": "Agree, the antibody binds selectively with the target antigen on the surface of target cells",
+          "question_number": "Q8(c)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: missed disagree mark (should disagree) and reason mark (did not state that antibody directs drug to target, not the reverse)."
+        },
+        {
+          "text": "Disagree, if proteins are not properly handled or stored, for instance, being exposed to heat and light, the hydrophobic sections may interact with hydrophobic regions of other molecules or vial components themselves such as rubber stoppers",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct disagreement; missed reason mark because response did not mention amber vials as light-protective packaging."
+        },
+        {
+          "text": "Disagree, solvent is used instead to dissolve peptides to enable safe injection.",
+          "question_number": "Q8(e)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: missed agree mark (should agree) and reason mark (did not note unsafe if not fully dissolved or acceptability of co-solvents in small amounts)."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31109675,
+    "question_no": "Q8",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: (a) Disagree + correct reason about solution preparation = 2/2. (b) Agree + generic but relevant reason about increased bonding leading to instability = 2/2. (c) Disagree + correct reason that antibody directs drug = 2/2. (d) Disagree correct but missing mention of amber vials or light\u2011protective packaging = 1/2. (e) Incorrect direction (disagree when agree required) and reason does not match rubric = 0/2. Sum = 7/10.",
+      "feedback": {
+        "summary": "Solid understanding of most concepts; missed specific packaging detail for light sensitivity and misunderstood the role of co\u2011solvents.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for noting that peptides can be prepared in solution form, satisfying the 'not necessary if drug is stable in solution' criterion."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing and 1 mark for providing a reason (more bonding/interactions leading to greater instability) that aligns with the rubric's intent regarding protein complexity."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for stating that the antibody directs the drug to the target, matching the rubric's required point."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing. Missed the second mark because the response did not mention amber vials or any light\u2011protective packaging as required."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No marks awarded because the student disagreed (rubric requires agreement) and the given reason does not satisfy the agree\u2011case criteria about dissolution safety or co\u2011solvent acceptability."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "No. Peptide can be prepared in solution form which is ready to be injected",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for disagreeing, 1 for noting solution preparation (matches 'not necessary if drug is stable in solution')."
+        },
+        {
+          "text": "yes. Protein is a larger macromolecule than peptide which has more bonding and interaction with different groups. hence, it has a more instability issue.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for agreeing, 1 for providing a reason linking greater bonding/interactions to increased instability (aligns with rubric intent)."
+        },
+        {
+          "text": "No. Antibody-drug conjugates uses the immunoaffinity of the antibody to bind to the target receptor on the target cell.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for disagreeing, 1 for stating antibody directs drug to target (matches rubric)."
+        },
+        {
+          "text": "No. Some types of peptides and proteins are light sensitive such as those consist of aromatic amino acid.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for disagreeing. Missed second mark: no mention of amber vials or light\u2011protective packaging as required."
+        },
+        {
+          "text": "No. Peptides are hydrophilic in nature and has high solubility, it does not need co solvent.",
+          "question_number": "Q8(e)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: incorrect direction (disagree when agree required) and reason does not satisfy the agree\u2011case criteria about dissolution safety or co\u2011solvent acceptability."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32025289,
+    "question_no": "Q8",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 5.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: (a) Student agreed but rubric requires disagree; reason given does not match 'not necessary if drug is stable in solution' \u2192 0/2. (b) Correctly agreed and gave reason about hydrophobic parts interacting with membranes/lipids, matching the rubric's hydrophobic\u2011surface concept \u2192 2/2. (c) Correctly disagreed but reason focused on linker mechanism rather than the antibody directing the drug; missed the required reason \u2192 1/2. (d) Correctly disagreed and noted need for UV protection, which captures the intent of light\u2011protective packaging (amber vials) \u2192 2/2. (e) Disagreed (rubric expects agree) and reason about lyophilisation/reconstitution does not match either allowed reason \u2192 0/2. Sum = 5/10.",
+      "feedback": {
+        "summary": "Partial understanding demonstrated; strengths in protein instability and light\u2011sensitivity concepts, but missed key points on lyophilization alternatives, antibody\u2011directed targeting, and co\u2011solvent use.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Student answered 'Agree' (incorrect direction) and gave instability reason; rubric requires 'Disagree' and reason 'not necessary if drug is stable in solution'. No marks awarded."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Correctly agreed and provided reason about hydrophobic protein sections interacting with membranes/lipids, satisfying both rubric points."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Correctly disagreed (1 mark) but reason discussed linker release rather than the antibody directing the drug; missed the required reason for the second mark."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Correctly disagreed and noted need for UV protection, which fulfills the intent of mentioning light\u2011protective packaging (e.g., amber vials)."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "Student disagreed (rubric expects agree) and gave reason about lyophilisation/reconstitution, which does not match either allowed reason ('unsafe if not dissolved' or 'co\u2011solvents OK in small amounts')."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Agree, this is because peptides are very unstable and prone to degradation if it is not freeze-dried, so lyophilisation will improve its plasma half-live and stability",
+          "question_number": "Q8(a)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: incorrect stance (should disagree) and reason does not address 'not necessary if drug is stable in solution'."
+        },
+        {
+          "text": "Agree, because complex structure of proteins often contains both hydrophilic and hydrophobic sections where hydrophobic sections tend to interact with membranes, lipid or other functional substrates which causes instability",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: correct agreement and reason matches hydrophobic parts associating with surfaces (membranes/lipids)."
+        },
+        {
+          "text": "Disagree, linkers are utilised to link cytotoxic agents to the monoclonal antibodies and the linker will only break and release the drug once it is inside the target cell",
+          "question_number": "Q8(c)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for correct disagreement; reason missed rubric point that antibody directs the drug, not vice\u2011versa."
+        },
+        {
+          "text": "Disagree, because certain proteins and peptides can absorb ultraviolet light which may affect their stability and hence need to be protected from sunlight",
+          "question_number": "Q8(d)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: correct disagreement and reason aligns with need for light protection (implicitly amber vials)."
+        },
+        {
+          "text": "Disagree, peptides are often lyophilised to form a sterile powder and are reconstituted either with water-for-injection or saline immediately prior to injection instead of co-solvents",
+          "question_number": "Q8(e)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 0 marks: incorrect disagreement and reason does not match either 'unsafe if not dissolved' or 'co\u2011solvents OK in small amounts'."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31107494,
+    "question_no": "Q8",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.9,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: awarded marks for correct agree/disagree judgments and assessed whether the provided reasons matched the rubric's expected concepts. Subpart (a) received full credit for disagree and offering a valid alternative formulation. Subparts (b)-(e) each received credit only for the correct agree/disagree stance; their reasons did not satisfy the rubric's specific justification requirements, resulting in one mark each.",
+      "feedback": {
+        "summary": "Correct identification of agree/disagree for all statements, but insufficient justification in most parts.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree and 1 mark for providing an alternative formulation (microsphere polymer) showing lyophilization is not the only option. The specific rubric reason about drug stability in solution was not mentioned."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree. The reason given (higher clearance) does not address protein instability due to complexity, missing the rubric points about hydrophobic association or tertiary structure disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree. The reason (drug can selectively bind target) does not capture the rubric concept that the antibody directs the drug to the target, not vice\u2011versa."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree. The reason notes light sensitivity but fails to mention amber vials or any specific light\u2011protective packaging as required by the rubric."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree. The reason describes co\u2011solvents making a solution but does not address the safety aspect (unsafe if not fully dissolved) or the acceptability of small amounts of injectable co\u2011solvents."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree because peptides can be formulated as microsphere polymer and injected subcutaneously.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for disagree, 1 for providing an alternative formulation (microsphere polymer) indicating lyophilization is not the only option. Missed the specific rubric point about drug stability in solution."
+        },
+        {
+          "text": "Agree because protein will have higher clearance.",
+          "question_number": "Q8(b)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for agree. The reason (higher clearance) does not address protein instability due to complexity; missed rubric points about hydrophobic parts associating with surfaces or tertiary structure disruption."
+        },
+        {
+          "text": "Disagree because the drug can selectively bind to its targeted cell.",
+          "question_number": "Q8(c)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for disagree. The reason (drug can bind target) does not convey that the antibody directs the drug to the target; missed the rubric concept about antibody\u2011directed delivery."
+        },
+        {
+          "text": "Disagree because proteins and peptides are sensitive to degradation by lights.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for disagree. The reason notes light sensitivity but omits mention of amber vials or any specific light\u2011protective packaging required by the rubric."
+        },
+        {
+          "text": "Agree because co-solvent such as sugars and salts can be used to enable it to become white solution and ready to be injected.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for agree. The reason describes co\u2011solvent use for solution formation but does not address safety concerns (unsafe if not fully dissolved) or acceptability of small amounts; missed the rubric justification points."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32270232,
+    "question_no": "Q8",
+    "human_score": 7.5,
+    "ai_evaluation": {
+      "overall_score": 8.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "The student addressed all five sub-parts. For (a) they correctly disagreed and noted that solution formulation with additives can maintain chemical stability, satisfying both marks. For (b) they agreed and explained how protein crosslinking and tertiary structure changes increase instability, earning both marks. For (c) they disagreed and clarified that the antibody directs the drug to the target, earning both marks. For (d) they disagreed about light sensitivity but omitted any mention of protective packaging such as amber vials, earning only the disagreement mark. For (e) they agreed that peptides need dissolution for absorption but did not mention the safety concerns of incomplete dissolution or the acceptability of co-solvents in small amounts, earning only the agreement mark. Total marks: 2+2+2+1+1 = 8 out of 10.",
+      "feedback": {
+        "summary": "Strong understanding of most concepts; missed specific packaging detail for light safety and co-solvent safety nuance.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for disagreeing and noting that solution preparation with antioxidants, surfactants, salts, or buffering can maintain chemical stability, showing lyophilization is not necessary if drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for agreeing and explaining that protein crosslinking/disulphide bridges and alterations in secondary/tertiary structure increase instability, matching the rubric point about tertiary structure disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 2 marks for disagreeing and stating that the antibody directs the drug to the target (antibody binds antigen then releases drug), satisfying the rubric requirement."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing about light sensitivity; missed the rubric point requiring mention of amber vials or other protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing that peptides need dissolution for absorption; missed the rubric point about either noting unsafe if not completely dissolved or that injectable co-solvents are acceptable in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. The preparation of peptides for injectable administration can also be a solution ready for injection by the addition of antioxidants, surfactants and salts or buffering to maintain chemical stability. Besides, the preparation of peptides for injectable administration can also get the chemical stability by modification of the peptides by substitution of alternative which has the different reactivity.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for disagreeing and noting that solution preparation with additives can maintain chemical stability, indicating lyophilization not necessary if drug stable in solution."
+        },
+        {
+          "text": "Agree. Protein has more cross-linking and disulphide bridges than peptides, any changes or alteration in the crosslinking and folding of the protein that change the secondary or tertiary structure will cause the protein become more unstable than peptide as this may result in partial or complete inactivation of the protein.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for agreeing and explaining that protein crosslinking/disulphide bridges and alterations in secondary/tertiary structure increase instability, matching the rubric point about tertiary structure disruption."
+        },
+        {
+          "text": "Disagree. Antibody-drug conjugates use the natural distribution of the antibody to bond selectively with the target antigen on the surface of tumour cell, then the antibody is digested to release the drug to deliver a therapeutic effect.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for disagreeing and stating that the antibody directs the drug to the target (antibody binds antigen then releases drug), satisfying the rubric requirement."
+        },
+        {
+          "text": "Disagree. Proteins and peptides are light sensitive and light may cause chemical instability of the proteins and peptides and thus result in partial or complete inactivation of the protein.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for disagreeing; missed mention of amber vials or protective packaging for light sensitivity as required by rubric."
+        },
+        {
+          "text": "Agree. Peptides need to be dissolve so that it can be absorbed into the systemic circulation after injection into the body. Discovery",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "Awarded 1 mark for agreeing; missed stating that unsafe if not completely dissolved or that injectable co-solvents are OK to use in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31107834,
+    "question_no": "Q8",
+    "human_score": 5.5,
+    "ai_evaluation": {
+      "overall_score": 8.0,
+      "confidence_score": 0.93,
+      "status": "graded",
+      "reasoning": "Step-by-step analysis: For each subpart, evaluated agreement/disagreement and justification against rubric. (a) Disagree with alternative method earns both marks. (b) Agree with protein complexity reasoning earns both marks. (c) Incorrect agreement yields zero marks. (d) Disagree with need for light protection earns both marks. (e) Agree with dissolution rationale earns both marks. Total 8/10.",
+      "feedback": {
+        "summary": "Solid understanding of most concepts; only missed the direction of antibody-drug conjugate relationship.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree and 1 mark for citing alternative method (vacuum foam drying) showing lyophilization is not the only option, matching rubric intent."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree and 1 mark for explaining that protein complexity leads to greater instability, aligning with rubric concept (though specific mechanisms not detailed)."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No marks awarded because student agreed whereas rubric requires disagree; the reason given does not address that antibody directs drug to target."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagree and 1 mark for noting need to store away from light, indicating light protection is needed, matching rubric concept (amber vials not explicitly mentioned)."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agree and 1 mark for noting need to dissolve to avoid gel formation, aligning with rubric point about unsafe if not completely dissolved."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. There is alternative like vacuum foam drying.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagree and 1 mark for noting alternative method (vacuum foam drying) showing lyophilization is not the only option."
+        },
+        {
+          "text": "Agree. Peptides bond are generally stable, more complex structure of protein causes it to be more susceptible to degradation.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agree and 1 mark for linking protein complexity to greater instability, matching rubric intent."
+        },
+        {
+          "text": "Agree. The antibody provides specificity for a tumor target antigen and the drug confers the cytotoxicity.",
+          "question_number": "Q8(c)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "No marks awarded because student agreed whereas rubric requires disagree; reason does not state that antibody directs drug to target."
+        },
+        {
+          "text": "Disagree. Some proteins or peptides products might be light sensitive and should be stored away from light.",
+          "question_number": "Q8(d)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagree and 1 mark for noting need to store away from light, indicating light protection is needed."
+        },
+        {
+          "text": "Agree. Peptides need to be dissolved to avoid consequences like gel formation in concentrated aqueous solution.",
+          "question_number": "Q8(e)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agree and 1 mark for noting need to dissolve to avoid gel formation, aligning with rubric point about unsafe if not completely dissolved."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32422296,
+    "question_no": "Q8",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: (a) Student disagreed (1 mark) but gave reason about alternative stabilizers rather than the rubric's 'not necessary if drug is stable in solution' (0 marks). (b) Correctly agreed (1 mark) and noted hydrophobic sections leading to aggregation/degradation, matching the rubric's hydrophobic parts point (1 mark). (c) Correctly disagreed (1 mark) and stated antibody directs drug to target, matching rubric (1 mark). (d) Correctly disagreed (1 mark) and mentioned amber packaging, matching rubric (1 mark). (e) Incorrectly disagreed (0 marks) and gave reason about hydrophilicity, which does not satisfy the rubric's required reason about unsafe if not dissolved or co-solvents OK in small amounts (0 marks). Total = 7/10.",
+      "feedback": {
+        "summary": "Solid understanding of protein/peptide instability, antibody-drug conjugates, and light protection; missed the nuance on lyophilization necessity and co-solvent use.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing with the statement. Missed the rubric reason point: did not state that lyophilization is unnecessary if the drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing and 1 mark for noting hydrophobic protein regions causing aggregation/degradation, which matches the rubric's hydrophobic parts/tertiary disruption point."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for stating that the antibody directs the drug to the target, exactly as the rubric requires."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for mentioning amber vials/packaging, fulfilling both rubric criteria."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No marks awarded: student disagreed (should agree) and gave reason about peptide hydrophilicity, which does not address the rubric's required reason about unsafe if not dissolved or co-solvents acceptable in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "a) DISAGREE, There are also some other approach by which they can be done by adding certain buffer or antioxidant to prevent the degradation and improve the stability of peptide as well.",
+          "question_number": "Q8(a)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing with the statement. The response failed to provide the rubric\u2011required reason that lyophilization is unnecessary if the drug is stable in solution."
+        },
+        {
+          "text": "b) AGREE. This is because protein somehow consists of more hydrophobic section compare to peptides which can increase the risk fo aggregation and degradation as well.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agreeing and 1 mark for citing hydrophobic protein sections leading to aggregation/degradation, matching the rubric's hydrophobic parts/tertiary disruption point."
+        },
+        {
+          "text": "c) DISAGREE. Antibody-drug conjugate used the ability of the antibody to selectively recognise the overexpression of certain receptor on the cell surface and carrying the drug specifically to the target cells.",
+          "question_number": "Q8(c)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing and 1 mark for stating that the antibody directs the drug to the target, exactly as the rubric requires."
+        },
+        {
+          "text": "d) DISAGREE. Proteins and peptides are normally light sensitive and should used an amber packaging to protect them from being exposed to light.",
+          "question_number": "Q8(d)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing and 1 mark for mentioning amber packaging, fulfilling both rubric criteria."
+        },
+        {
+          "text": "e) DISAGREE. Peptide are normally hydrophilic and readily soluble in water. Hence co-solvent are not normally require as co-solvent is mainly to enhance solubility of weak electrolyte or non-polar compounds.",
+          "question_number": "Q8(e)",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "No marks awarded: student disagreed (should agree) and gave reason about peptide hydrophilicity, which does not satisfy the rubric's required reason about unsafe if not dissolved or co-solvents acceptable in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31986862,
+    "question_no": "Q8",
+    "human_score": 7.5,
+    "ai_evaluation": {
+      "overall_score": 7.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "Evaluated each sub\u2011part against the rubric: (a) Disagree + solution alternative \u2192 2/2; (b) Agree but missing specific instability mechanism \u2192 1/2; (c) Incorrect stance (Agree) but correct reason about antibody binding \u2192 1/2; (d) Disagree + amber vial mention \u2192 2/2; (e) Agree but reason does not address safety or small\u2011amount use \u2192 1/2. Total = 7/10.",
+      "feedback": {
+        "summary": "Solid understanding of most concepts; missed specific mechanistic details in parts (b) and (c) and the safety nuance in (e).",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for noting that a solution (with buffers, antioxidants, surfactants, salts) can be used, satisfying the 'not necessary if drug is stable in solution' point."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing. Missed the specific reason about hydrophobic surface association or tertiary structure disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for the correct reason (antibody binds target antigen). No mark for stance because the student agreed instead of disagreeing."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing and 1 mark for mentioning amber container (amber vials) as light protection."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing. Missed the required point about unsafe injection if not fully dissolved or that injectable co\u2011solvents are acceptable in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree, may also be a solution ready for injection using buffering, addition of antioxidants, surfactants and salts.",
+          "question_number": "Q8(a)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for disagreeing, 1 for noting alternative solution preparation (buffers, antioxidants, surfactants, salts) which satisfies the 'not necessary if drug is stable in solution' criterion."
+        },
+        {
+          "text": "Agree, complex structure more susceptible to instability.",
+          "question_number": "Q8(b)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "partial",
+          "comment": "Awarded 1 mark for agreeing. Failed to provide the specific mechanistic reason (hydrophobic parts sticking to surfaces or tertiary structure disruption) required for the second mark."
+        },
+        {
+          "text": "Agree, on intravenous administration and distribution the antibody binds selectively with the target antigen on the surface of the tumor cell",
+          "question_number": "Q8(c)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "partial",
+          "comment": "Awarded 1 mark for the correct reason (antibody binds target antigen). No mark for stance because the student agreed instead of disagreeing, missing the core concept that the antibody directs the drug, not vice\u2011versa."
+        },
+        {
+          "text": "Disagree, they are sensitive to UV light and amber container is needed to protect the drug from exposing to light.",
+          "question_number": "Q8(d)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks: 1 for disagreeing, 1 for explicitly mentioning amber container (amber vials) as light protection, fulfilling both rubric points."
+        },
+        {
+          "text": "Agree, co-solvent is used to enhance solubility of non-polar compounds in water by altering solvent polarity.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "partial",
+          "comment": "Awarded 1 mark for agreeing. Missed the required justification about safety (unsafe if not fully dissolved) or acceptability of injectable co\u2011solvents in small amounts, thus losing the second mark."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32025351,
+    "question_no": "Q8",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 5.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "The student answered each sub\u2011part with a correct agree/disagree stance but omitted or provided incorrect justifications. For each sub\u2011part the rubric awards 1 mark for the correct stance and 1 mark for a specific reason. The student earned the stance marks for all five sub\u2011parts (5 marks total) but received no marks for any of the required reasons, resulting in a final score of 5/10.",
+      "feedback": {
+        "summary": "Correct identification of agree/disagree positions but lacking the required explanatory details for each statement.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly stating 'Disagree'. No mark for the reason because the student did not mention that lyophilization is not necessary if the drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly stating 'Agree'. No mark for the reason because the student did not mention hydrophobic protein parts sticking to surfaces or disruption of tertiary structure by unwanted chemical reactions."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly stating 'Disagree'. No mark for the reason because the student did not state that the antibody directs the drug to the target, not the other way around."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly stating 'Disagree'. No mark for the reason because the student discussed temperature\u2011induced denaturation instead of mentioning amber vials or light\u2011protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly stating 'Agree'. No mark for the reason because the student described an oily base for dissolution but did not address safety concerns of incomplete dissolution or the acceptability of injectable co\u2011solvents in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree.",
+          "question_number": "Q8(a)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct disagreement. Missed rubric reason: not necessary if drug is stable in solution."
+        },
+        {
+          "text": "Agree.",
+          "question_number": "Q8(b)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct agreement. Missed rubric reason: hydrophobic parts of proteins can associate and stick to surfaces, or tertiary structure may be disrupted by unwanted chemical reactions."
+        },
+        {
+          "text": "Disagree.",
+          "question_number": "Q8(c)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct disagreement. Missed rubric reason: the antibody directs the drug to the target not the other way around."
+        },
+        {
+          "text": "Disagree. High temperature will denature the proteins and peptides and cause aggregation.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct disagreement. Missed rubric reason: need to mention amber vials or light\u2011protective packaging."
+        },
+        {
+          "text": "Agree. Co-solvents can be oily base that allows peptides to dissolve into it.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correct agreement. Missed rubric reason: should note that co\u2011solvents are unsafe if peptides not completely dissolved, or that injectable co\u2011solvents are acceptable in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 30720842,
+    "question_no": "Q8",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.93,
+      "status": "graded",
+      "reasoning": "Evaluated each subpart against the rubric: awarded 1 mark for correct agree/disagree stance and an additional mark only when the student's justification matched the specific rubric reason. Subpart (b) satisfied both criteria; all others matched only the stance.",
+      "feedback": {
+        "summary": "Correct identification of agree/disagree positions but justifications often lacked the specific rubric\u2011required reasoning, resulting in partial credit.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly disagreeing. Missed the rubric reason 'not necessary if drug is stable in solution'."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing and 1 mark for noting that protein tertiary structure can be disrupted by unwanted chemical reactions (disulfide/weak bonds)."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing. Missed the rubric reason 'the antibody directs the drug to the target not the other way around'."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for disagreeing. Missed the rubric reason 'mentioning amber vials'."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing. Missed the rubric reason 'unsafe if proteins/peptides not completely dissolved' or 'injectable co-solvents are OK to use in small amounts'."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "(A) LYOPHILIZATION IS THE ONLY OPTION FOR PREPARATION OF PEPTIDES FOR INJECTABLE ADMINISTRATION. Disagree, there are many other options for preparation of peptides including as it could also be innjected subcutaneously",
+          "question_number": "Q8(a)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly disagreeing. Failed to provide the rubric\u2011required reason 'not necessary if drug is stable in solution'."
+        },
+        {
+          "text": "(B) PROTEIN STRUCTURE IS MORE COMPLEX THAN PEPTIDES, MEANING INSTABILITY IS OFTEN A GREATER ISSUE. Agree. Protein structures are made up of sequences of amino acids linked with disulphide bonds and other weal bonds, could be broken down into different parts compared to Peptide bond that usually only has a strong covalent bond.",
+          "question_number": "Q8(b)",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agreeing and 1 mark for noting that protein tertiary structure can be disrupted by unwanted chemical reactions (disulfide/weak bonds), matching the rubric reason."
+        },
+        {
+          "text": "(C) ANTIBODY-DRUG CONJUGATES USE THE NATURAL DISTRIBUTION OF A DRUG TO GET THE ANTIBODY TO BIND TO ITS TARGET ON CELLS TO DELIVER A THERAPEUTIC EFFECT. Disagree. The ADC can differentiate between cancerous and healthy cells by the overexpression of certain receptors on the cell surface, and release the drug once inside the target cell.",
+          "question_number": "Q8(c)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly disagreeing. Failed to provide the rubric\u2011required reason 'the antibody directs the drug to the target not the other way around'."
+        },
+        {
+          "text": "(D) PROTEINS AND PEPTIDES ARE NOT LIGHT SENSITIVE, SO PACKAGING TO PROTECT THE DRUG FROM LIGHT IS NEVER USED. Disagree, Proteins and peptides are sensitive to light so packaging is needed",
+          "question_number": "Q8(d)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly disagreeing. Failed to provide the rubric\u2011required reason 'mentioning amber vials'."
+        },
+        {
+          "text": "(E) CO-SOLVENTS ARE USED TO DISSOLVE PEPTIDES TO ENABLE SAFE INJECTION. Agree. Peptides are usually dissolve in organic solvents such as methanol.",
+          "question_number": "Q8(e)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly agreeing. Failed to provide the rubric\u2011required reason 'unsafe if proteins/peptides not completely dissolved' or 'injectable co-solvents are OK to use in small amounts'."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31858929,
+    "question_no": "Q8",
+    "human_score": 3.0,
+    "ai_evaluation": {
+      "overall_score": 2.0,
+      "confidence_score": 0.98,
+      "status": "graded",
+      "reasoning": "The student answered each of the five sub-questions. For (a) they agreed instead of disagreeing and did not mention that lyophilization is unnecessary if the drug is stable in solution, earning 0/2. For (b) they correctly agreed (1 mark) but gave a reason about disulfide bridges and glycosylation rather than the required hydrophobic surface association or tertiary structure disruption, earning 0 for the reason. For (c) they agreed when disagreement was required and did not state that the antibody directs the drug to the target, earning 0/2. For (d) they correctly disagreed (1 mark) but omitted the specific mention of amber vials needed for the second mark, earning 0 for the reason. For (e) they disagreed when agreement was required and gave an unrelated explanation about colloidal dispersion, earning 0/2. Total score is 2 out of 10.",
+      "feedback": {
+        "summary": "The response shows limited understanding of the concepts; only the agree/disagree judgments for parts (b) and (d) were correct, with insufficient justification in most cases.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 0,
+            "max_score": 2,
+            "reasoning": "Awarded 0 marks for disagree; the student agreed and did not state that lyophilization is unnecessary if the drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 1,
+            "max_score": 2,
+            "reasoning": "Awarded 1 mark for agreeing; failed to provide reason about hydrophobic parts associating with surfaces or tertiary structure disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0,
+            "max_score": 2,
+            "reasoning": "Awarded 0 marks for disagree; the student agreed and did not state that the antibody directs the drug to the target."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1,
+            "max_score": 2,
+            "reasoning": "Awarded 1 mark for disagreeing; failed to mention amber vials as required for the second mark."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0,
+            "max_score": 2,
+            "reasoning": "Awarded 0 marks for agree; the student disagreed and gave an unrelated explanation about colloidal dispersion."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Agree. Macromolecules like peptides are usually prepared as lyophilized solid powder products in a vial, then combine with salt, sugar or surfactant then reconstituted to become a clear solution for injection.",
+          "question_number": "Q8(a)",
+          "score_awarded": 0,
+          "max_score": 2,
+          "type": "weakness",
+          "comment": "Awarded 0 marks for disagree; the student agreed and did not state that lyophilization is unnecessary if the drug is stable in solution."
+        },
+        {
+          "text": "Agree. protein is more complex because it possess multiple disulfide bridges and additional glycosylation of the protein backbone, while peptide only have limited disulfide cross-linking.",
+          "question_number": "Q8(b)",
+          "score_awarded": 1,
+          "max_score": 2,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agreeing; failed to provide reason about hydrophobic parts associating with surfaces or tertiary structure disruption."
+        },
+        {
+          "text": "Agree. antibody drug conjugates combine the affinity modality of monoclonal antibodies (mAbs) that are tumor cell-specific but not sufficiently cytotoxic, with a potent anticancer drug. The mAb is linked to the drug by a chemical linker with labile bonds. Both the mAb and anticancer drug target cancerous cell selectively and naturally.",
+          "question_number": "Q8(c)",
+          "score_awarded": 0,
+          "max_score": 2,
+          "type": "weakness",
+          "comment": "Awarded 0 marks for disagree; the student agreed and did not state that the antibody directs the drug to the target."
+        },
+        {
+          "text": "Disagree. Proteins and peptides are susceptible to heat, packaging to protect from light and heat is needed.",
+          "question_number": "Q8(d)",
+          "score_awarded": 1,
+          "max_score": 2,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing; failed to mention amber vials as required for the second mark."
+        },
+        {
+          "text": "Disagree. Co-solvent is used to enhance solubility of colloidal dispersion, peptide is too big. Colloidal dispersion means undissolved drug particles are <1\u00b5m in size and dispersed in a liquid medium",
+          "question_number": "Q8(e)",
+          "score_awarded": 0,
+          "max_score": 2,
+          "type": "weakness",
+          "comment": "Awarded 0 marks for agree; the student disagreed and gave an unrelated explanation about colloidal dispersion."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 31860192,
+    "question_no": "Q8",
+    "human_score": 4.5,
+    "ai_evaluation": {
+      "overall_score": 3.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "The student's responses were evaluated against the rubric for each of the five sub\u2011questions (Q8a\u2013Q8e). For each sub\u2011part, one mark is allocated for the correct agree/disagree stance and a second mark for providing the specific reason outlined in the rubric. The student correctly identified the stance for (a), (b), and (d) earning 1 mark each, but did not supply the required justification in any case. Stances for (c) and (e) were incorrect, yielding 0 marks for those items. Consequently, the total score is 3 out of 10.",
+      "feedback": {
+        "summary": "The student demonstrated correct directional judgments for three statements but missed the required explanatory details, resulting in a low overall score.",
+        "breakdown": [
+          {
+            "question_number": "Q8(a)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly disagreeing with the statement. No mark for the reason because the response did not mention that lyophilization is unnecessary if the drug is stable in solution."
+          },
+          {
+            "question_number": "Q8(b)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for agreeing with the statement. No mark for the reason because the response cited larger size leading to lower stability, which does not match the rubric's required points about hydrophobic surface association or tertiary structure disruption."
+          },
+          {
+            "question_number": "Q8(c)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No marks awarded because the student agreed with the statement, whereas the rubric requires disagreement. The provided explanation did not correct the misconception that the antibody directs the drug to the target."
+          },
+          {
+            "question_number": "Q8(d)",
+            "score_awarded": 1.0,
+            "max_score": 2.0,
+            "reasoning": "Awarded 1 mark for correctly disagreeing with the statement. No mark for the reason because the response did not specifically mention amber vials as the protective packaging."
+          },
+          {
+            "question_number": "Q8(e)",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "reasoning": "No marks awarded because the student disagreed with the statement, while the rubric expects agreement. The justification given about co\u2011solvent harming the patient does not align with the required points about incomplete dissolution or safe use of injectable co\u2011solvents in small amounts."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Disagree. There are different options for preparation of peptides for injectable administration. For example, solid phase method and coupling method.",
+          "question_number": "Q8(a)",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing with the statement. Failed to provide the reason that lyophilization is not necessary if the drug is stable in solution."
+        },
+        {
+          "question_number": "Q8(b)",
+          "text": "Agree. Protein has larger size compared to peptides, thus protein will be less stable compared to peptides",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for agreeing with the statement. Missed the required reason about hydrophobic parts associating to surfaces or tertiary structure disruption."
+        },
+        {
+          "question_number": "Q8(c)",
+          "text": "Agree. \"The antibody is linked to the drug by a chemical linker with labile bonds. The antibody-drug conjugates can differentiate between cancerous and healthy cells by the overexpression of certain receptors on the cell surface, and release the drug once inside the target cell\" (Discovery).",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "No marks awarded because the student agreed with the statement, whereas the rubric requires disagreement. The explanation did not correct the error that the antibody directs the drug to the target."
+        },
+        {
+          "question_number": "Q8(d)",
+          "text": "Disagree. Protein and peptides are light sensitive and it will degrade under light condition. Thus, it is important to protect the drug from light",
+          "score_awarded": 1.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for disagreeing with the statement. No mark for the reason because the response did not specifically mention amber vials as protective packaging."
+        },
+        {
+          "question_number": "Q8(e)",
+          "text": "Disagree. Co-solvent is not recommended as it will harm the patient. In this case, using buffering, addition of antioxidants, surfactants, and salt will be recommended to prevent chemical instability",
+          "score_awarded": 0.0,
+          "max_score": 2.0,
+          "type": "weakness",
+          "comment": "No marks awarded because the student disagreed with the statement, while the rubric expects agreement. The justification did not address the required points about incomplete dissolution or safe use of injectable co\u2011solvents in small amounts."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 33350299,
+    "question_no": "Q9",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 4.0,
+      "confidence_score": 0.98,
+      "status": "graded",
+      "reasoning": "The rubric awards 0.5 marks for each correct calculation (weight/10) and 1 mark for each correct whole square (rounded to nearest whole square). The student correctly calculated weight/10 for all four individuals, earning 2.0 marks. For whole squares, the student gave Tony (7) and Bella (4) correctly, earning 2.0 marks, but Melissa (6.5) and Bobby (2.5) were incorrect; the correct whole squares are 6 and 2 respectively. No other criteria apply. Total earned = 4.0 out of 6.0.",
+      "feedback": {
+        "summary": "Correct calculations demonstrated; whole\u2011square conversion partially correct.",
+        "breakdown": [
+          {
+            "question_number": "Q9",
+            "score_awarded": 4.0,
+            "max_score": 6.0,
+            "reasoning": "Awarded 2.0 marks for four correct weight/10 calculations (0.5 each). Awarded 2.0 marks for two correct whole\u2011square values (Tony and Bella). Missed marks for Melissa and Bobby due to incorrect rounding to whole squares."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Melissa: 64kg/10 = 6.4 squares Tony: 73kg/10=7.3 squares Bella: 39kg / 10 = 3.9 squares Bobby: 23kg /10 = 2.3 squares",
+          "question_number": "Q9",
+          "score_awarded": 2.0,
+          "max_score": 2.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for correct calculations (0.5 marks each for Melissa, Tony, Bella, Bobby). All four weight/10 calculations are correct."
+        },
+        {
+          "text": "Melissa: 6.5 squares Tony: 7 squares Bella: 4 squares Bobby: 2.5 squares",
+          "question_number": "Q9",
+          "score_awarded": 2.0,
+          "max_score": 4.0,
+          "type": "strength",
+          "comment": "Awarded 2 marks for correct whole squares for Tony and Bella (1 mark each). Failed to award marks for Melissa and Bobby as their values (6.5 and 2.5) are not correct whole squares; correct whole squares should be 6 and 2 respectively."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 33213232,
+    "question_no": "Q9",
+    "human_score": 5.0,
+    "ai_evaluation": {
+      "overall_score": 5.0,
+      "confidence_score": 0.98,
+      "status": "graded",
+      "reasoning": "The rubric awards 0.5 marks for each correct weight-based dose calculation (weight \u00d7 10\u202fmg) and 1 mark for each correct whole number of chocolate squares (rounded to the nearest whole square, as cutting squares is impractical). There are four students, so maximum marks are 4 \u00d7 0.5 = 2.0 for calculations plus 4 \u00d7 1 = 4.0 for squares, totaling 6.0.\n\nStudent submission:\n- Melissa: 6 squares = 640\u202fmg \u2013 correct calculation (0.5) and correct square count (1) \u2192 1.5 marks.\n- Tony: 7 squares = 730\u202fmg \u2013 correct calculation (0.5) and correct square count (1) \u2192 1.5 marks.\n- Bella: 3 squares = 390\u202fmg \u2013 correct calculation (0.5) but square count should be 4 squares (nearest whole to 3.9) \u2192 0 marks for square, total 0.5 marks.\n- Bobby: 2 squares = 230\u202fmg \u2013 correct calculation (0.5) and correct square count (1) \u2192 1.5 marks.\nSumming: 1.5 + 1.5 + 0.5 + 1.5 = 5.0 marks.\n\nThe student correctly performed all four dose calculations and identified the appropriate whole\u2011square amounts for Melissa, Tony, and Bobby. For Bella, the student correctly calculated the dose but incorrectly chose 3 squares instead of the rubric\u2011expected 4 squares, losing the square\u2011allocation mark.",
+      "feedback": {
+        "summary": "Solid understanding of dose calculations and most square allocations; only one square\u2011allocation error prevented full credit.",
+        "breakdown": [
+          {
+            "question_number": "Q9",
+            "score_awarded": 5.0,
+            "max_score": 6.0,
+            "reasoning": "Awarded 0.5 marks for each of the four correct calculations (2.0 total) and 1 mark for each correct whole square for Melissa, Tony, and Bobby (3.0 total). Bella\u2019s square allocation was incorrect, resulting in a missed 1\u2011mark."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Melissa - 6 squares = 640mg Tony - 7 squares = 730mg Bobby - 2 squares = 230mg",
+          "question_number": "Q9",
+          "score_awarded": 4.5,
+          "max_score": 6.0,
+          "type": "strength",
+          "comment": "Awarded 0.5 marks for each correct calculation (3 \u00d7 0.5 = 1.5) and 1 mark for each correct whole square (3 \u00d7 1 = 3), totaling 4.5 marks. The response matched the rubric\u2019s calculation and square\u2011allocation requirements for these three students."
+        },
+        {
+          "text": "Bella - 3 squares = 390mg (although close to 4 squares it is safer to give 3 squares as it would exceed recommended dose)",
+          "question_number": "Q9",
+          "score_awarded": 0.5,
+          "max_score": 6.0,
+          "type": "weakness",
+          "comment": "Awarded 0.5 marks for the correct dose calculation; missed 1 mark for the whole\u2011square allocation (should be 4 squares per rubric). The student\u2019s safety reasoning does not override the rubric\u2019s specified rounding rule."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32842716,
+    "question_no": "Q9",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.99,
+      "status": "graded",
+      "reasoning": "The student provided correct calculations for each person (weight \u00d7 10 mg) and correctly determined the number of whole squares by rounding to the nearest whole number, as required by the rubric. For each of the four individuals, the student earned 0.5 marks for the calculation and 1 mark for the correct whole square, totaling 6.0 marks.",
+      "feedback": {
+        "summary": "Excellent submission demonstrating correct calculations and rounding for all four individuals.",
+        "breakdown": [
+          {
+            "question_number": "Q9",
+            "score_awarded": 6.0,
+            "max_score": 6.0,
+            "reasoning": "Awarded 0.5 marks for each of the four correct calculations (2.0 marks) and 1 mark for each of the four correct whole squares (4.0 marks). All rubric criteria satisfied."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "For [PERSON_NAME], she should have 6 squares 10mg/kg        [PERSON_NAME] is 64kg, 100mg/10kg        64/10=6.4 6 squares, eMIMS states 57-70kg should take 6 For [PERSON_NAME], he should have 7 squares Tony 73kg, 73/10=7.3 7 squares, eMIMS states adults >70kg should have 7 squares [PERSON_NAME] should have 4 squares Bella 39kg, 39/10=3.9, eMIMS states people 26-45kg should have 3-4 squares factoring bella's weight it should be 4 squares [PERSON_NAME] should have 2 squares [PERSON_NAME], 23/10=2.3, eMIMS states children between 10-25kg should have 1-2 squares factoring [PERSON_NAME]'s weight [PERSON_NAME] should have 2 squares",
+          "question_number": "Q9",
+          "score_awarded": 6.0,
+          "max_score": 6.0,
+          "type": "strength",
+          "comment": "Awarded 0.5 marks for each correct calculation (4 calculations) and 1 mark for each correct whole square (4 squares). The response fully satisfies the rubric: correct calculations and appropriate rounding to whole squares for Melissa, Tony, Bella, and Bobby."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 32885636,
+    "question_no": "Q9",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 4.0,
+      "confidence_score": 0.95,
+      "status": "graded",
+      "reasoning": "The rubric awards 0.5 marks for each correct dosage calculation (4 calculations \u2192 2.0 marks) and 1 mark for each correct whole square of chocolate (4 squares \u2192 4 marks). The student correctly calculated all four dosages, earning the full 2.0 marks for calculations. For whole squares, the student correctly identified Melissa's 6 squares and Tony's 7 squares, earning 2 marks. However, the student gave Bella 3 squares (should be 4) and Bobby 3 squares (should be 2), missing 2 marks for squares. Total awarded = 2.0 (calculations) + 2.0 (correct squares) = 4.0 out of 6.0.",
+      "feedback": {
+        "summary": "Correct calculations but incorrect whole\u2011square rounding for two family members.",
+        "breakdown": [
+          {
+            "question_number": "Q9",
+            "score_awarded": 4.0,
+            "max_score": 6.0,
+            "reasoning": "Awarded 0.5 marks for each of the four correct dosage calculations (2.0 marks). Awarded 1 mark for each correct whole square for Melissa (6 squares) and Tony (7 squares) (2.0 marks). No marks for Bella and Bobby squares because the student gave 3 squares each instead of the correct 4 and 2 squares."
+          }
+        ],
+        "highlights": [
+          {
+            "text": "Melissa: 30 years old and weighs 64kg * 64kg x 10mg/kg = 640mg Tony, Melissa\u2019s husband: 32 years old and weighs 73kg * 73kg x 10mg/kg = 730mg Bella, their first child: 12 years old, weighs 39kg * 39kg x 10mg/kg = 390mg Bobby, their youngest child: 7 years old, weighs 23kg * 23kg x 10mg/kg = 230mg",
+            "question_number": "Q9",
+            "score_awarded": 2.0,
+            "max_score": 2.0,
+            "type": "strength",
+            "comment": "Awarded 0.5 marks for each correct calculation (4\u00d70.5=2.0). All four dosage calculations are correct."
+          },
+          {
+            "text": "Melissa: 30 years old and weighs 64kg * 64kg x 10mg/kg = 640mg * 6 chocholate squares as a single and first dose Tony, Melissa\u2019s husband: 32 years old and weighs 73kg * 73kg x 10mg/kg = 730mg * 7 chocholate squares as a single and first dose",
+            "question_number": "Q9",
+            "score_awarded": 2.0,
+            "max_score": 4.0,
+            "type": "strength",
+            "comment": "Awarded 1 mark for each correct whole square for Melissa (6 squares) and Tony (7 squares)."
+          },
+          {
+            "text": "Bella, their first child: 12 years old, weighs 39kg * 39kg x 10mg/kg = 390mg * 3 chocholate squares as a single and first dose Bobby, their youngest child: 7 years old, weighs 23kg * 23kg x 10mg/kg = 230mg * 3 chocholate squares as a single and first dose",
+            "question_number": "Q9",
+            "score_awarded": 0.0,
+            "max_score": 2.0,
+            "type": "weakness",
+            "comment": "No marks awarded for Bella and Bobby whole squares; correct squares should be 4 and 2 respectively."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "response_id": 33940304,
+    "question_no": "Q9",
+    "human_score": 6.0,
+    "ai_evaluation": {
+      "overall_score": 6.0,
+      "confidence_score": 0.96,
+      "status": "graded",
+      "reasoning": "The student provided the correct dosage calculations for each individual (weight \u00d7 10 mg) and correctly derived the whole number of chocolate squares (dosage \u00f7 100 mg, rounded down because squares cannot be cut). This matches the rubric exactly: 0.5 marks for each of the four correct calculations (total 2.0) and 1 mark for each of the four correct whole square counts (total 4.0), yielding the maximum 6.0 marks.",
+      "feedback": {
+        "summary": "Excellent submission that fully satisfies all rubric criteria for Q9.",
+        "breakdown": [
+          {
+            "question_number": "Q9",
+            "score_awarded": 6.0,
+            "max_score": 6.0,
+            "reasoning": "Awarded 0.5 marks for each of the four correct dosage calculations (Melissa, Tony, Bella, Bobby) and 1 mark for each of the four correct whole square counts. No omissions or errors."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Melissa: Requires 640mg, 6 chocolate squares Tony: Requires 730mg, 7 chocolate squares Bella: Requires 390 mg, 4 chocolate squares Bobby: Requires 230mg, 2 chocolate squares",
+          "question_number": "Q9",
+          "score_awarded": 6.0,
+          "max_score": 6.0,
+          "type": "strength",
+          "comment": "Awarded full marks (6.0) for providing all four correct dosage calculations and the corresponding whole square counts, satisfying the rubric's 0.5 marks per calculation and 1 mark per whole square."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 33351708,
+    "question_no": "Q9",
+    "human_score": 2.0,
+    "ai_evaluation": {
+      "overall_score": 2.0,
+      "confidence_score": 0.93,
+      "status": "graded",
+      "reasoning": "The student correctly identified the whole square doses for Melissa (6 squares) and Tony (7 squares), earning 1 mark each for correct whole squares (total 2 marks). They did not show the explicit weight \u00d7 10mg calculations, so no marks were awarded for the 0.5\u2011per\u2011calculation component. Bella's and Bobby's whole square doses were incorrect (should be 4 and 2 squares, respectively), and the reasoning based on weight ranges does not align with the rubric's calculation method.",
+      "feedback": {
+        "summary": "Partial understanding of whole\u2011square dosing; missing calculation steps and incorrect dosing for two patients.",
+        "breakdown": [
+          {
+            "question_number": "Q9",
+            "score_awarded": 2.0,
+            "max_score": 6.0,
+            "reasoning": "Awarded 1 mark for Melissa's correct whole square (6) and 1 mark for Tony's correct whole square (7). No marks for calculations (0.5 each \u00d7 4 = 2 marks) because the student did not show the weight \u00d7 10mg steps. Bella's and Bobby's whole square doses were incorrect, yielding no additional marks."
+          }
+        ]
+      },
+      "highlights": [
+        {
+          "text": "Melissa is 64kg so she gets 6 squares because it is in the range of 46-56 kg.",
+          "question_number": "Q9",
+          "score_awarded": 1.0,
+          "max_score": 6.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly stating Melissa's whole square dose (6 squares). The response did not show the calculation (64kg \u00d7 10mg = 640mg \u2192 6.4 squares \u2192 6 squares)."
+        },
+        {
+          "text": "Tony: 73kg so he gets 7 squares because he is more than 70 kg",
+          "question_number": "Q9",
+          "score_awarded": 1.0,
+          "max_score": 6.0,
+          "type": "strength",
+          "comment": "Awarded 1 mark for correctly stating Tony's whole square dose (7 squares). The calculation (73kg \u00d7 10mg = 730mg \u2192 7.2 squares \u2192 7 squares) was not shown."
+        },
+        {
+          "text": "Bella: 39kg so she gets 3 because the range is 26-45kg get 3-4 squares",
+          "question_number": "Q9",
+          "score_awarded": 0.0,
+          "max_score": 6.0,
+          "type": "weakness",
+          "comment": "No marks awarded: Bella's correct whole square dose is 4 squares (39kg \u00d7 10mg = 390mg \u2192 3.9 squares \u2192 4 squares). The student gave 3 squares, which is incorrect."
+        },
+        {
+          "text": "Bobby:23 kg so he gets 1 because 10-25 kg will get 1-2 squares",
+          "question_number": "Q9",
+          "score_awarded": 0.0,
+          "max_score": 6.0,
+          "type": "weakness",
+          "comment": "No marks awarded: Bobby's correct whole square dose is 2 squares (23kg \u00d7 10mg = 230mg \u2192 2.3 squares \u2192 2 squares). The student gave 1 square, which is incorrect."
+        },
+        {
+          "text": "Bella got 3 and Bobby got 1 because it is inconvenient to cut the squares into the exact dose.",
+          "question_number": "Q9",
+          "score_awarded": 0.0,
+          "max_score": 6.0,
+          "type": "weakness",
+          "comment": "No marks awarded: The justification does not replace the required calculation and whole\u2011square determination; Bella and Bobby's doses remain incorrect."
+        }
+      ]
+    }
+  },
+  {
+    "response_id": 33427917,
+    "question_no": "Q9",
+    "human_score": 4.0,
+    "ai_evaluation": {
+      "overall_score": 0.0,
+      "reasoning": "FAILED: empty_choices: {'message': 'Provider timed out after 11099ms', 'code': 504}"
+    }
+  }
+]

@@ -1,0 +1,58 @@
+response_id,question_no,max_score,human_score,ai_score,ai_feedback,latency_s,input_tokens,output_tokens,cost_usd,error
+31109578,Q6,10.0,3.0,0.0,,16.923,0,0,0.0,"empty_choices: {'message': 'error code: 502\n', 'code': 502}"
+31862160,Q6,10.0,3.0,0.0,,17.369,0,0,0.0,"empty_choices: {'message': 'error code: 502\n', 'code': 502}"
+31860737,Q6,10.0,6.0,6.0,Submission shows correct grasp of several key points but omits multiple rubric‑specified advantages and disadvantages for both microspheres and in‑situ gelling systems.,328.902,2063,3554,0.001597,
+32025238,Q6,10.0,7.0,9.0,"Strong submission demonstrating good understanding of both microsphere and in situ gelling systems, with minor omissions in part (a).",65.037,2157,3694,0.001661,
+32022271,Q6,10.0,5.0,7.0,Strong understanding of polymer microsphere advantages/disadvantages; limited detail on in situ gelling system attributes.,58.633,2096,3837,0.001713,
+32227787,Q6,10.0,8.0,9.0,Strong submission demonstrating clear understanding of core concepts with minor omissions.,30.747,2125,3351,0.001521,
+32022735,Q6,10.0,8.0,0.0,,17.088,0,0,0.0,"empty_choices: {'message': 'Provider returned error', 'code': 429}"
+32629796,Q6,10.0,5.0,0.0,,17.065,0,0,0.0,"empty_choices: {'message': 'Provider returned error', 'code': 429}"
+32228872,Q6,10.0,8.0,0.0,,17.408,0,0,0.0,"empty_choices: {'message': 'Provider returned error', 'code': 429}"
+30897181,Q6,10.0,4.0,1.0,"The response shows limited understanding of the rubric expectations, capturing only a single correct point about solvent diffusion in part (b).",258.189,1937,2653,0.001226,
+31858996,Q6,10.0,4.0,4.0,The response shows basic understanding of sustained release and some attributes of in situ gelling systems but misses many key advantages/disadvantages required by the rubric.,57.559,2061,2513,0.00118,
+32557590,Q6,10.0,5.0,6.0,"Solid understanding of key concepts but misses several specific rubric points, particularly in part (b).",42.727,2230,3854,0.001731,
+31920918,Q6,10.0,6.0,7.0,Solid understanding of key concepts; missed several rubric-specific points in both parts.,23.979,2082,2655,0.001239,
+32233167,Q6,10.0,5.0,0.0,,28.925,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 12182ms', 'code': 504}"
+31109675,Q6,10.0,6.0,7.0,Good demonstration of core concepts; missing several specific rubric points especially regarding practical considerations and comparative benefits.,39.819,2276,2848,0.001333,
+32025289,Q6,10.0,5.0,6.0,Solid understanding of key concepts but missed several specific rubric points in both sections.,92.781,2062,4225,0.001865,
+31107494,Q6,10.0,4.0,6.0,"Submission shows understanding of sustained release and acid‑labile issue, but misses several key advantages/disadvantages and attributes.",55.814,2003,3772,0.001679,
+32270232,Q6,10.0,4.0,0.0,,29.969,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 12086ms', 'code': 504}"
+31107834,Q6,10.0,7.0,8.0,Solid understanding of microsphere advantages/disadvantages and in situ gelling system attributes; missed a few microsphere points but excelled on the rival technology.,69.843,2045,4491,0.00197,
+32422296,Q6,10.0,8.0,0.0,,29.924,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 12365ms', 'code': 504}"
+31986862,Q6,10.0,4.0,0.0,,20.709,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 11993ms', 'code': 504}"
+32025351,Q6,10.0,5.0,6.0,The response demonstrates understanding of core concepts but omits several key rubric points and includes some inaccuracies.,78.271,2108,3432,0.001552,
+30720842,Q6,10.0,0.0,0.0,No response provided.,0.0,0,0,0.0,
+31858929,Q6,10.0,5.0,5.0,The response shows partial understanding of polymer microsphere advantages and in‑situ gelling system attributes but omits several key points required by the rubric.,93.036,2153,3445,0.001561,
+31860192,Q6,10.0,7.0,7.0,Solid understanding of key concepts; could improve by covering all rubric-listed points and using terminology matching the marking scheme.,52.933,1992,2534,0.001183,
+31109578,Q8,10.0,4.5,5.0,"The student demonstrated solid understanding of lyophilization alternatives and protein/peptide instability, but missed key points on antibody‑directed conjugates, light‑protection specifics, and omitted the co‑solvent question.",42.284,2102,2434,0.001152,
+31862160,Q8,10.0,4.0,0.0,,28.912,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 11957ms', 'code': 504}"
+31860737,Q8,10.0,5.0,0.0,,20.838,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 12104ms', 'code': 504}"
+32025238,Q8,10.0,6.0,6.0,"Strong understanding of lyophilization, protein instability, and antibody‑drug conjugate concepts; missed the light‑sensitivity and co‑solvent points.",86.613,2165,3029,0.001396,
+32022271,Q8,10.0,5.5,0.0,,24.899,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 12075ms', 'code': 504}"
+32227787,Q8,10.0,9.0,8.0,Strong understanding of most concepts; missed specific examples in two parts.,191.241,2165,3101,0.001424,
+32022735,Q8,10.0,7.5,7.0,"Solid understanding of most concepts; missed specific justifications in parts (a), (d), and (e).",159.568,2088,3103,0.001419,
+32629796,Q8,10.0,5.0,6.0,"Solid understanding of protein/peptide instability and formulation concepts, but missed key directional concept in antibody-drug conjugates and omitted specific protective packaging and co-solvent safety details.",143.055,2041,2705,0.001255,
+32228872,Q8,10.0,6.5,6.0,"The student correctly identified the agree/disagree direction for all five statements, earning half the available marks. Justifications often missed the specific rubric‑points, resulting in lost reasoning marks.",198.742,2128,3705,0.001663,
+30897181,Q8,10.0,4.0,4.0,The response shows basic understanding of agree/disagree judgments but largely lacks the specific justifications required by the rubric.,141.974,2010,2164,0.001036,
+31858996,Q8,10.0,3.0,3.0,"The student demonstrated understanding of protein complexity but missed key concepts in most statements, resulting in a low total score.",72.646,2229,3291,0.001506,
+32557590,Q8,10.0,6.5,7.0,Solid understanding of most concepts; missed the directional relationship in antibody-drug conjugates and the specific packaging example for light protection.,31.333,2112,2563,0.001205,
+31920918,Q8,10.0,9.0,8.0,"Solid understanding demonstrated; most correct judgments with appropriate reasoning, minor gaps in specific justifications for parts (d) and (e).",248.703,2145,2743,0.00128,
+32233167,Q8,10.0,4.5,5.0,"Student demonstrated correct understanding of lyophilization alternatives and protein complexity but missed key concepts regarding antibody-drug conjugates, light protection, and co-solvent use.",400.975,2115,3416,0.001546,
+31109675,Q8,10.0,6.0,7.0,Solid understanding of most concepts; missed specific packaging detail for light sensitivity and misunderstood the role of co‑solvents.,301.938,2080,2583,0.00121,
+32025289,Q8,10.0,4.0,5.0,"Partial understanding demonstrated; strengths in protein instability and light‑sensitivity concepts, but missed key points on lyophilization alternatives, antibody‑directed targeting, and co‑solvent use.",354.745,2134,2758,0.001285,
+31107494,Q8,10.0,5.0,6.0,"Correct identification of agree/disagree for all statements, but insufficient justification in most parts.",443.483,2050,3237,0.001469,
+32270232,Q8,10.0,7.5,8.0,Strong understanding of most concepts; missed specific packaging detail for light safety and co-solvent safety nuance.,447.464,2210,3287,0.001503,
+31107834,Q8,10.0,5.5,8.0,Solid understanding of most concepts; only missed the direction of antibody-drug conjugate relationship.,82.257,2069,4478,0.001967,
+32422296,Q8,10.0,6.0,7.0,"Solid understanding of protein/peptide instability, antibody-drug conjugates, and light protection; missed the nuance on lyophilization necessity and co-solvent use.",76.522,2138,3244,0.001479,
+31986862,Q8,10.0,7.5,7.0,Solid understanding of most concepts; missed specific mechanistic details in parts (b) and (c) and the safety nuance in (e).,220.039,2075,2666,0.001243,
+32025351,Q8,10.0,5.0,5.0,Correct identification of agree/disagree positions but lacking the required explanatory details for each statement.,240.577,2023,2319,0.0011,
+30720842,Q8,10.0,6.0,6.0,"Correct identification of agree/disagree positions but justifications often lacked the specific rubric‑required reasoning, resulting in partial credit.",295.926,2314,3505,0.001599,
+31858929,Q8,10.0,3.0,2.0,"The response shows limited understanding of the concepts; only the agree/disagree judgments for parts (b) and (d) were correct, with insufficient justification in most cases.",272.3,2172,3099,0.001424,
+31860192,Q8,10.0,4.5,3.0,"The student demonstrated correct directional judgments for three statements but missed the required explanatory details, resulting in a low overall score.",52.214,2152,2614,0.001229,
+33350299,Q9,6.0,4.0,4.0,Correct calculations demonstrated; whole‑square conversion partially correct.,236.757,1340,2748,0.001213,
+33213232,Q9,6.0,5.0,5.0,Solid understanding of dose calculations and most square allocations; only one square‑allocation error prevented full credit.,318.854,1305,2706,0.001193,
+32842716,Q9,6.0,6.0,6.0,Excellent submission demonstrating correct calculations and rounding for all four individuals.,282.689,1427,2792,0.001238,
+32885636,Q9,6.0,4.0,4.0,Correct calculations but incorrect whole‑square rounding for two family members.,457.543,1516,4259,0.001832,
+33940304,Q9,6.0,6.0,6.0,Excellent submission that fully satisfies all rubric criteria for Q9.,57.588,1363,1967,0.000903,
+33351708,Q9,6.0,2.0,2.0,Partial understanding of whole‑square dosing; missing calculation steps and incorrect dosing for two patients.,78.215,1300,2587,0.001145,
+33427917,Q9,6.0,4.0,0.0,,29.405,0,0,0.0,"empty_choices: {'message': 'Provider timed out after 11099ms', 'code': 504}"

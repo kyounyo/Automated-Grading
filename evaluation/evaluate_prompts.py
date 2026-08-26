@@ -4,6 +4,7 @@ import pandas as pd
 import pingouin as pg
 import sys
 import json
+from dotenv import load_dotenv
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(script_dir, "../ai-pipeline")))
@@ -206,7 +207,7 @@ def main():
     df_results = pd.DataFrame(results_data)
     print("\nSaved raw grades to raw_grading_results.csv")
 
-    with open(os.path.join(script_dir, "ai_json_responses32(M).json"), "w") as f:
+    with open(os.path.join(script_dir, "ai_json_responses32(Gemini3.1FlashLite).json"), "w") as f:
         json.dump(json_outputs_data, f, indent=4)
     print("Saved detailed AI reasoning to ai_json_responses.json")
 

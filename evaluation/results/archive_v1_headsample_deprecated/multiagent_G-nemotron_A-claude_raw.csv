@@ -1,0 +1,23 @@
+response_id,question_no,max_score,human_score,grader_score,auditor_score,audit_passed,confidence_score,status,total_cost_usd,total_latency_s,errors
+30720842,Q6,10.0,0.0,0.0,0.0,True,1.0,Auto-Approved,0.0,0.0,
+30881447,Q6,10.0,5.0,4.0,4.0,True,1.0,Auto-Approved,0.012759,421.978,
+30883350,Q6,10.0,2.0,2.0,2.0,True,1.0,Auto-Approved,0.010197,339.467,
+30884772,Q6,10.0,2.0,2.0,2.0,True,1.0,Auto-Approved,0.009497,313.072,
+30897181,Q6,10.0,4.0,0.0,2.0,False,0.9,Auto-Approved,0.007491,28.635,"grader:empty_choices: {'message': 'Provider timed out after 11072ms', 'code': 504}"
+30897254,Q6,10.0,5.0,0.0,4.0,False,0.8,Auto-Approved,0.008898,45.493,"grader:empty_choices: {'message': 'Provider timed out after 11090ms', 'code': 504}"
+31062377,Q6,10.0,4.0,0.0,4.0,False,0.8,Auto-Approved,0.00855,45.932,"grader:empty_choices: {'message': 'Provider timed out after 11108ms', 'code': 504}"
+31106897,Q6,10.0,3.0,5.0,4.0,False,0.95,Auto-Approved,0.013871,84.348,
+31106951,Q6,10.0,7.0,0.0,6.0,False,0.7,Action Required,0.009198,44.827,"grader:empty_choices: {'message': 'Provider timed out after 11505ms', 'code': 504}"
+31107125,Q6,10.0,9.0,0.0,6.0,False,0.7,Action Required,0.009456,36.912,"grader:empty_choices: {'message': 'Provider timed out after 11132ms', 'code': 504}"
+31107494,Q6,10.0,4.0,0.0,3.0,False,0.85,Auto-Approved,0.007776,44.398,"grader:empty_choices: {'message': 'Provider timed out after 11143ms', 'code': 504}"
+31107834,Q6,10.0,7.0,0.0,4.0,False,0.8,Auto-Approved,0.007575,43.755,"grader:empty_choices: {'message': 'Provider timed out after 11198ms', 'code': 504}"
+31107990,Q6,10.0,8.0,0.0,6.0,False,0.7,Action Required,0.009408,44.94,"grader:empty_choices: {'message': 'Provider timed out after 11267ms', 'code': 504}"
+31108083,Q6,10.0,8.0,0.0,5.0,False,0.75,Auto-Approved,0.008673,45.295,"grader:empty_choices: {'message': 'Provider timed out after 11221ms', 'code': 504}"
+31108490,Q6,10.0,7.0,0.0,6.0,False,0.7,Action Required,0.010086,46.388,"grader:empty_choices: {'message': 'Provider timed out after 11275ms', 'code': 504}"
+31108547,Q6,10.0,5.0,0.0,4.0,False,0.8,Auto-Approved,0.009057,45.43,"grader:empty_choices: {'message': 'Provider timed out after 11213ms', 'code': 504}"
+31109462,Q6,10.0,4.0,0.0,5.0,False,0.75,Auto-Approved,0.008556,45.566,"grader:empty_choices: {'message': 'Provider timed out after 11195ms', 'code': 504}"
+31109551,Q6,10.0,6.0,6.0,4.0,False,0.9,Auto-Approved,0.01624,109.498,
+31109578,Q6,10.0,3.0,0.0,5.0,False,0.75,Auto-Approved,0.009507,45.609,"grader:empty_choices: {'message': 'Provider timed out after 11182ms', 'code': 504}"
+31109675,Q6,10.0,6.0,7.0,6.0,False,0.95,Auto-Approved,0.013707,188.035,
+31110185,Q6,10.0,7.0,8.0,5.0,False,0.85,Auto-Approved,0.010881,365.132,
+31172091,Q6,10.0,7.0,8.0,5.0,False,0.85,Auto-Approved,0.014782,325.078,
