@@ -56,6 +56,14 @@ PRESET_MODELS = {
         "model_str": os.getenv("MODEL_C_STR", "anthropic/claude-sonnet-4.6"),
         "cost_per_1k_in": 0.0030,
         "cost_per_1k_out": 0.0150
+    },
+    "D": {
+        "id": "D",
+        "name": "Gemini 3.5 Flash Lite",
+        "file_tag": "Gemini_3.5_Flash_Lite",
+        "model_str": os.getenv("MODEL_D_STR", "google/gemini-3.5-flash-lite"),
+        "cost_per_1k_in": 0.0001,
+        "cost_per_1k_out": 0.0004
     }
 }
 
@@ -606,9 +614,9 @@ def generate_master_audit_comparison():
 def main():
     parser = argparse.ArgumentParser(description="Experiment 2: Manual Grader ➔ Auditor Quality-Control Evaluation.")
     parser.add_argument("--grader", type=str, default=None,
-                        help="Grader model key (A, B, C) or full OpenRouter model string (e.g. google/gemini-3.1-flash-lite).")
+                        help="Grader model key (A, B, C, D) or full OpenRouter model string (e.g. google/gemini-3.5-flash-lite).")
     parser.add_argument("--auditor", type=str, default=None,
-                        help="Auditor model key (A, B, C) or full OpenRouter model string (e.g. nvidia/nemotron-3-super-120b-a12b).")
+                        help="Auditor model key (A, B, C, D) or full OpenRouter model string (e.g. nvidia/nemotron-3-super-120b-a12b).")
     parser.add_argument("--compile_only", action="store_true",
                         help="Only re-generate Master comparison Excel from existing CSVs.")
     args = parser.parse_args()
@@ -624,13 +632,14 @@ def main():
         print("  [A] Gemini 3.1 Flash Lite  (google/gemini-3.1-flash-lite)")
         print("  [B] Nemotron 3 Super 120B  (nvidia/nemotron-3-super-120b-a12b)")
         print("  [C] Claude 4.6 Sonnet      (anthropic/claude-sonnet-4.6)")
-        grader_input = input("\nEnter Grader model (A, B, C, or custom OpenRouter string) [Default: A]: ").strip()
+        print("  [D] Gemini 3.5 Flash Lite  (google/gemini-3.5-flash-lite)")
+        grader_input = input("\nEnter Grader model (A, B, C, D, or custom OpenRouter string) [Default: D]: ").strip()
         if not grader_input:
-            grader_input = "A"
+            grader_input = "D"
 
     auditor_input = args.auditor
     if not auditor_input:
-        auditor_input = input("Enter Auditor model (A, B, C, or custom OpenRouter string) [Default: B]: ").strip()
+        auditor_input = input("Enter Auditor model (A, B, C, D, or custom OpenRouter string) [Default: B]: ").strip()
         if not auditor_input:
             auditor_input = "B"
 

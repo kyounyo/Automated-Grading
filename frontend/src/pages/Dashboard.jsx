@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, CheckCircle2, AlertTriangle, Clock, Play, ArrowRight, Sparkles, Layers, Download } from 'lucide-react';
+import { FileText, CheckCircle2, AlertTriangle, Play, ArrowRight, Layers, Download, Calendar, Users, Award, ShieldAlert, TrendingUp } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -43,11 +43,8 @@ const Dashboard = () => {
   // Class Average calculated strictly from graded papers
   const totalScoreSum = gradedSubs.reduce((acc, curr) => acc + curr.score, 0);
   const averageScore = gradedSubs.length > 0 ? (totalScoreSum / gradedSubs.length).toFixed(1) : '0.0';
-  const averageDisplay = gradedSubs.length > 0
-    ? (totalRubricMax ? `${averageScore} / ${totalRubricMax} marks` : `${averageScore} marks`)
-    : (totalRubricMax ? `0.0 / ${totalRubricMax} marks` : 'N/A');
 
-  // Extract Whole Question Breakdown Analytics (aggregating subparts Q6(a), Q6(b) -> Q6)
+  // Extract Whole Question Breakdown Analytics
   const getParentQuestionKey = (qNum) => {
     if (!qNum) return 'Q1';
     const match = String(qNum).match(/(?:Question\s*|Q)?\s*(\d+)/i);
@@ -56,7 +53,6 @@ const Dashboard = () => {
 
   const parentQuestionMap = {};
 
-  // First seed max scores from rubric_data
   if (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0) {
     currentAssignment.rubric_data.forEach((r, idx) => {
       const rawKey = r.question_number || r.criterion || `Q${idx + 1}`;
@@ -74,7 +70,6 @@ const Dashboard = () => {
     });
   }
 
-  // Accumulate scores awarded per student for each parent question
   gradedSubs.forEach(sub => {
     const breakdown = sub.feedback?.breakdown || [];
     const studentQuestionTotals = {};
@@ -93,7 +88,7 @@ const Dashboard = () => {
             studentScores: {}
           };
         }
-        
+
         if (!currentAssignment?.rubric_data || currentAssignment.rubric_data.length === 0) {
           parentQuestionMap[pKey].max_score += maxSc;
         }
@@ -129,279 +124,343 @@ const Dashboard = () => {
   });
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Premium Header Banner */}
-      <div className="glass-panel" style={{ padding: '1.5rem 2rem', background: 'linear-gradient(135deg, rgba(0, 96, 156, 0.08) 0%, rgba(16, 185, 129, 0.05) 100%)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+      {/* 1. Header Section */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1.25rem' }}>
         <div>
-          <h2 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Sparkles size={24} color="var(--primary)" /> Evaluation Overview
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+              Evaluation Analytics
+            </span>
+            {currentAssignment?.course_code && (
+              <span style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-dark)', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.55rem', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                {currentAssignment.course_code}
+              </span>
+            )}
+          </div>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--secondary)', letterSpacing: '-0.02em', margin: 0 }}>
+            {currentAssignment?.title || 'No Active Assignment'}
+          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginTop: '0.35rem', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
+            {currentAssignment?.due_date && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Calendar size={14} color="var(--primary)" /> Due Date: <strong style={{ color: 'var(--text-main)' }}>{currentAssignment.due_date}</strong>
+              </span>
+            )}
+            <span>Total Papers: <strong style={{ color: 'var(--text-main)' }}>{totalSubmissions}</strong></span>
+            {totalRubricMax && <span>Total Points: <strong style={{ color: 'var(--text-main)' }}>{totalRubricMax} pts</strong></span>}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+
+        <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
           <button
             className="btn btn-outline"
             onClick={onExportCSVClick}
             disabled={totalSubmissions === 0}
-            style={{ backgroundColor: '#fff', border: '1px solid var(--border)', color: 'var(--primary-dark)', padding: '0.6rem 1.1rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            style={{ fontSize: '0.825rem' }}
           >
-            <Download size={18} color="var(--primary)" /> Export Grades (CSV)
+            <Download size={14} color="var(--primary)" /> Export CSV
           </button>
-          <button className="btn btn-primary" onClick={gradeAll} disabled={loading || totalSubmissions === 0 || unassessedSubs.length === 0} style={{ padding: '0.6rem 1.25rem' }}>
-            <Play size={18} /> Grade All Pending Submissions
+          <button
+            className="btn btn-primary"
+            onClick={gradeAll}
+            disabled={loading || totalSubmissions === 0 || unassessedSubs.length === 0}
+            style={{ fontSize: '0.825rem' }}
+          >
+            <Play size={14} /> Grade All Pending ({unassessedSubs.length})
           </button>
         </div>
       </div>
 
-      {/* Active Assignment Info Panel */}
-      <div className="glass-panel" style={{ backgroundColor: '#fff', borderLeft: '4px solid var(--primary)', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h3 style={{ margin: '0 0 0.4rem 0', color: 'var(--primary-dark)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={20} color="var(--primary)" /> {currentAssignment?.title || 'No Active Assignment'}
-          </h3>
-          <p style={{ margin: 0, color: 'var(--text-main)', fontSize: '0.9rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-            <span>Course Code: <strong style={{ color: 'var(--primary)' }}>{currentAssignment?.course_code || 'N/A'}</strong></span>
-            {currentAssignment?.due_date && <span>Due Date: <strong>{currentAssignment.due_date}</strong></span>}
-          </p>
-        </div>
-        <button className="btn btn-outline" onClick={() => navigate('/assignment-creator')} style={{ fontSize: '0.85rem' }}>
-          + New Assignment
-        </button>
-      </div>
+      {/* 2. Soft Blue Minimalist Metric Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.15rem' }}>
 
-      {/* Metric Cards Grid - 4 Organized Boxes in 1 Single Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem' }}>
-        {/* Card 1: Total Submissions */}
-        <div 
-          className="glass-panel" 
+        {/* Card 1: Total Submissions (Crisp Sky Blue - distinct from panel) */}
+        <div
           onClick={() => navigate('/submissions', { state: { filter: 'all' } })}
-          style={{ 
-            padding: '1.25rem 1.5rem', 
-            borderRadius: '12px', 
-            borderTop: '4px solid var(--primary)', 
-            backgroundColor: '#fff', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            justifyContent: 'space-between', 
-            minHeight: '130px',
+          className="card-panel"
+          style={{
+            padding: '1.2rem 1.35rem',
             cursor: 'pointer',
-            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+            backgroundColor: '#E0F2FE',
+            borderColor: '#BAE6FD',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: '125px'
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(0, 96, 156, 0.12)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-          title="Click to view all student submissions"
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total Submissions</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={18} color="var(--primary)" />
-            </div>
-          </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--secondary)', lineHeight: 1.1 }}>{totalSubmissions}</div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--primary)', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
-              View All Submissions <ArrowRight size={13} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0369A1' }}>
+              Total Submissions
             </span>
-          </div>
-        </div>
-
-        {/* Card 2: Graded / Approved */}
-        <div 
-          className="glass-panel" 
-          onClick={() => navigate('/submissions', { state: { filter: 'graded' } })}
-          style={{ 
-            padding: '1.25rem 1.5rem', 
-            borderRadius: '12px', 
-            borderTop: '4px solid var(--success)', 
-            backgroundColor: '#fff', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            justifyContent: 'space-between', 
-            minHeight: '130px',
-            cursor: 'pointer',
-            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.15)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-          title="Click to view graded and approved submissions"
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Graded / Approved</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckCircle2 size={18} color="var(--success)" />
+            <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Users size={15} color="#0284C7" />
             </div>
           </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <div style={{ fontSize: '2.1rem', fontWeight: 800, color: 'var(--success)', lineHeight: 1.1 }}>{gradedApproved}</div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--success)', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
-              View Graded ({gradedApproved}) <ArrowRight size={13} />
-            </span>
-          </div>
-        </div>
-
-        {/* Card 3: Flagged for Review (Hyperlink to all flagged papers) */}
-        <div 
-          className="glass-panel" 
-          onClick={() => navigate('/submissions', { state: { filter: 'flagged' } })}
-          style={{ 
-            padding: '1.25rem 1.5rem', 
-            borderRadius: '12px', 
-            borderTop: '4px solid var(--warning)', 
-            backgroundColor: flaggedCount > 0 ? '#fffdf7' : '#fff', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            justifyContent: 'space-between', 
-            minHeight: '130px',
-            cursor: 'pointer',
-            border: flaggedCount > 0 ? '1.5px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--border)',
-            transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(245, 158, 11, 0.2)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-          title="Click to review all flagged submissions requiring lecturer audit"
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: flaggedCount > 0 ? '#b45309' : 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Flagged for Review
-            </span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AlertTriangle size={18} color="var(--warning)" />
+          <div style={{ margin: '0.25rem 0' }}>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0369A1', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {totalSubmissions}
             </div>
           </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <div style={{ fontSize: '2.1rem', fontWeight: 800, color: '#b45309', lineHeight: 1.1 }}>{flaggedCount}</div>
-            <span style={{ fontSize: '0.78rem', color: '#b45309', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 700 }}>
-              {flaggedCount > 0 ? (
-                <>Review Flagged Papers ({flaggedCount}) <ArrowRight size={13} /></>
-              ) : (
-                <>No flagged papers pending</>
-              )}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 4: Class Average Score */}
-        <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', borderRadius: '12px', borderTop: '4px solid var(--primary-dark)', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '130px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Class Average</span>
-            <div style={{ width: '34px', height: '34px', borderRadius: '50%', backgroundColor: 'rgba(0, 96, 156, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Clock size={18} color="var(--primary-dark)" />
-            </div>
-          </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <div style={{ fontSize: totalRubricMax ? '1.5rem' : '2.1rem', fontWeight: 800, color: 'var(--primary-dark)', lineHeight: 1.1 }}>
-              {gradedSubs.length > 0
-                ? (totalRubricMax ? `${averageScore} / ${totalRubricMax}` : `${averageScore} pts`)
-                : (totalRubricMax ? `0.0 / ${totalRubricMax}` : 'N/A')}
-            </div>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'block' }}>Based on {gradedSubs.length} graded paper(s)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Cohort Score Distribution Chart */}
-      <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div>
-            <h3 style={{ margin: 0, color: 'var(--secondary)' }}>Cohort Score Distribution</h3>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-              Distribution breakdown showing assessed score brackets and unassessed papers.
-            </p>
-          </div>
-          <button className="btn btn-outline" onClick={() => navigate('/submissions')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-            View Submissions List <ArrowRight size={16} />
-          </button>
-        </div>
-
-        <div style={{ width: '100%', height: 280 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={scoreDistribution}>
-              <XAxis dataKey="range" stroke="var(--text-muted)" fontSize={12} />
-              <YAxis stroke="var(--text-muted)" fontSize={12} allowDecimals={false} />
-              <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid var(--border)' }} />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {scoreDistribution.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={
-                      entry.range === 'Unassessed' ? '#f59e0b' :
-                        index > 4 ? 'var(--success)' :
-                          index > 2 ? 'var(--primary)' :
-                            'var(--primary-dark)'
-                    }
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {unassessedSubs.length > 0 && (
-          <div style={{ marginTop: '0.75rem', fontSize: '0.825rem', color: 'var(--warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <AlertTriangle size={15} /> Note: {unassessedSubs.length} submission(s) are currently unassessed (Pending AI Grade) and categorized in the Unassessed bar.
-          </div>
-        )}
-      </div>
-
-      {/* Question-by-Question Average Mark Breakdown Panel */}
-      <div className="glass-panel" style={{ padding: '1.5rem 2rem', backgroundColor: '#fff' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <div>
-            <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Layers size={20} color="var(--primary)" /> Question-by-Question Performance Breakdown
-            </h3>
-            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-              Average marks awarded per rubric subquestion across evaluated student papers.
-            </p>
-          </div>
-          <span style={{ fontSize: '0.825rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-            {questionAnalyticsList.length} Question Criteria Evaluated
+          <span style={{ fontSize: '0.775rem', color: '#0284C7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            Browse All Papers <ArrowRight size={12} color="#0284C7" />
           </span>
         </div>
 
-        {questionAnalyticsList.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No question breakdown available yet. Grade submissions to view per-question analytics.</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
-            {questionAnalyticsList.map((item, idx) => {
-              const barColor = item.percentage >= 75 ? 'var(--success)' : item.percentage >= 50 ? 'var(--primary)' : 'var(--warning)';
-
-              return (
-                <div 
-                  key={idx} 
-                  style={{ 
-                    padding: '1.15rem 1.25rem', 
-                    border: '1px solid var(--border)', 
-                    borderRadius: '10px', 
-                    backgroundColor: 'var(--bg-main)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justify: 'space-between'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <span style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--primary-dark)' }}>{item.question_number}</span>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: barColor }}>
-                      {item.avgScore} / {item.max_score} marks <span style={{ fontSize: '0.78rem', opacity: 0.8 }}>({item.percentage}%)</span>
-                    </span>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border)', borderRadius: '4px', overflow: 'hidden', marginBottom: '0.85rem' }}>
-                    <div style={{ width: `${Math.min(100, Math.max(0, item.percentage))}%`, height: '100%', backgroundColor: barColor, borderRadius: '4px', transition: 'width 0.4s ease' }} />
-                  </div>
-
-                  {/* Detailed Stats */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border)', paddingTop: '0.55rem' }}>
-                    <span>Lowest: <strong>{item.minScore}</strong></span>
-                    <span>Highest: <strong>{item.maxScoreAchieved}</strong></span>
-                    <span>Evaluated: <strong>{item.count} paper(s)</strong></span>
-                  </div>
-                </div>
-              );
-            })}
+        {/* Card 2: Graded & Approved (Soft Mint Emerald) */}
+        <div
+          onClick={() => navigate('/submissions', { state: { filter: 'graded' } })}
+          className="card-panel"
+          style={{
+            padding: '1.2rem 1.35rem',
+            cursor: 'pointer',
+            backgroundColor: '#EAF7EE',
+            borderColor: '#A7E0B9',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: '125px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#16A34A' }}>
+              Graded & Approved
+            </span>
+            <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Award size={15} color="#16A34A" />
+            </div>
           </div>
-        )}
+          <div style={{ margin: '0.25rem 0' }}>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#16A34A', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {gradedApproved}
+            </div>
+          </div>
+          <span style={{ fontSize: '0.775rem', color: '#16A34A', fontWeight: 600 }}>
+            {totalSubmissions > 0 ? `${Math.round((gradedApproved / totalSubmissions) * 100)}% evaluated` : '0%'}
+          </span>
+        </div>
+
+        {/* Card 3: Flagged for Review (Soft Warm Amber) */}
+        <div
+          onClick={() => navigate('/submissions', { state: { filter: 'flagged' } })}
+          className="card-panel"
+          style={{
+            padding: '1.2rem 1.35rem',
+            cursor: 'pointer',
+            backgroundColor: '#FEF6E8',
+            borderColor: '#FAD494',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: '125px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#D97706' }}>
+              Flagged for Audit
+            </span>
+            <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldAlert size={15} color="#D97706" />
+            </div>
+          </div>
+          <div style={{ margin: '0.25rem 0' }}>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#D97706', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {flaggedCount}
+            </div>
+          </div>
+          <span style={{ fontSize: '0.775rem', color: '#D97706', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+            {flaggedCount > 0 ? <>Review Flagged Papers <ArrowRight size={12} /></> : 'All papers clear'}
+          </span>
+        </div>
+
+        {/* Card 4: Class Average (Light Blush Pink) */}
+        <div
+          className="card-panel"
+          style={{
+            padding: '1.2rem 1.35rem',
+            backgroundColor: '#FAF0F6',
+            borderColor: '#E8D4E2',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: '125px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#91215B' }}>
+              Class Average
+            </span>
+            <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TrendingUp size={15} color="#91215B" />
+            </div>
+          </div>
+          <div style={{ margin: '0.25rem 0' }}>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#4A102E', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {gradedSubs.length > 0 ? averageScore : '—'}
+              {totalRubricMax && <span style={{ fontSize: '1.05rem', fontWeight: 600, color: '#91215B', marginLeft: '0.25rem' }}>/ {totalRubricMax}</span>}
+            </div>
+          </div>
+          <span style={{ fontSize: '0.775rem', color: '#91215B', fontWeight: 600 }}>
+            From {gradedSubs.length} graded paper(s)
+          </span>
+        </div>
+
       </div>
+
+      {/* 3. Side-by-Side Analytics */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.45fr 1fr', gap: '1.25rem', alignItems: 'stretch' }}>
+
+        {/* Left Column: Score Distribution Chart */}
+        <div
+          className="card-panel"
+          style={{
+            padding: '1.5rem 1.75rem',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--secondary)' }}>
+                  Cohort Score Distribution
+                </h3>
+                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Student score frequency distribution across rubric mark brackets.
+                </p>
+              </div>
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate('/submissions')}
+                style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem' }}
+              >
+                Submissions Table <ArrowRight size={12} />
+              </button>
+            </div>
+
+            {/* Soft Blue Bar Chart Area */}
+            <div style={{ width: '100%', height: 280 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={scoreDistribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-light)" />
+                  <XAxis dataKey="range" stroke="var(--text-muted)" fontSize={11} fontWeight={500} tickLine={false} axisLine={{ stroke: 'var(--border)' }} />
+                  <YAxis stroke="var(--text-muted)" fontSize={11} fontWeight={500} allowDecimals={false} tickLine={false} axisLine={{ stroke: 'var(--border)' }} />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(217, 236, 250, 0.6)' }}
+                    contentStyle={{
+                      backgroundColor: 'var(--surface)',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      boxShadow: 'none',
+                      fontFamily: 'var(--font-main)',
+                      fontSize: '0.825rem',
+                      fontWeight: 600,
+                      color: 'var(--text-main)'
+                    }}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                    {scoreDistribution.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          entry.range === 'Unassessed' ? '#CBD5E1' :
+                            index > 4 ? '#16A34A' :
+                              index > 2 ? '#3B82C4' :
+                                '#1E4E73'
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {unassessedSubs.length > 0 && (
+            <div style={{ marginTop: '1rem', padding: '0.55rem 0.85rem', backgroundColor: 'var(--primary-light)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--primary-dark)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <AlertTriangle size={14} color="var(--primary)" /> {unassessedSubs.length} submission(s) are awaiting AI grading.
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Question Performance Breakdown */}
+        <div
+          className="card-panel"
+          style={{
+            padding: '1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between'
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--secondary)' }}>
+                  Question Performance
+                </h3>
+                <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Mean marks awarded per rubric item.
+                </p>
+              </div>
+              <span style={{ fontSize: '0.725rem', color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 600 }}>
+                {questionAnalyticsList.length} Criteria
+              </span>
+            </div>
+
+            {questionAnalyticsList.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', margin: '3rem 0', textAlign: 'center', fontSize: '0.85rem' }}>
+                No question breakdown available yet. Grade submissions to view analytics.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', maxHeight: '290px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+                {questionAnalyticsList.map((item, idx) => {
+                  const barColor = item.percentage >= 75 ? '#16A34A' : item.percentage >= 50 ? '#3B82C4' : '#D97706';
+
+                  return (
+                    <div
+                      key={idx}
+                      className="card-secondary"
+                      style={{
+                        padding: '0.75rem 0.9rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                          <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--secondary)', minWidth: '34px' }}>{item.question_number}</span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Avg: <strong style={{ color: 'var(--text-main)' }}>{item.avgScore} / {item.max_score} pts</strong></span>
+                        </div>
+                        <span style={{ fontSize: '0.775rem', fontWeight: 700, color: barColor }}>
+                          {item.percentage}%
+                        </span>
+                      </div>
+
+                      {/* Progress Bar */}
+                      <div style={{ width: '100%', height: '5px', backgroundColor: '#C9DCEB', borderRadius: '2.5px', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, Math.max(0, item.percentage))}%`, height: '100%', backgroundColor: barColor, borderRadius: '2.5px', transition: 'width 0.4s ease' }} />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        <span>Min: <strong style={{ color: 'var(--text-main)' }}>{item.minScore}</strong></span>
+                        <span>Max: <strong style={{ color: 'var(--text-main)' }}>{item.maxScoreAchieved}</strong></span>
+                        <span>Evaluated: <strong style={{ color: 'var(--text-main)' }}>{item.count} paper(s)</strong></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+
     </div>
   );
 };

@@ -98,14 +98,15 @@ You can manually specify any **Grader** and **Auditor** model via CLI flags or i
 * `A` = Gemini 3.1 Flash Lite (`google/gemini-3.1-flash-lite`)
 * `B` = Nemotron 3 Super 120B (`nvidia/nemotron-3-super-120b-a12b`)
 * `C` = Claude 4.6 Sonnet (`anthropic/claude-sonnet-4.6`)
+* `D` = Gemini 3.5 Flash Lite (`google/gemini-3.5-flash-lite`)
 
 #### Commands:
 ```bash
-# 1. Heterogeneous: Fast Grader + Deep Auditor (Gemini 3.1 -> Nemotron 120B)
-./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader A --auditor B
+# 1. Gemini 3.5 Flash Lite Grader + Nemotron 120B Auditor:
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader D --auditor B
 
-# 2. Self-Audit A: Gemini 3.1 -> Gemini 3.1
-./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader A --auditor A
+# 2. Self-Audit D: Gemini 3.5 -> Gemini 3.5
+./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader D --auditor D
 
 # 3. Heterogeneous: Deep Grader + Fast Guardrail (Nemotron 120B -> Gemini 3.1)
 ./backend/venv/bin/python evaluation/run_experiment_2_audit.py --grader B --auditor A

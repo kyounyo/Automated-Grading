@@ -15,6 +15,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
+            <Route path="create-assignment" element={<AssignmentCreator />} />
             <Route path="assignment-creator" element={<AssignmentCreator />} />
             <Route path="bulk-upload" element={<BulkUpload />} />
             <Route path="submissions" element={<SubmissionsList />} />

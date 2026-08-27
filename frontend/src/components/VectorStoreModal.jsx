@@ -68,7 +68,8 @@ const VectorStoreModal = ({ assignmentId, isOpen, onClose }) => {
         maxHeight: '85vh',
         display: 'flex',
         flexDirection: 'column',
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        boxShadow: 'none',
+        border: '1px solid var(--border)',
         overflow: 'hidden'
       }}>
         {/* Header */}
@@ -205,7 +206,7 @@ const VectorStoreModal = ({ assignmentId, isOpen, onClose }) => {
                         borderRadius: '12px',
                         padding: '1.2rem',
                         backgroundColor: '#ffffff',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                        boxShadow: 'none'
                       }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                           <span style={{

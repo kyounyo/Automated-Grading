@@ -50,26 +50,33 @@ def get_assignment_detail(assignment_id: str, db: Session = Depends(get_db)):
 
 @router.get("/qc-settings")
 def get_qc_settings():
-    """Retrieve current Quality Control Audit settings."""
+    """Retrieve current Quality Control Audit and Confidence Threshold settings."""
     enable_qc = os.getenv("ENABLE_RANDOM_QC_AUDIT", "false").lower() in ["true", "1", "yes"]
     qc_rate = float(os.getenv("QC_AUDIT_RATE", "0.05"))
+    conf_thresh = float(os.getenv("CONFIDENCE_THRESHOLD", "0.75"))
     return {
         "enable_random_qc": enable_qc,
-        "qc_audit_rate": qc_rate
+        "qc_audit_rate": qc_rate,
+        "confidence_threshold": conf_thresh
     }
 
 
 @router.post("/qc-settings")
 def update_qc_settings(data: dict):
-    """Update Quality Control Audit settings (ON/OFF toggle & sampling percentage rate)."""
+    """Update Quality Control Audit settings and Low Confidence Threshold."""
     enable_qc = bool(data.get("enable_random_qc", False))
     qc_rate = float(data.get("qc_audit_rate", 0.05))
+    conf_thresh = float(data.get("confidence_threshold", 0.75))
+
     os.environ["ENABLE_RANDOM_QC_AUDIT"] = "true" if enable_qc else "false"
     os.environ["QC_AUDIT_RATE"] = str(qc_rate)
+    os.environ["CONFIDENCE_THRESHOLD"] = str(conf_thresh)
+
     return {
-        "message": "Quality Control Audit settings updated successfully",
+        "message": "Quality Control Audit & Confidence settings updated successfully",
         "enable_random_qc": enable_qc,
-        "qc_audit_rate": qc_rate
+        "qc_audit_rate": qc_rate,
+        "confidence_threshold": conf_thresh
     }
 
 
@@ -248,6 +255,7 @@ async def parse_rubric_file(files: List[UploadFile] = File(...)):
         "file_names": file_names,
         "extracted_text": full_text,
         "parsed_questions": parsed_questions,
+        "extracted_questions": parsed_questions,
         "has_rubric": has_rubric,
         "rubric_warning": rubric_warning,
         "message": f"Parsed {len(files)} file(s). Extracted {len(parsed_questions)} questions."
@@ -308,4 +316,37 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
         'Content-Disposition': f'attachment; filename="{filename}"'
     }
     return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers=headers)
+
+
+@router.delete("/{assignment_id}")
+def delete_assignment(assignment_id: str, db: Session = Depends(get_db)):
+    """
+    Deletes a specific assignment, all its student submissions, audit logs,
+    and associated ChromaDB vector store collection while preserving all other assignments.
+    """
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    title = assignment.title
+    course_code = assignment.course_code
+
+    # Clean up ChromaDB collection if exists
+    try:
+        if hasattr(embedding_service, "chroma_client") and embedding_service.chroma_client:
+            coll_name = f"rubric_{assignment_id.replace('-', '_')}"
+            try:
+                embedding_service.chroma_client.delete_collection(coll_name)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    db.delete(assignment)
+    db.commit()
+
+    return {
+        "message": f"Assignment '{title}' ({course_code}) and all related submissions were deleted successfully.",
+        "deleted_assignment_id": assignment_id
+    }
 

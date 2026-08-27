@@ -1,62 +1,80 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Roboto:wght@400;500;700&display=swap');
 
 :root {
-  /* Brand Colors - Academic & Monash Inspired */
-  --primary: #00609C;
-  /* Deep academic blue */
-  --primary-light: #E6F3FA;
-  --primary-dark: #004573;
+  /* User-Defined Soft Blue Aesthetic Palette */
+  --bg-main: #EEF5FB;          /* Soft blue-gray instead of white */
+  --sidebar-bg: #DCEBF7;       /* Strong blue identity sidebar */
+  --surface: #F8FBFE;          /* Card surface - slightly lighter than bg */
+  --surface-hover: #FFFFFF;
+  --bg-subtle: #E8F2FA;        /* Card secondary - avoids pure white panels */
+  
+  --primary: #3B82C4;          /* Primary blue - buttons / active states */
+  --primary-hover: #2D6CA8;
+  --primary-light: #D9ECFA;    /* Light blue highlight areas */
+  --primary-subtle: #C9DCEB;
+  --primary-dark: #1E4E73;
+  --primary-glow: rgba(59, 130, 196, 0.15);
 
-  --secondary: #2C3E50;
-  /* Dark slate */
-  --accent: #E24301;
-  /* Vibrant orange accent */
-  --accent-light: #FCECE5;
+  --secondary: #1E4E73;        /* Dark blue - headings / important text */
+  --accent: #3B82C4;
+  --accent-light: #D9ECFA;
 
-  --success: #10B981;
-  --success-bg: #D1FAE5;
-  --warning: #F59E0B;
-  --warning-bg: #FEF3C7;
-  --danger: #EF4444;
+  --success: #16A34A;          /* Emerald */
+  --success-bg: #EAF7EE;
+  --success-border: #A7E0B9;
+  
+  --warning: #D97706;          /* Amber */
+  --warning-bg: #FEF6E8;
+  --warning-border: #FAD494;
+  
+  --danger: #DC2626;           /* Crimson */
+  --danger-bg: #FEEEEE;
 
-  /* Neutral scale */
-  --bg-main: #F4F7F9;
-  /* Extremely soft blue-gray for main background */
-  --surface: #FFFFFF;
-  --border: #E5E7EB;
-  --text-main: #111827;
-  --text-muted: #6B7280;
+  --border: #C9DCEB;           /* Border - subtle separation */
+  --border-light: #D8E7F3;
+  --border-focus: #3B82C4;
+  
+  --text-main: #243B53;        /* Main text - softer than pure black */
+  --text-muted: #627D98;       /* Secondary text - supporting text */
+  --text-dim: #8FA4B8;
 
   /* Layout */
-  --sidebar-width: 260px;
-  --header-height: 70px;
+  --sidebar-width: 240px;
+  --header-height: 65px;
 
-  /* Shadows for depth (glassmorphism feel) */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
-  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  /* Zero Shadows (Clean, Crisp, Minimalist) */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-glass: none;
 
-  /* Typography */
-  --font-main: 'Inter', system-ui, sans-serif;
+  /* Distinct Typographic Stack */
+  --font-heading: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-main: var(--font-body);
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Roboto Mono', Menlo, Monaco, Consolas, monospace;
 
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
+  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  box-shadow: none !important;
 }
 
 body {
-  font-family: var(--font-main);
+  font-family: var(--font-body);
   background-color: var(--bg-main);
   color: var(--text-main);
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 h1,
@@ -65,34 +83,51 @@ h3,
 h4,
 h5,
 h6 {
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-weight: 700;
   color: var(--secondary);
-  line-height: 1.2;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
 }
 
 h1 {
-  font-size: 1.875rem;
+  font-size: 1.65rem;
+  font-weight: 800;
 }
 
 h2 {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
+  font-weight: 700;
 }
 
 h3 {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 p {
   color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
-/* Utilities */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
+/* Soft Blue Minimalist Panels */
+.glass-panel,
+.card-panel {
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-glass);
+  border-radius: 8px;
+  box-shadow: none !important;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.card-panel:hover {
+  border-color: #AECADE;
+}
+
+.card-secondary {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 .flex-center {
@@ -112,90 +147,85 @@ p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: 8px;
-  border: none;
+  gap: 0.45rem;
+  padding: 0.5rem 1.1rem;
+  font-family: var(--font-main);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid transparent;
   cursor: pointer;
+  box-shadow: none !important;
+  letter-spacing: -0.01em;
   transition: all var(--transition-fast);
 }
 
 .btn:active {
-  transform: scale(0.98);
+  transform: translateY(1px);
 }
 
 .btn-primary {
   background-color: var(--primary);
-  color: white;
-  box-shadow: 0 4px 10px rgba(0, 96, 156, 0.2);
+  color: #FFFFFF;
+  border: 1px solid var(--primary);
+  font-weight: 600;
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-dark);
-  box-shadow: 0 6px 14px rgba(0, 96, 156, 0.3);
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .btn-outline {
-  background-color: transparent;
-  color: var(--primary);
-  border: 1px solid var(--primary);
+  background-color: var(--surface);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  font-weight: 600;
 }
 
 .btn-outline:hover {
   background-color: var(--primary-light);
+  border-color: #AECADE;
+  color: var(--primary-dark);
 }
 
-.btn-accent {
-  background-color: var(--accent);
-  color: white;
-  box-shadow: 0 4px 10px rgba(226, 67, 1, 0.2);
-}
-
-.btn-accent:hover {
-  background-color: #c93b00;
-  box-shadow: 0 6px 14px rgba(226, 67, 1, 0.3);
-}
-
-/* Base Inputs */
+/* Form Inputs */
 .input-field {
   width: 100%;
-  padding: 0.625rem 0.875rem;
+  padding: 0.55rem 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   font-family: inherit;
   font-size: 0.875rem;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  background-color: var(--surface);
+  color: var(--text-main);
+  box-shadow: none !important;
+  transition: border-color var(--transition-fast);
 }
 
 .input-field:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(0, 96, 156, 0.1);
+  background-color: #FFFFFF;
 }
 
 .label {
   display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-family: var(--font-heading);
+  font-size: 0.825rem;
+  font-weight: 700;
   color: var(--secondary);
-  margin-bottom: 0.375rem;
+  margin-bottom: 0.35rem;
+  letter-spacing: -0.01em;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s ease forwards;
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }

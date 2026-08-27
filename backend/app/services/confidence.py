@@ -136,13 +136,11 @@ def evaluate_confidence_and_status(
     elif discrepancy_pct > (AUDIT_DISCREPANCY_THRESHOLD * 100.0):
         flag_reasons.append(f"🤖 Multi-Agent Conflict: Score discrepancy of {score_discrepancy:.1f} pts ({discrepancy_pct:.1f}%)")
 
-    # Flag low confidence when below 75% (matching frontend default safeguard)
-    if calibrated_confidence < 0.75:
-        flag_reasons.append(f"📉 Low System Confidence ({calibrated_confidence * 100:.0f}% < 75%)")
-
-    # Flag borderline pass/fail grades (45% - 55%)
-    if 45.0 <= score_pct <= 55.0:
-        flag_reasons.append("⚖️ Borderline Pass/Fail Grade (45-55%): Human verification recommended")
+    # Flag low confidence when below configured threshold (e.g. 75%, 80%)
+    import os
+    conf_threshold = float(os.getenv("CONFIDENCE_THRESHOLD", "0.75"))
+    if calibrated_confidence < conf_threshold:
+        flag_reasons.append(f"📉 Low System Confidence ({calibrated_confidence * 100:.0f}% < {conf_threshold * 100:.0f}%)")
 
     # Flag terse answers
     if word_count < 20 and max_sc >= 5.0:
@@ -154,7 +152,7 @@ def evaluate_confidence_and_status(
         "confidence_score": calibrated_confidence,
         "status": status,
         "flag_reasons": flag_reasons,
-        "is_borderline": (45.0 <= score_pct <= 55.0),
+        "is_borderline": False,
         "is_audit_flagged": len(flag_reasons) > 0,
         "confidence_components": {
             "score_agreement": round(score_agreement, 2),

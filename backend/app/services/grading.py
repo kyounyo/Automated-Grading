@@ -10,7 +10,7 @@ from .llm_service import call_llm_for_grading
 from .confidence import evaluate_confidence_and_status
 
 PROMPT_VERSION = os.getenv("PROMPT_VERSION", "v1.2-rubric-cot")
-LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.5-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-3.5-flash-lite")
 
 
 def is_blank_submission(text: str) -> bool:

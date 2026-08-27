@@ -1,152 +1,215 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  CheckCircle, 
-  AlertTriangle, 
-  Edit3, 
-  Layers, 
-  Save, 
-  FileText, 
-  ChevronLeft, 
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  ArrowLeft,
+  ChevronLeft,
   ChevronRight,
+  Sparkles,
+  Save,
+  CheckCircle2,
+  FileText,
+  AlertTriangle,
+  Layers,
   Plus,
   Minus,
-  Sparkles
+  Edit3,
+  Award,
+  HelpCircle,
+  ShieldAlert,
+  Zap
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
 const GradingReview = () => {
-  const location = useLocation();
   const navigate = useNavigate();
-  const { currentAssignment, submissions, handleScoreOverride, triggerGradeSubmission } = useAssignment();
+  const location = useLocation();
+  const {
+    currentAssignmentId,
+    currentAssignment,
+    submissions,
+    activeSubmission,
+    setActiveSubmission,
+    handleScoreOverride,
+    triggerGradeSubmission
+  } = useAssignment();
 
-  // Selected submission from router state or default to first submission
-  const navSubmission = location.state?.submission;
-  const currentSubId = navSubmission?.id || (submissions.length > 0 ? submissions[0].id : null);
-  const activeSubmission = submissions.find(s => s.id === currentSubId) || navSubmission;
+  // Selected Highlight Popover State
+  const [activeHighlightPop, setActiveHighlightPop] = useState(null);
 
+  // Per-Question score overrides state: { "Q1": 8.5, "Q2": 9.0 }
+  const [questionScores, setQuestionScores] = useState({});
+
+  // Overall Final Grade Override input state
   const [overrideScore, setOverrideScore] = useState('');
   const [overrideComment, setOverrideComment] = useState('');
   const [saving, setSaving] = useState(false);
-  const [questionScores, setQuestionScores] = useState({});
-  const [activeHighlightPop, setActiveHighlightPop] = useState(null);
 
+  // Sync location.state submission into context and ensure activeSubmission is populated
   useEffect(() => {
-    if (activeSubmission) {
-      if (activeSubmission.score != null) {
-        setOverrideScore(activeSubmission.score.toString());
-      }
-      const feedback = activeSubmission.feedback || {};
-      const breakdown = feedback.breakdown || [];
+    if (location.state?.submission) {
+      setActiveSubmission(location.state.submission);
+    } else if (location.state?.submissionId) {
+      const match = submissions.find(s => s.id === location.state.submissionId);
+      if (match) setActiveSubmission(match);
+    } else if (!activeSubmission && submissions.length > 0) {
+      setActiveSubmission(submissions[0]);
+    }
+  }, [location.state, submissions]);
+
+  const currentSub = activeSubmission
+    || location.state?.submission
+    || (submissions.length > 0 ? submissions[0] : null);
+
+  // Sync state when currentSub changes
+  useEffect(() => {
+    if (currentSub) {
+      setOverrideScore(currentSub.score != null ? currentSub.score.toString() : '');
+      setOverrideComment('');
+      setActiveHighlightPop(null);
+
+      const fb = currentSub.feedback || {};
+      const bd = fb.breakdown || [];
       const initialScores = {};
-      breakdown.forEach((item, idx) => {
+      bd.forEach((item, idx) => {
         const qKey = item.question_number || `Q${idx + 1}`;
-        initialScores[qKey] = item.score_awarded != null ? item.score_awarded : 0;
+        initialScores[qKey] = item.score_awarded != null ? item.score_awarded : (item.score != null ? item.score : 0);
       });
       setQuestionScores(initialScores);
-      setActiveHighlightPop(null);
     }
-  }, [activeSubmission?.id, activeSubmission?.score, activeSubmission?.status]);
+  }, [currentSub]);
 
-  if (!activeSubmission) {
+  // Navigate to adjacent submission
+  const currentIndex = submissions.findIndex(s => s.id === currentSub?.id);
+  const prevSubmission = currentIndex > 0 ? submissions[currentIndex - 1] : null;
+  const nextSubmission = currentIndex < submissions.length - 1 ? submissions[currentIndex + 1] : null;
+
+  const navigateToSubmission = (sub) => {
+    if (!sub) return;
+    setActiveSubmission(sub);
+    navigate('/review', { state: { submission: sub } });
+  };
+
+  if (!currentSub) {
     return (
-      <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-        <h2>No Submission Selected</h2>
-        <button className="btn btn-primary" onClick={() => navigate('/submissions')} style={{ marginTop: '1rem' }}>
-          Return to Submissions List
+      <div className="card-panel" style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: '600px', margin: '3rem auto' }}>
+        <FileText size={48} color="var(--primary)" style={{ opacity: 0.6, marginBottom: '1rem' }} />
+        <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--secondary)' }}>No Submission Selected</h3>
+        <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+          Please choose a student submission from the Submissions List to review AI grading breakdown.
+        </p>
+        <button className="btn btn-primary" onClick={() => navigate('/submissions')}>
+          <ArrowLeft size={16} /> Back to Submissions List
         </button>
       </div>
     );
   }
 
-  // Calculate next and previous submission targets
-  const currentIndex = submissions.findIndex(s => s.id === activeSubmission.id);
-  const prevSubmission = currentIndex > 0 ? submissions[currentIndex - 1] : null;
-  const nextSubmission = currentIndex >= 0 && currentIndex < submissions.length - 1 ? submissions[currentIndex + 1] : null;
+  const activeSubmissionObj = currentSub;
+  const feedback = activeSubmissionObj.feedback || {};
+  const breakdown = feedback.breakdown || [];
+  
+  // Extract or synthesize highlights from breakdown reasoning if highlights array is empty
+  let highlights = feedback.highlights || activeSubmissionObj.highlights || [];
+  if (highlights.length === 0 && breakdown.length > 0) {
+    breakdown.forEach((item, idx) => {
+      const qNum = item.question_number || `Q${idx + 1}`;
+      const scoreAwarded = item.score_awarded ?? item.score ?? 0;
+      const isPositive = scoreAwarded > 0;
+      
+      const quoteMatches = (item.reasoning || '').match(/'([^']+)'|"([^"]+)"/g);
+      if (quoteMatches) {
+        quoteMatches.forEach(qm => {
+          const cleanQ = qm.replace(/['"]/g, '').trim();
+          if (cleanQ.length > 4) {
+            highlights.push({
+              text: cleanQ,
+              type: isPositive ? 'strength' : 'weakness',
+              score_awarded: isPositive ? scoreAwarded : 0,
+              question_number: qNum,
+              comment: item.reasoning
+            });
+          }
+        });
+      }
+    });
+  }
 
-  const navigateToSubmission = (targetSub) => {
-    if (targetSub) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      navigate('/review', { state: { submission: targetSub }, replace: true });
+  // Determine Flags and Conflicted Questions
+  const isFlagged = Boolean(
+    activeSubmissionObj.status === 'flagged' ||
+    (feedback.flag_reasons && feedback.flag_reasons.length > 0) ||
+    activeSubmissionObj.is_flagged
+  );
+
+  let rawFlagReasons = feedback.flag_reasons || [];
+  if (isFlagged && rawFlagReasons.length === 0) {
+    rawFlagReasons = ['⚠️ Flagged for Quality Audit: Score discrepancy or low AI confidence detected'];
+  }
+
+  // Parse specific conflicted questions from flag reasons (e.g. "on Q6(a), Q8")
+  const conflictedQuestions = new Set();
+  rawFlagReasons.forEach(reason => {
+    const match = reason.match(/(?:on|question|in)\s+([A-Za-z0-9_(),\s]+?)(?::|\(|$)/i);
+    if (match && match[1]) {
+      const parts = match[1].split(/[,&]/);
+      parts.forEach(p => {
+        const clean = p.trim();
+        if (clean.length > 0 && (clean.toLowerCase().startsWith('q') || /\d+/.test(clean))) {
+          conflictedQuestions.add(clean.toUpperCase());
+        }
+      });
     }
-  };
+  });
 
-  const feedback = activeSubmission.feedback || {};
-  const rawBreakdown = feedback.breakdown || [];
-  const highlights = activeSubmission.highlights || [];
+  const totalMaxScore = currentAssignment?.rubric_data
+    ? currentAssignment.rubric_data.reduce((acc, q) => acc + (parseFloat(q.max_score) || 0), 0)
+    : (breakdown.length > 0 ? breakdown.reduce((acc, b) => acc + (parseFloat(b.max_score) || 0), 0) : null);
 
-  const breakdown = rawBreakdown.length > 0
-    ? rawBreakdown
-    : (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0
-      ? currentAssignment.rubric_data.map((r, idx) => ({
-          question_number: r.question_number || r.criterion || `Q${idx + 1}`,
-          score_awarded: 0.0,
-          max_score: parseFloat(r.max_score || r.maxMark || 5.0),
-          reasoning: "Rubric criteria loaded. Pending AI grading evaluation."
-        }))
-      : []);
+  // Per-question score stepper
+  const handleStepQuestionScore = (qKey, maxScore, delta) => {
+    const current = questionScores[qKey] != null ? questionScores[qKey] : 0;
+    const stepped = Math.round((current + delta) * 10) / 10;
+    const clamped = Math.max(0, Math.min(maxScore, stepped));
 
-  const totalMaxScore = breakdown.length > 0
-    ? breakdown.reduce((acc, item) => acc + (parseFloat(item.max_score) || 0), 0)
-    : (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0
-      ? currentAssignment.rubric_data.reduce((acc, item) => acc + (parseFloat(item.max_score || item.maxMark) || 0), 0)
-      : null);
-
-  const calculatedTotalFromQuestions = breakdown.length > 0
-    ? breakdown.reduce((sum, item, idx) => {
-      const qKey = item.question_number || `Q${idx + 1}`;
-      const val = parseFloat(questionScores[qKey]);
-      return sum + (isNaN(val) ? 0 : val);
-    }, 0)
-    : (activeSubmission.score ?? 0);
-
-  const handlePerQuestionScoreChange = (qKey, maxScore, valStr) => {
-    const nextScores = {
-      ...questionScores,
-      [qKey]: valStr
-    };
+    const nextScores = { ...questionScores, [qKey]: clamped };
     setQuestionScores(nextScores);
 
-    // Auto-calculate new total and update New Final Score (overrideScore) in real time
-    let newSum = 0;
-    breakdown.forEach((item, idx) => {
-      const key = item.question_number || `Q${idx + 1}`;
-      const val = parseFloat(key === qKey ? valStr : nextScores[key]);
-      newSum += isNaN(val) ? 0 : val;
-    });
-    setOverrideScore((Math.round(newSum * 10) / 10).toString());
+    const newSum = Object.values(nextScores).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+    setOverrideScore(Math.round(newSum * 10) / 10);
   };
 
-  const handleStepQuestionScore = (qKey, maxScore, delta) => {
-    const current = parseFloat(questionScores[qKey]) || 0;
-    const newVal = Math.max(0, Math.min(maxScore, Math.round((current + delta) * 10) / 10));
-    handlePerQuestionScoreChange(qKey, maxScore, newVal.toString());
+  const handlePerQuestionScoreChange = (qKey, maxScore, rawVal) => {
+    const parsed = parseFloat(rawVal);
+    const validVal = isNaN(parsed) ? 0 : Math.max(0, Math.min(maxScore, parsed));
+    const nextScores = { ...questionScores, [qKey]: validVal };
+    setQuestionScores(nextScores);
+
+    const newSum = Object.values(nextScores).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+    setOverrideScore(Math.round(newSum * 10) / 10);
   };
+
+  const calculatedTotalFromQuestions = Object.values(questionScores).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
 
   const handleOverrideSubmit = async (e) => {
-    if (e) e.preventDefault();
+    e.preventDefault();
     const newScore = parseFloat(overrideScore);
-    if (isNaN(newScore) || newScore < 0 || (totalMaxScore && newScore > totalMaxScore)) {
-      alert(`Please enter a valid score between 0 and ${totalMaxScore || 100}.`);
+    if (isNaN(newScore)) {
+      alert("Please enter a valid numeric grade.");
       return;
     }
 
     try {
       setSaving(true);
-      // Map updated per-question breakdown
       let updatedBreakdown = breakdown.map((item, idx) => {
         const qKey = item.question_number || `Q${idx + 1}`;
-        const rawVal = parseFloat(questionScores[qKey]);
-        const validVal = isNaN(rawVal) ? 0 : Math.max(0, Math.min(item.max_score, rawVal));
+        const individualScore = questionScores[qKey];
         return {
           ...item,
-          score_awarded: Math.round(validVal * 10) / 10
+          score_awarded: individualScore != null ? individualScore : item.score_awarded
         };
       });
 
-      // If user directly typed an overall score differing from subquestions sum, sync breakdown
-      const breakdownSum = updatedBreakdown.reduce((sum, item) => sum + item.score_awarded, 0);
+      const breakdownSum = updatedBreakdown.reduce((sum, item) => sum + (item.score_awarded || 0), 0);
       if (Math.abs(breakdownSum - newScore) > 0.05 && breakdownSum > 0) {
         const scale = newScore / breakdownSum;
         updatedBreakdown = updatedBreakdown.map(item => ({
@@ -156,7 +219,7 @@ const GradingReview = () => {
       }
 
       const updated = await handleScoreOverride(
-        activeSubmission.id,
+        activeSubmissionObj.id,
         newScore,
         overrideComment || "Grade overridden / adjusted by lecturer",
         updatedBreakdown
@@ -188,7 +251,7 @@ const GradingReview = () => {
   const handleGradeWithAI = async () => {
     try {
       setSaving(true);
-      await triggerGradeSubmission(activeSubmission.id);
+      await triggerGradeSubmission(activeSubmissionObj.id);
       alert("AI grading pipeline completed successfully!");
     } catch (err) {
       alert(`AI grading failed: ${err.message}`);
@@ -201,30 +264,126 @@ const GradingReview = () => {
     const isBlank = !rawText || rawText.trim() === '' || rawText.trim() === '-' || rawText.trim() === 'N/A';
     if (isBlank) {
       return (
-        <div style={{ padding: '2rem 1.5rem', backgroundColor: 'rgba(239, 68, 68, 0.06)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)', textAlign: 'center' }}>
-          <AlertTriangle size={28} color="#ef4444" style={{ marginBottom: '0.5rem' }} />
-          <h4 style={{ margin: '0 0 0.25rem 0', color: '#991b1b' }}>Blank / Empty Student Submission</h4>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+        <div style={{ padding: '2rem 1.5rem', backgroundColor: 'var(--danger-bg)', borderRadius: '8px', border: '1px solid var(--danger)', textAlign: 'center' }}>
+          <AlertTriangle size={28} color="var(--danger)" style={{ marginBottom: '0.5rem' }} />
+          <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--danger)' }}>Blank / Empty Student Submission</h4>
+          <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Student provided no text response ('-'). 0.0 marks awarded across all questions.
           </p>
         </div>
       );
     }
 
+    const questionBlocks = rawText.split(/(?=(?:^|\n\n)Question\s+[A-Za-z0-9_()]+:)/g).filter(b => b.trim().length > 0);
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {questionBlocks.map((block, bIdx) => {
+          const matchHeader = block.trim().match(/^(Question\s+[A-Za-z0-9_()]+):([\s\S]*)$/);
+          const headerTitle = matchHeader ? matchHeader[1] : null;
+          const bodyContent = matchHeader ? matchHeader[2].trim() : block.trim();
+
+          const matchedBreakdown = breakdown.find(b => {
+            if (!headerTitle) return false;
+            const qClean = (b.question_number || '').replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+            const hClean = headerTitle.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+            return hClean.includes(qClean) || qClean.includes(hClean);
+          });
+
+          // Check if this question is flagged for conflict
+          const isQConflicted = Array.from(conflictedQuestions).some(cq => {
+            if (!headerTitle) return false;
+            const cleanHeader = headerTitle.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            const cleanCQ = cq.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+            return cleanHeader.includes(cleanCQ) || cleanCQ.includes(cleanHeader);
+          });
+
+          const isBodyEmpty = !bodyContent || bodyContent === '-' || bodyContent === 'N/A';
+
+          return (
+            <div
+              key={bIdx}
+              style={{
+                backgroundColor: 'var(--surface)',
+                border: isQConflicted ? '1.5px solid #F59E0B' : '1px solid var(--border)',
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}
+            >
+              {/* Question Header Pill */}
+              <div
+                style={{
+                  padding: '0.6rem 0.9rem',
+                  backgroundColor: isQConflicted ? '#FEF9EE' : '#EDF5FB',
+                  borderBottom: `1px solid ${isQConflicted ? '#FCD34D' : '#D1E5F5'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.4rem'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.85rem', color: isQConflicted ? '#92400E' : 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    📘 {headerTitle || `Question Part ${bIdx + 1}`}
+                  </span>
+                  {isQConflicted && (
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
+                      ⚠️ Conflicted Question
+                    </span>
+                  )}
+                </div>
+
+                {matchedBreakdown && (
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    backgroundColor: (matchedBreakdown.score_awarded || 0) > 0 ? 'var(--success-bg)' : 'var(--danger-bg)',
+                    color: (matchedBreakdown.score_awarded || 0) > 0 ? 'var(--success)' : 'var(--danger)',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '4px',
+                    border: `1px solid ${(matchedBreakdown.score_awarded || 0) > 0 ? 'var(--success-border)' : 'var(--danger-border)'}`
+                  }}>
+                    Awarded: {matchedBreakdown.score_awarded != null ? matchedBreakdown.score_awarded : 0} / {matchedBreakdown.max_score || 10} pts
+                  </span>
+                )}
+              </div>
+
+              {/* Student Response Content */}
+              <div style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', lineHeight: '1.65', color: 'var(--text-main)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-body)' }}>
+                {isBodyEmpty ? (
+                  <span style={{ color: 'var(--danger)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <AlertTriangle size={14} color="var(--danger)" /> No response submitted for this question (-). 0 marks awarded.
+                  </span>
+                ) : (
+                  renderHighlightedSnippet(bodyContent, highlightsList, headerTitle)
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderHighlightedSnippet = (textSnippet, highlightsList, currentHeader) => {
     if (!highlightsList || highlightsList.length === 0) {
-      return (
-        <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', lineHeight: '1.8', fontSize: '0.875rem', color: 'var(--text-main)' }}>
-          {rawText}
-        </div>
-      );
+      return textSnippet;
     }
 
-    const sortedHighlights = [...highlightsList].filter(h => h.text && h.text.trim().length > 3);
-    let parts = [rawText];
+    const relevantHighlights = highlightsList.filter(h => {
+      if (!h.text || h.text.trim().length < 3) return false;
+      return textSnippet.toLowerCase().includes(h.text.trim().toLowerCase());
+    });
 
-    sortedHighlights.forEach((hl, idx) => {
-      const quote = hl.text ? hl.text.trim() : '';
-      if (!quote) return;
+    if (relevantHighlights.length === 0) {
+      return textSnippet;
+    }
+
+    let parts = [textSnippet];
+
+    relevantHighlights.forEach((hl, idx) => {
+      const quote = hl.text.trim();
       const newParts = [];
 
       parts.forEach(part => {
@@ -234,33 +393,12 @@ const GradingReview = () => {
         }
 
         let matchIdx = part.toLowerCase().indexOf(quote.toLowerCase());
-        let matchLen = quote.length;
-
-        if (matchIdx === -1 && quote.length > 15) {
-          const subKey = quote.slice(0, Math.min(25, quote.length)).toLowerCase();
-          matchIdx = part.toLowerCase().indexOf(subKey);
-          if (matchIdx !== -1) {
-            matchLen = Math.min(quote.length, part.length - matchIdx);
-          }
-        }
-
-        if (matchIdx === -1 && quote.length > 5) {
-          const words = quote.split(/\s+/).filter(w => w.length > 2);
-          if (words.length > 0) {
-            const firstWord = words[0].toLowerCase();
-            matchIdx = part.toLowerCase().indexOf(firstWord);
-            if (matchIdx !== -1) {
-              matchLen = Math.min(quote.length, part.length - matchIdx);
-            }
-          }
-        }
-
         if (matchIdx === -1) {
           newParts.push(part);
         } else {
           const before = part.slice(0, matchIdx);
-          const matchedStr = part.slice(matchIdx, matchIdx + matchLen);
-          const after = part.slice(matchIdx + matchLen);
+          const matchedStr = part.slice(matchIdx, matchIdx + quote.length);
+          const after = part.slice(matchIdx + quote.length);
 
           if (before) newParts.push(before);
 
@@ -275,33 +413,32 @@ const GradingReview = () => {
                 setActiveHighlightPop(hl);
               }}
               style={{
-                backgroundColor: isSelected 
-                  ? (isStrength ? 'rgba(16, 185, 129, 0.45)' : 'rgba(239, 68, 68, 0.45)') 
-                  : (isStrength ? 'rgba(16, 185, 129, 0.22)' : 'rgba(239, 68, 68, 0.22)'),
-                color: isStrength ? '#065f46' : '#991b1b',
-                borderBottom: `3px solid ${isStrength ? 'var(--success)' : '#ef4444'}`,
+                backgroundColor: isSelected
+                  ? (isStrength ? 'rgba(34, 197, 94, 0.45)' : 'rgba(239, 68, 68, 0.45)')
+                  : (isStrength ? 'rgba(34, 197, 94, 0.22)' : 'rgba(239, 68, 68, 0.22)'),
+                color: isStrength ? '#14532D' : '#7F1D1D',
+                borderBottom: `2.5px solid ${isStrength ? '#16A34A' : '#DC2626'}`,
                 borderRadius: '4px',
-                padding: '0.2rem 0.45rem',
+                padding: '0.15rem 0.35rem',
                 margin: '0 0.15rem',
                 fontWeight: 600,
                 cursor: 'pointer',
-                boxShadow: isSelected ? '0 0 0 2px var(--primary)' : 'none',
                 transition: 'all 0.15s ease'
               }}
-              title="Click to view AI grading reason and awarded marks"
+              title="Click to view AI grading evidence & reasoning"
             >
               {matchedStr}
               <span style={{
-                fontSize: '0.72rem',
-                marginLeft: '0.35rem',
-                padding: '0.1rem 0.4rem',
+                fontSize: '0.7rem',
+                marginLeft: '0.3rem',
+                padding: '0.05rem 0.35rem',
                 borderRadius: '3px',
-                backgroundColor: isStrength ? 'var(--success)' : '#ef4444',
+                backgroundColor: isStrength ? '#16A34A' : '#DC2626',
                 color: '#fff',
                 fontWeight: 700,
                 display: 'inline-block'
               }}>
-                {hl.question_number ? `${hl.question_number} ` : ''}{hl.score_awarded != null ? `+${hl.score_awarded}m` : (isStrength ? '✓' : '0m')}
+                {hl.score_awarded != null ? `+${hl.score_awarded}m` : (isStrength ? '✓ Key Point' : '⚠️ Issue')}
               </span>
             </mark>
           );
@@ -313,266 +450,393 @@ const GradingReview = () => {
       parts = newParts;
     });
 
-    return (
-      <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', lineHeight: '1.8', fontSize: '0.875rem', color: 'var(--text-main)' }}>
-        {parts}
-      </div>
-    );
+    return parts;
   };
 
-  const rawStudentText = activeSubmission.raw_text || activeSubmission.extracted_text || '';
+  const rawStudentText = activeSubmissionObj.raw_text || activeSubmissionObj.extracted_text || '';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', paddingBottom: '2rem' }}>
+    <div className="grading-review-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', gap: '0.65rem' }}>
 
-      {/* Top Header Controls: Back Button, Quick Student Switcher, AI Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <button
-            className="btn"
-            onClick={() => navigate('/submissions')}
-            style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
-          >
-            <ArrowLeft size={18} /> Submissions List
-          </button>
-        </div>
-
-        {/* Center Quick Student Navigation */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#fff', padding: '0.3rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => navigateToSubmission(prevSubmission)}
-            disabled={!prevSubmission}
-            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', opacity: !prevSubmission ? 0.4 : 1 }}
-            title={prevSubmission ? `Previous: ${prevSubmission.student_name || prevSubmission.student_id}` : 'First student'}
-          >
-            <ChevronLeft size={16} /> Prev
-          </button>
-
-          <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--secondary)', padding: '0 0.5rem', minWidth: '100px', textAlign: 'center' }}>
-            Student {currentIndex >= 0 ? `${currentIndex + 1} of ${submissions.length}` : '—'}
-          </span>
-
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => navigateToSubmission(nextSubmission)}
-            disabled={!nextSubmission}
-            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem', opacity: !nextSubmission ? 0.4 : 1 }}
-            title={nextSubmission ? `Next: ${nextSubmission.student_name || nextSubmission.student_id}` : 'Last student'}
-          >
-            Next <ChevronRight size={16} />
-          </button>
-        </div>
-
-        {/* Right Status & Action */}
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          {activeSubmission.status === 'pending' && (
-            <button className="btn btn-primary" onClick={handleGradeWithAI} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <Sparkles size={16} /> Run AI Grading
-            </button>
-          )}
-          <span className="status-badge" style={{ backgroundColor: activeSubmission.status === 'flagged' ? 'rgba(245, 158, 11, 0.12)' : 'var(--success-bg)', color: activeSubmission.status === 'flagged' ? '#b45309' : 'var(--success)', padding: '0.4rem 0.85rem', fontSize: '0.85rem', fontWeight: 600, border: activeSubmission.status === 'flagged' ? '1px solid rgba(245, 158, 11, 0.3)' : 'none', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            {activeSubmission.status === 'flagged'
-              ? `⚠️ Flagged: ${feedback.flag_reasons?.[0] || 'Quality Audit Discrepancy'}`
-              : '✓ Graded'}
-          </span>
-        </div>
-      </div>
-
-      {/* Student Information Banner */}
-      <div 
-        className="glass-panel" 
-        style={{ 
-          padding: '0.85rem 1.25rem', 
-          borderLeft: '4px solid var(--primary)',
-          backgroundColor: '#fff'
-        }}
-      >
+      {/* =========================================================================
+          1. PERMANENTLY FROZEN TOP HEADER & STUDENT METADATA
+          ========================================================================= */}
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+        
+        {/* Row 1: Back Button | Quick Student Switcher | Action Status */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <h3 style={{ margin: 0, color: 'var(--primary-dark)', fontSize: '1.2rem', fontWeight: 700 }}>
-                {activeSubmission.student_name || `Student ${activeSubmission.student_id}`}
-              </h3>
-              <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '4px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                ID: {activeSubmission.student_id}
-              </span>
-            </div>
-            <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-              Email: <strong>{activeSubmission.student_email || 'N/A'}</strong> | File: <strong>{activeSubmission.file_name}</strong>
-              {activeSubmission.model_used && ` | Model: ${activeSubmission.model_used}`}
-            </p>
+          
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => navigate('/submissions')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 600, fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}
+          >
+            <ArrowLeft size={16} /> Submissions List
+          </button>
+
+          {/* Quick Student Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--surface)', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => navigateToSubmission(prevSubmission)}
+              disabled={!prevSubmission}
+              style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !prevSubmission ? 0.4 : 1 }}
+              title={prevSubmission ? `Previous: ${prevSubmission.student_name || prevSubmission.student_id}` : 'First student'}
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
+
+            <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--secondary)', padding: '0 0.65rem', minWidth: '110px', textAlign: 'center' }}>
+              Student {currentIndex >= 0 ? `${currentIndex + 1} of ${submissions.length}` : '—'}
+            </span>
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => navigateToSubmission(nextSubmission)}
+              disabled={!nextSubmission}
+              style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !nextSubmission ? 0.4 : 1 }}
+              title={nextSubmission ? `Next: ${nextSubmission.student_name || nextSubmission.student_id}` : 'Last student'}
+            >
+              Next <ChevronRight size={15} />
+            </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Total Score
-              </div>
-              <div style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1.1 }}>
-                {activeSubmission.score != null ? activeSubmission.score : 'N/A'} 
-                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>{totalMaxScore ? ` / ${totalMaxScore}` : ''}</span>
-              </div>
-            </div>
+          {/* Right Status & Actions */}
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+            {activeSubmissionObj.status === 'pending' && (
+              <button className="btn btn-primary" onClick={handleGradeWithAI} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}>
+                <Sparkles size={15} /> Run AI Grading
+              </button>
+            )}
+            <span
+              className="status-badge"
+              style={{
+                backgroundColor: isFlagged ? 'var(--warning-bg)' : 'var(--success-bg)',
+                color: isFlagged ? 'var(--warning)' : 'var(--success)',
+                border: `1px solid ${isFlagged ? 'var(--warning-border)' : 'var(--success-border)'}`,
+                padding: '0.35rem 0.75rem',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              {isFlagged ? `⚠️ Flagged for Audit` : '✓ Graded & Approved'}
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* DUAL PANE SIDE-BY-SIDE MAIN CONTAINER */}
-      <div 
-        style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', 
-          gap: '1.25rem',
-          alignItems: 'start'
-        }}
-      >
-
-        {/* LEFT PANE: Highlighted Student Raw Submission */}
-        <div 
-          className="glass-panel" 
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            height: 'calc(100vh - 215px)', 
-            minHeight: '620px',
-            overflow: 'hidden',
-            backgroundColor: '#ffffff',
-            borderTop: '4px solid var(--primary)'
+        {/* Row 2: Frozen Student Information & Total Score Banner */}
+        <div
+          className="card-panel"
+          style={{
+            padding: '0.65rem 1.15rem',
+            backgroundColor: 'var(--surface)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.65rem'
           }}
         >
-          {/* Left Pane Header */}
-          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', backgroundColor: 'rgba(244, 247, 249, 0.7)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700 }}>
-              <FileText size={18} color="var(--primary)" /> Highlighted Student Raw Submission
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--secondary)' }}>
+              {activeSubmissionObj.student_name || `Student ${activeSubmissionObj.student_id}`}
+            </span>
+            <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '4px', fontWeight: 600, color: 'var(--text-muted)' }}>
+              ID: {activeSubmissionObj.student_id}
+            </span>
+            <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
+              Email: <strong>{activeSubmissionObj.student_email || 'N/A'}</strong> | File: <strong>{activeSubmissionObj.file_name}</strong>
+              {activeSubmissionObj.model_used && ` | Model: ${activeSubmissionObj.model_used}`}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Total Score
+            </span>
+            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>
+              {activeSubmissionObj.score != null ? activeSubmissionObj.score : '—'}
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{totalMaxScore ? ` / ${totalMaxScore}` : ''}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Row 3: SPECIFIC AUDIT & CONFLICT REASONS BANNER (If Flagged) */}
+        {isFlagged && rawFlagReasons.length > 0 && (
+          <div
+            style={{
+              backgroundColor: '#FFFBEB',
+              border: '1.5px solid #F59E0B',
+              borderRadius: '8px',
+              padding: '0.65rem 1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.4rem'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#92400E', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ShieldAlert size={17} color="#D97706" /> Quality Audit & Discrepancy Alerts ({rawFlagReasons.length})
+              </span>
+              <span style={{ fontSize: '0.725rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
+                Human Lecturer Review Recommended
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {rawFlagReasons.map((reason, idx) => {
+                // Extract flag category
+                let flagType = "Audit Discrepancy";
+                let flagColor = "#B45309";
+                let flagBg = "#FEF3C7";
+
+                if (reason.includes("Multi-Agent Conflict")) {
+                  flagType = "🤖 Multi-Agent Grading Conflict";
+                  flagColor = "#B45309";
+                  flagBg = "#FEF3C7";
+                } else if (reason.includes("Low System Confidence")) {
+                  flagType = "📉 Low AI Confidence";
+                  flagColor = "#C2410C";
+                  flagBg = "#FFEDD5";
+                } else if (reason.includes("Terse Answer")) {
+                  flagType = "⚠️ Brief / Terse Answer";
+                  flagColor = "#A16207";
+                  flagBg = "#FEF9C3";
+                } else if (reason.includes("Quality Audit")) {
+                  flagType = "🎲 Random QA Sampling";
+                  flagColor = "#4338CA";
+                  flagBg = "#EEF2FF";
+                }
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #FCD34D',
+                      borderRadius: '6px',
+                      padding: '0.4rem 0.75rem',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ backgroundColor: flagBg, color: flagColor, fontWeight: 700, fontSize: '0.725rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                        {flagType}
+                      </span>
+                      <span style={{ color: '#78350F', fontWeight: 600 }}>
+                        {reason}
+                      </span>
+                    </div>
+
+                    {conflictedQuestions.size > 0 && (
+                      <span style={{ fontSize: '0.725rem', fontWeight: 700, color: '#92400E', backgroundColor: '#FEF3C7', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
+                        Target: {Array.from(conflictedQuestions).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* =========================================================================
+          2. SPACIOUS TWO-COLUMN SEPARATED LAYOUT (Independent Scrolling Viewports)
+          ========================================================================= */}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)',
+          gap: '1.25rem',
+          alignItems: 'stretch'
+        }}
+      >
+
+        {/* LEFT COLUMN: Highlighted Student Raw Submission */}
+        <div
+          className="card-panel"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            overflow: 'hidden',
+            backgroundColor: 'var(--surface)'
+          }}
+        >
+          {/* Header */}
+          <div style={{ padding: '0.75rem 1.15rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+            <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: 700 }}>
+              <FileText size={17} color="var(--primary)" /> Highlighted Student Response
             </h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, backgroundColor: '#fff', padding: '0.2rem 0.55rem', borderRadius: '4px', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 600, backgroundColor: 'var(--surface)', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }}>
               {highlights.length} Evidence Highlight{highlights.length === 1 ? '' : 's'}
             </span>
           </div>
 
-          {/* Left Pane Scrollable Text Content */}
-          <div 
-            style={{ 
-              flex: 1, 
-              overflowY: 'auto', 
-              padding: '1.25rem', 
-              backgroundColor: '#ffffff'
+          {/* Scrollable Question Blocks */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.15rem',
+              backgroundColor: 'var(--surface)'
             }}
           >
             {renderHighlightedRawText(rawStudentText, highlights)}
           </div>
 
-          {/* Left Pane Bottom Evidence Popover Card */}
+          {/* Evidence Popover at Bottom of Left Column */}
           {activeHighlightPop && (
             <div
               style={{
-                padding: '0.85rem 1.15rem',
-                backgroundColor: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-                borderTop: `3px solid ${activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? 'var(--success)' : '#ef4444'}`,
-                borderBottom: '1px solid var(--border)',
+                flexShrink: 0,
+                padding: '0.75rem 1.15rem',
+                backgroundColor: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? '#EDFBF3' : '#FDF2F2',
+                borderTop: `2px solid ${activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? '#16A34A' : '#DC2626'}`,
                 position: 'relative'
               }}
             >
               <button
                 type="button"
                 onClick={() => setActiveHighlightPop(null)}
-                style={{ position: 'absolute', top: '0.5rem', right: '0.75rem', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1rem', color: 'var(--text-muted)', fontWeight: 700 }}
+                style={{ position: 'absolute', top: '0.4rem', right: '0.65rem', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}
               >
                 ✕
               </button>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', paddingRight: '1.5rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--primary-dark)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Layers size={15} color="var(--primary)" /> {activeHighlightPop.question_number ? (activeHighlightPop.question_number.startsWith('Q') ? `Question ${activeHighlightPop.question_number}` : `Question Q${activeHighlightPop.question_number}`) : 'Question Mark Evidence'}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', paddingRight: '1.25rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Layers size={14} color="var(--primary)" /> {activeHighlightPop.question_number ? (activeHighlightPop.question_number.startsWith('Q') ? `Question ${activeHighlightPop.question_number}` : `Question Q${activeHighlightPop.question_number}`) : 'Evidence Quote'}
                 </span>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? '#065f46' : '#991b1b' }}>
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  padding: '0.1rem 0.4rem',
+                  borderRadius: '4px',
+                  backgroundColor: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? 'var(--success-bg)' : 'var(--danger-bg)',
+                  color: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? 'var(--success)' : 'var(--danger)'
+                }}>
                   {activeHighlightPop.score_awarded != null ? `+${activeHighlightPop.score_awarded} Marks` : (activeHighlightPop.type === 'strength' ? 'Strength' : 'Weakness')}
                 </span>
               </div>
 
-              <div style={{ fontStyle: 'italic', fontSize: '0.8rem', color: 'var(--text-main)', marginBottom: '0.35rem', padding: '0.3rem 0.5rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px dashed var(--border)' }}>
+              <div style={{ fontStyle: 'italic', fontSize: '0.775rem', color: 'var(--text-main)', marginBottom: '0.25rem', padding: '0.25rem 0.45rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid var(--border)' }}>
                 📄 "{activeHighlightPop.text}"
               </div>
 
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', lineHeight: '1.45' }}>
+              <div style={{ fontSize: '0.775rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
                 💡 <strong>AI Rubric Reasoning:</strong> {activeHighlightPop.comment}
               </div>
             </div>
           )}
         </div>
 
-        {/* RIGHT PANE: Score Override & Rubric Evaluation Controls */}
-        <div 
-          style={{ 
-            height: 'calc(100vh - 215px)', 
-            minHeight: '620px',
-            overflowY: 'auto', 
-            paddingRight: '6px',
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '1.25rem' 
+        {/* RIGHT COLUMN: Grading Overrides & AI Evaluation Summary */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            height: '100%',
+            overflowY: 'auto',
+            paddingRight: '4px'
           }}
         >
-
-          {/* Section 1: Detailed Rubric Criteria & Per-Question Score Overrides */}
-          <div className="glass-panel" style={{ padding: '1.25rem', borderTop: '4px solid var(--accent)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700 }}>
-                <Edit3 size={18} color="var(--accent)" /> Per-Question Score Override
+          {/* Card 1: Per-Question Score Overrides */}
+          <div
+            className="card-panel"
+            style={{
+              padding: '1rem 1.15rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+              backgroundColor: 'var(--surface)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.925rem', fontWeight: 700 }}>
+                <Edit3 size={16} color="var(--primary)" /> Per-Question Score Override
               </h3>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
-                Sum: {calculatedTotalFromQuestions} / {totalMaxScore || 100} marks
-              </div>
+              <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                Sum: {calculatedTotalFromQuestions} / {totalMaxScore || 100}
+              </span>
             </div>
 
-            {breakdown.length === 0 ? (
-              <div style={{ padding: '1.25rem', backgroundColor: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
-                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  {activeSubmission.status === 'pending'
-                    ? '⌛ Submission pending AI grading. Click "Run AI Grading" to evaluate this paper.'
-                    : 'No rubric breakdown available for this assignment.'}
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {breakdown.map((item, index) => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {breakdown.length === 0 ? (
+                <div style={{ padding: '1.25rem', backgroundColor: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.825rem' }}>
+                    {activeSubmissionObj.status === 'pending'
+                      ? '⌛ Submission pending AI grading. Click "Run AI Grading" above.'
+                      : 'No rubric breakdown available for this assignment.'}
+                  </p>
+                </div>
+              ) : (
+                breakdown.map((item, index) => {
                   const qKey = item.question_number || `Q${index + 1}`;
                   const currentScoreVal = questionScores[qKey] != null ? questionScores[qKey] : (item.score_awarded ?? 0);
                   const maxSc = parseFloat(item.max_score || 10.0);
 
+                  // Check if this breakdown item has an active conflict
+                  const isItemConflicted = Array.from(conflictedQuestions).some(cq => {
+                    const cleanQ = qKey.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                    const cleanCQ = cq.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+                    return cleanQ.includes(cleanCQ) || cleanCQ.includes(cleanQ);
+                  });
+
                   return (
-                    <div 
-                      key={index} 
-                      style={{ 
-                        padding: '0.85rem 1rem', 
-                        border: '1px solid var(--border)', 
-                        borderRadius: '8px', 
-                        background: '#ffffff',
-                        boxShadow: 'var(--shadow-sm)'
+                    <div
+                      key={index}
+                      className="card-secondary"
+                      style={{
+                        padding: '0.75rem 0.85rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.45rem',
+                        border: isItemConflicted ? '1.5px solid #F59E0B' : '1px solid var(--border)',
+                        backgroundColor: isItemConflicted ? '#FEFDF9' : 'var(--surface)'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ backgroundColor: 'var(--primary)', color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                          <span style={{ backgroundColor: isItemConflicted ? '#F59E0B' : 'var(--primary)', color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                             {qKey}
                           </span>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                            Max: {maxSc} marks
+                          <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                            Max: {maxSc} pts
                           </span>
+                          {isItemConflicted && (
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
+                              ⚠️ Conflict
+                            </span>
+                          )}
                         </div>
 
-                        {/* Step Controls and Score Input */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        {/* Score Steppers */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                           <button
                             type="button"
                             className="btn btn-outline"
                             onClick={() => handleStepQuestionScore(qKey, maxSc, -0.5)}
-                            style={{ padding: '0.2rem 0.4rem', minWidth: '24px', height: '28px', borderRadius: '4px' }}
-                            title="Decrease score by 0.5"
+                            style={{ padding: '0.15rem 0.35rem', minWidth: '22px', height: '26px', borderRadius: '4px' }}
+                            title="Decrease 0.5"
                           >
-                            <Minus size={13} />
+                            <Minus size={12} />
                           </button>
 
                           <input
@@ -583,53 +847,43 @@ const GradingReview = () => {
                             className="input-field"
                             value={currentScoreVal}
                             onChange={(e) => handlePerQuestionScoreChange(qKey, maxSc, e.target.value)}
-                            style={{ width: '65px', height: '28px', padding: '0.2rem', textAlign: 'center', fontWeight: 700, fontSize: '0.9rem', borderRadius: '4px', border: '1px solid var(--primary)' }}
+                            style={{ width: '55px', height: '26px', padding: '0.15rem', textAlign: 'center', fontWeight: 700, fontSize: '0.85rem', borderRadius: '4px', border: `1px solid ${isItemConflicted ? '#F59E0B' : 'var(--primary)'}` }}
                           />
 
                           <button
                             type="button"
                             className="btn btn-outline"
                             onClick={() => handleStepQuestionScore(qKey, maxSc, 0.5)}
-                            style={{ padding: '0.2rem 0.4rem', minWidth: '24px', height: '28px', borderRadius: '4px' }}
-                            title="Increase score by 0.5"
+                            style={{ padding: '0.15rem 0.35rem', minWidth: '22px', height: '26px', borderRadius: '4px' }}
+                            title="Increase 0.5"
                           >
-                            <Plus size={13} />
+                            <Plus size={12} />
                           </button>
                         </div>
                       </div>
 
-                      <p style={{ margin: 0, fontSize: '0.825rem', color: 'var(--text-main)', lineHeight: '1.5', backgroundColor: 'var(--bg-main)', padding: '0.5rem 0.75rem', borderRadius: '6px', borderLeft: '3px solid var(--primary)' }}>
+                      <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-main)', lineHeight: '1.45', backgroundColor: isItemConflicted ? '#FFFBEB' : 'var(--surface)', padding: '0.45rem 0.65rem', borderRadius: '4px', border: `1px solid ${isItemConflicted ? '#FCD34D' : 'var(--border)'}` }}>
                         💡 <strong>AI Reasoning:</strong> {item.reasoning}
                       </p>
                     </div>
                   );
-                })}
-
-                {/* Auto-sync notification footer */}
-                <div style={{ marginTop: '0.25rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    Auto-summed Total: <strong style={{ color: 'var(--primary)' }}>{calculatedTotalFromQuestions} / {totalMaxScore || 100}</strong>
-                  </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    ✨ Synced to Final Override
-                  </span>
-                </div>
-              </div>
-            )}
+                })
+              )}
+            </div>
           </div>
 
-          {/* Section 2: Lecturer Final Grade Override & PostgreSQL Audit Submission */}
-          <div className="glass-panel" style={{ padding: '1.25rem', borderTop: '4px solid var(--primary)' }}>
-            <h3 style={{ margin: '0 0 0.85rem 0', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', fontWeight: 700 }}>
-              <Save size={18} color="var(--primary)" /> Final Score Override & Audit
+          {/* Card 2: Final Score Override & Audit Form */}
+          <div className="card-panel" style={{ padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.925rem', fontWeight: 700 }}>
+              <Save size={16} color="var(--primary)" /> Final Score Override & Audit
             </h3>
 
-            <form onSubmit={handleOverrideSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <form onSubmit={handleOverrideSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
-                  New Final Score (0 - {totalMaxScore || 100})
+                <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                  Final Score (0 - {totalMaxScore || 100})
                 </label>
-                <input 
+                <input
                   type="number"
                   step="0.5"
                   min="0"
@@ -637,52 +891,51 @@ const GradingReview = () => {
                   className="input-field"
                   value={overrideScore}
                   onChange={(e) => setOverrideScore(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '1.1rem', fontWeight: 700, color: 'var(--primary)' }}
+                  style={{ width: '100%', padding: '0.4rem 0.65rem', fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}
                   required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text-main)' }}>
+                <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
                   Audit Comment / Justification
                 </label>
-                <textarea 
-                  rows={3}
+                <textarea
+                  rows={2}
                   className="input-field"
-                  placeholder="Explain reason for grade override (e.g. Adjusted marks for alternate derivation method)..."
+                  placeholder="Explain reason for grade override (e.g. Alternate derivation accepted)..."
                   value={overrideComment}
                   onChange={(e) => setOverrideComment(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem 0.75rem', fontSize: '0.85rem' }}
+                  style={{ width: '100%', padding: '0.4rem 0.65rem', fontSize: '0.8rem', resize: 'vertical' }}
                 />
               </div>
 
-              <button 
-                type="submit" 
-                className="btn btn-primary" 
+              <button
+                type="submit"
+                className="btn btn-primary"
                 disabled={saving}
-                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.65rem', fontWeight: 600 }}
+                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem', fontWeight: 600, fontSize: '0.825rem' }}
               >
-                <Save size={16} /> {saving ? 'Saving to Database...' : 'Save Grade & Record Audit Log'}
+                <Save size={15} /> {saving ? 'Saving...' : 'Save & Record Audit'}
               </button>
             </form>
 
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <div style={{ paddingTop: '0.35rem', borderTop: '1px solid var(--border)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
               🔒 Overrides are recorded in PostgreSQL audit logs with full delta traceability.
             </div>
           </div>
 
-          {/* Section 3: AI Overall Evaluation Summary */}
+          {/* Card 3: AI Overall Evaluation Summary */}
           {feedback.summary && (
-            <div className="glass-panel" style={{ padding: '1.15rem', backgroundColor: '#fff' }}>
-              <h4 style={{ margin: '0 0 0.4rem 0', color: 'var(--secondary)', fontSize: '0.9rem', fontWeight: 700 }}>
-                AI Overall Evaluation Summary
+            <div className="card-panel" style={{ padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <h4 style={{ margin: 0, color: 'var(--secondary)', fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Award size={15} color="var(--primary)" /> AI Overall Evaluation Summary
               </h4>
-              <p style={{ margin: 0, color: 'var(--text-main)', lineHeight: '1.5', fontSize: '0.85rem' }}>
+              <p style={{ margin: 0, color: 'var(--text-main)', lineHeight: '1.45', fontSize: '0.8rem' }}>
                 {feedback.summary}
               </p>
             </div>
           )}
-
         </div>
 
       </div>

@@ -73,9 +73,19 @@ def calculate_question_max_mark(prompt_text: str) -> float:
 
 def parse_excel_rubric(file_path: str) -> List[Dict[str, Any]]:
     """
-    Parses an Excel (.xlsx/.csv) rubric table containing columns like:
-    question_n/question_no, question, answer/rubric, max_mark/marks.
+    Template-tolerant parser for Excel/CSV rubric schemes.
+    Uses header detection, alias matching, and content validation.
+    Falls back to positional heuristic parser for backward compatibility.
     """
+    try:
+        from .flexible_excel_parser import parse_flexible_rubric
+        parsed = parse_flexible_rubric(file_path)
+        if parsed and len(parsed) > 0:
+            return parsed
+    except Exception as e:
+        print(f"[DocumentParser Warning] Flexible rubric parser exception: {e}, attempting fallback.")
+
+    # Deterministic Legacy Fallback
     try:
         import pandas as pd
         ext = Path(file_path).suffix.lower()
@@ -117,7 +127,7 @@ def parse_excel_rubric(file_path: str) -> List[Dict[str, Any]]:
 
         return questions
     except Exception as e:
-        print(f"[DocumentParser Error] Excel rubric parsing failed on {file_path}: {e}")
+        print(f"[DocumentParser Error] Excel rubric parsing fallback failed on {file_path}: {e}")
         return []
 
 
@@ -230,10 +240,19 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
 
 def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
     """
-    Parses an Excel (.xlsx/.csv) dataset file containing student responses.
-    Supports columns: Student_ID / student_id, question_no / question_n, Response / response / answer.
-    Groups responses by Student_ID so all answers for a student are combined into one submission record.
+    Template-tolerant parser for Excel/CSV student submission datasets.
+    Uses header detection, alias matching, and content validation.
+    Falls back to legacy heuristic parser for backward compatibility.
     """
+    try:
+        from .flexible_excel_parser import parse_flexible_submissions
+        parsed = parse_flexible_submissions(file_path)
+        if parsed and len(parsed) > 0:
+            return parsed
+    except Exception as e:
+        print(f"[DocumentParser Warning] Flexible submissions parser exception: {e}, attempting fallback.")
+
+    # Deterministic Legacy Fallback
     try:
         import pandas as pd
         ext = Path(file_path).suffix.lower()
@@ -310,7 +329,7 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
             })
         return rows
     except Exception as e:
-        print(f"[DocumentParser Error] Excel row parsing failed: {e}")
+        print(f"[DocumentParser Error] Excel row parsing fallback failed: {e}")
         return []
 
 

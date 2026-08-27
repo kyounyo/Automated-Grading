@@ -103,3 +103,46 @@ export async function downloadGradesCSV(assignmentId) {
   a.remove();
   window.URL.revokeObjectURL(url);
 }
+
+export async function getQCSettings() {
+  const response = await fetch(`${API_BASE_URL}/assignments/qc-settings`);
+  if (!response.ok) return { enable_random_qc: true, qc_audit_rate: 0.1 };
+  return await response.json();
+}
+
+export async function updateQCSettings(settings) {
+  const response = await fetch(`${API_BASE_URL}/assignments/qc-settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings)
+  });
+  if (!response.ok) throw new Error('Failed to update QC settings');
+  return await response.json();
+}
+
+export async function uploadBulkSubmissions(assignmentId, formData) {
+  formData.append('assignment_id', assignmentId);
+  const response = await fetch(`${API_BASE_URL}/upload`, {
+    method: 'POST',
+    body: formData
+  });
+  if (!response.ok) throw new Error('Failed to upload submissions');
+  return await response.json();
+}
+
+export async function triggerGradeAll(assignmentId) {
+  return await gradeAllSubmissions(assignmentId);
+}
+
+export async function previewSubmissions(formData) {
+  const response = await fetch(`${API_BASE_URL}/upload/preview-submissions`, {
+    method: 'POST',
+    body: formData
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || 'Failed to preview submissions');
+  }
+  return await response.json();
+}
+

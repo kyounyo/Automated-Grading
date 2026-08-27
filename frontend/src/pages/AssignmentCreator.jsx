@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, Plus, Trash2, CheckCircle2, FileText, Settings2, Sparkles, ArrowRight, Loader2, FileCheck, AlertTriangle, Download } from 'lucide-react';
+import { UploadCloud, Plus, Trash2, CheckCircle2, FileText, Sparkles, ArrowRight, Loader2, FileCheck, AlertTriangle, Download } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { createAssignment, parseRubricFile } from '../api/client';
 
@@ -11,8 +11,6 @@ const AssignmentCreator = () => {
   // Form State initialized clean/empty for user input
   const [assignmentTitle, setAssignmentTitle] = useState('');
   const [courseCode, setCourseCode] = useState('');
-  const [auditPercentage, setAuditPercentage] = useState(5);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(75);
   const [rubricFiles, setRubricFiles] = useState([]);
   const [rubricWarning, setRubricWarning] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -63,47 +61,21 @@ const AssignmentCreator = () => {
         setRubricWarning(res.rubric_warning);
       }
 
-      if (res.parsed_questions && res.parsed_questions.length > 0) {
-        setQuestions([...res.parsed_questions]);
-      } else if (res.extracted_text) {
-        const lines = res.extracted_text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-        const parsedQuestions = [];
-        let qCount = 1;
-
-        for (let i = 0; i < lines.length; i += 2) {
-          parsedQuestions.push({
-            id: qCount,
-            question_number: `Q${qCount}`,
-            text: lines[i] || `Question ${qCount}`,
-            maxMark: 10,
-            modelAnswer: lines[i + 1] || `Extracted criteria: ${lines[i]}`
-          });
-          qCount++;
-          if (qCount > 10) break;
-        }
-
-        if (parsedQuestions.length > 0) {
-          setQuestions(parsedQuestions);
-        }
+      const questionsList = res.parsed_questions || res.extracted_questions || [];
+      if (questionsList.length > 0) {
+        const mappedQuestions = questionsList.map((q, idx) => ({
+          id: Date.now() + idx,
+          question_number: q.question_number || (q.number ? `Q${q.number}` : `Q${idx + 1}`),
+          text: q.text || q.prompt || q.question || '',
+          maxMark: q.maxMark != null ? q.maxMark : (q.max_score != null ? q.max_score : 10),
+          modelAnswer: q.modelAnswer || q.model_answer || q.answer || ''
+        }));
+        setQuestions(mappedQuestions);
       }
     } catch (err) {
-      console.warn("Rubric files parsing error:", err);
+      alert(`Error parsing rubric files: ${err.message}`);
     } finally {
       setIsParsing(false);
-    }
-  };
-
-  const handleAddQuestion = () => {
-    const newId = questions.length + 1;
-    setQuestions([
-      ...questions,
-      { id: newId, question_number: `Q${newId}`, text: '', maxMark: 50, modelAnswer: '' }
-    ]);
-  };
-
-  const handleRemoveQuestion = (id) => {
-    if (questions.length > 1) {
-      setQuestions(questions.filter(q => q.id !== id));
     }
   };
 
@@ -111,15 +83,27 @@ const AssignmentCreator = () => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processRubricFiles(Array.from(e.dataTransfer.files), true);
+      processRubricFiles(e.dataTransfer.files, false);
     }
   };
 
   const handleFileSelect = (e, isAppend = false) => {
-    e.stopPropagation();
     if (e.target.files && e.target.files.length > 0) {
-      processRubricFiles(Array.from(e.target.files), isAppend);
-      e.target.value = '';
+      processRubricFiles(e.target.files, isAppend);
+    }
+  };
+
+  const handleAddQuestion = () => {
+    const nextQNum = questions.length + 1;
+    setQuestions([
+      ...questions,
+      { id: Date.now(), question_number: `Q${nextQNum}`, text: '', maxMark: 10, modelAnswer: '' }
+    ]);
+  };
+
+  const handleRemoveQuestion = (id) => {
+    if (questions.length > 1) {
+      setQuestions(questions.filter(q => q.id !== id));
     }
   };
 
@@ -131,6 +115,9 @@ const AssignmentCreator = () => {
     } else {
       setRubricFiles([]);
       setRubricWarning(null);
+      setQuestions([
+        { id: Date.now(), question_number: 'Q1', text: '', maxMark: 10, modelAnswer: '' }
+      ]);
     }
   };
 
@@ -170,20 +157,6 @@ const AssignmentCreator = () => {
 
       const created = await createAssignment(payload);
 
-      // Save Quality Control Audit settings (0% closes/disables QC audit)
-      try {
-        await fetch('/api/assignments/qc-settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            enable_random_qc: (parseFloat(auditPercentage) > 0),
-            qc_audit_rate: parseFloat(auditPercentage) / 100.0
-          })
-        });
-      } catch (e) {
-        console.warn("Could not save QC settings:", e);
-      }
-
       await loadAssignments();
       setCurrentAssignmentId(created.id);
 
@@ -197,319 +170,326 @@ const AssignmentCreator = () => {
   };
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Header Banner */}
-      <div className="glass-panel" style={{ padding: '1.5rem 2rem', background: 'linear-gradient(135deg, rgba(0, 96, 156, 0.08) 0%, rgba(16, 185, 129, 0.05) 100%)' }}>
-        <h2 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <Sparkles size={24} color="var(--primary)" /> Create Assignment & Upload Marking Scheme
-        </h2>
-        <p style={{ margin: '0.4rem 0 0 0', color: 'var(--text-muted)' }}>
-          Complete Step 1 & Step 2 below to parse questions and index ChromaDB vector context.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {/* Section 1: Basic Details */}
-        <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-          <h3 style={{ marginBottom: '1.25rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FileText size={20} color="var(--primary)" /> 1. Assignment Details <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>*Required</span>
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
-            <div>
-              <label className="label">Course Code *</label>
-              <input
-                type="text"
-                className="input-field"
-                value={courseCode}
-                onChange={(e) => setCourseCode(e.target.value)}
-                placeholder="Enter course code (e.g. PHR1021)..."
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Assignment Title *</label>
-              <input
-                type="text"
-                className="input-field"
-                value={assignmentTitle}
-                onChange={(e) => setAssignmentTitle(e.target.value)}
-                placeholder="Enter assignment title..."
-                required
-              />
-            </div>
-          </div>
+    <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* 1. Header (Unboxed Minimalist) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.5rem', fontWeight: 800 }}>
+            Create Assignment
+          </h2>
+          <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
+            Complete Step 1 & Step 2 below to parse questions, rubrics & answer schemes. Modify parsed components in Step 3 if necessary.
+          </p>
         </div>
 
-        {/* Section 2: Rubric File Drop Box */}
-        <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '1rem' }}>
-            <div>
-              <h3 style={{ margin: '0 0 0.4rem 0', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <UploadCloud size={20} color="var(--primary)" /> 2. Upload Questions, Marking Rubric & Answer Scheme <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>*Required</span>
-              </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-                <span className="status-badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.12)', color: 'var(--success)', fontWeight: 600 }}>
-                  Recommended: Excel (.xlsx / .csv)
-                </span>
-                <span style={{ color: 'var(--text-muted)' }}>
-                  | PDF (.pdf) and Word (.docx) are also supported
-                </span>
+        {/* Quick Actions in Header to save bottom space */}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <button type="button" className="btn btn-outline" onClick={() => navigate('/')} style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="btn btn-primary"
+            disabled={isSaving || isParsing || !isFormValid}
+            style={{ fontSize: '0.8rem', padding: '0.4rem 1rem', opacity: !isFormValid ? 0.6 : 1, cursor: !isFormValid ? 'not-allowed' : 'pointer' }}
+          >
+            {isSaving ? 'Creating...' : 'Create & Index Rubric'} <ArrowRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+        {/* 2. SIDE-BY-SIDE SECTION: Step 1 (Details) + Step 2 (Upload Rubrics) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '1.25rem', alignItems: 'stretch' }}>
+
+          {/* Column 1: Step 1 Assignment Details */}
+          <div className="card-panel" style={{ padding: '1.35rem 1.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', minHeight: '235px' }}>
+            <h3 style={{ marginBottom: '1.15rem', color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <FileText size={18} color="var(--primary)" /> 1. Assignment Details <span style={{ color: 'var(--danger)', fontSize: '0.775rem', fontWeight: 600 }}>*Required</span>
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="label" style={{ fontSize: '0.825rem', marginBottom: '0.35rem' }}>Course Code *</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  style={{ padding: '0.55rem 0.85rem', fontSize: '0.875rem' }}
+                  value={courseCode}
+                  onChange={(e) => setCourseCode(e.target.value)}
+                  placeholder="e.g. PHR1021"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label" style={{ fontSize: '0.825rem', marginBottom: '0.35rem' }}>Assignment Title *</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  style={{ padding: '0.55rem 0.85rem', fontSize: '0.875rem' }}
+                  value={assignmentTitle}
+                  onChange={(e) => setAssignmentTitle(e.target.value)}
+                  placeholder="e.g. Pharmacokinetics Assignment 1"
+                  required
+                />
               </div>
             </div>
-
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={downloadExcelTemplate}
-              style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem' }}
-            >
-              <Download size={15} color="var(--primary)" /> Download Excel Rubric Template (.csv)
-            </button>
           </div>
 
-          <div
-            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleFileDrop}
-            style={{
-              border: `2px dashed ${isDragging ? 'var(--primary)' : !isStep2Valid ? 'var(--warning)' : 'var(--border)'}`,
-              borderRadius: '12px',
-              padding: '2rem 1.5rem',
-              textAlign: 'center',
-              backgroundColor: isDragging ? 'var(--primary-light)' : 'rgba(244, 247, 249, 0.5)',
-              cursor: 'pointer'
-            }}
-            onClick={() => document.getElementById('rubricFileInput').click()}
-          >
-            <input
-              id="rubricFileInput"
-              type="file"
-              multiple
-              accept=".xlsx,.csv,.pdf,.docx,.txt"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-            />
-            {isParsing ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', color: 'var(--primary)' }}>
-                <Loader2 size={32} className="spin" />
-                <div style={{ textAlign: 'left' }}>
-                  <h4 style={{ margin: 0, color: 'var(--primary-dark)' }}>Extracting {rubricFiles.length} File(s)...</h4>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>Merging questions and rubrics into fields below</p>
-                </div>
-              </div>
-            ) : rubricFiles.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', color: 'var(--success)' }}>
-                <CheckCircle2 size={32} />
-                <h4 style={{ margin: 0, color: 'var(--text-main)' }}>{rubricFiles.length} File(s) Attached</h4>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {rubricFiles.map((f, i) => (
-                    <span 
-                      key={i} 
-                      className="status-badge" 
-                      style={{ 
-                        backgroundColor: 'var(--success-bg)', 
-                        color: 'var(--success)', 
-                        display: 'inline-flex', 
-                        alignItems: 'center', 
-                        gap: '0.4rem', 
-                        padding: '0.35rem 0.65rem' 
-                      }}
-                    >
-                      📄 {f.name} ({(f.size / 1024).toFixed(1)} KB)
-                      <span 
-                        onClick={(e) => handleRemoveRubricFile(i, e)}
-                        title="Remove file"
-                        style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.2rem', color: 'var(--danger)' }}
-                      >
-                        ✕
-                      </span>
-                    </span>
-                  ))}
-                </div>
+          {/* Column 2: Step 2 Upload Marking Rubric & Answer Scheme */}
+          <div className="card-panel" style={{ padding: '1.35rem 1.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '235px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <UploadCloud size={18} color="var(--primary)" /> 2. Upload Marking Scheme <span style={{ color: 'var(--danger)', fontSize: '0.775rem', fontWeight: 600 }}>*Required</span>
+                </h3>
 
                 <button
                   type="button"
                   className="btn btn-outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    document.getElementById('addMoreRubricFileInput').click();
-                  }}
-                  style={{ marginTop: '0.4rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.8rem', backgroundColor: '#fff', border: '1px solid var(--primary)', color: 'var(--primary-dark)', fontWeight: 600 }}
+                  onClick={downloadExcelTemplate}
+                  style={{ fontSize: '0.775rem', padding: '0.3rem 0.7rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
-                  <Plus size={16} color="var(--primary)" /> Add More Files
+                  <Download size={14} color="var(--primary)" /> Template (.csv)
                 </button>
+              </div>
+
+              {/* Full-Height Clean Drop Zone */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleFileDrop}
+                style={{
+                  border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: '8px',
+                  padding: '1.35rem 1.15rem',
+                  textAlign: 'center',
+                  backgroundColor: isDragging ? 'var(--primary-light)' : 'var(--bg-main)',
+                  cursor: 'pointer',
+                  flex: 1,
+                  minHeight: '140px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all var(--transition-fast)'
+                }}
+                onClick={() => document.getElementById('rubricFileInput').click()}
+              >
                 <input
-                  id="addMoreRubricFileInput"
+                  id="rubricFileInput"
                   type="file"
                   multiple
-                  accept=".xlsx,.csv,.pdf,.docx,.txt"
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => handleFileSelect(e, true)}
+                  accept=".xlsx,.xls,.csv,.pdf"
+                  onChange={handleFileSelect}
                   style={{ display: 'none' }}
                 />
+
+                {isParsing ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--primary)' }}>
+                    <Loader2 size={24} className="spin" />
+                    <div style={{ textAlign: 'left' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--primary-dark)' }}>Extracting {rubricFiles.length} File(s)...</h4>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Parsing questions & answer keys</p>
+                    </div>
+                  </div>
+                ) : rubricFiles.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--success)' }}>
+                      <CheckCircle2 size={20} />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>{rubricFiles.length} File(s) Attached</span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {rubricFiles.map((f, i) => (
+                        <span
+                          key={i}
+                          className="status-badge"
+                          style={{
+                            backgroundColor: 'var(--success-bg)',
+                            color: 'var(--success)',
+                            fontSize: '0.75rem',
+                            padding: '0.2rem 0.5rem',
+                            border: '1px solid var(--success-border)'
+                          }}
+                        >
+                          📄 {f.name} ({(f.size / 1024).toFixed(1)} KB)
+                          <span
+                            onClick={(e) => handleRemoveRubricFile(i, e)}
+                            title="Remove file"
+                            style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.3rem', color: 'var(--danger)' }}
+                          >
+                            ✕
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        document.getElementById('addMoreRubricFileInput').click();
+                      }}
+                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', marginTop: '0.2rem' }}
+                    >
+                      <Plus size={13} color="var(--primary)" /> Add More
+                    </button>
+                    <input
+                      id="addMoreRubricFileInput"
+                      type="file"
+                      multiple
+                      accept=".xlsx,.xls,.csv,.pdf"
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => handleFileSelect(e, true)}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <UploadCloud size={28} color="var(--primary)" style={{ marginBottom: '0.25rem', opacity: 0.8 }} />
+                    <h4 style={{ margin: '0 0 0.2rem 0', fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>
+                      Drag & drop Questions, Rubric or Answer Scheme files here
+                    </h4>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                      Supports <strong>.xlsx, .csv, .pdf</strong> or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Browse files</span>
+                    </p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div>
-                <UploadCloud size={40} color="var(--primary)" style={{ marginBottom: '0.5rem', opacity: 0.8 }} />
-                <h4 style={{ margin: '0 0 0.25rem 0', color: 'var(--secondary)' }}>
-                  Drag & Drop Questions, Marking Rubric & Answer Scheme Files Here *
-                </h4>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                  Supports XLSX, CSV, PDF, DOCX or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Click to Browse</span>
+            </div>
+
+            {/* Warning Banner */}
+            {rubricWarning && (
+              <div style={{ marginTop: '0.65rem', padding: '0.5rem 0.75rem', backgroundColor: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={16} color="var(--warning)" style={{ flexShrink: 0 }} />
+                <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--warning)' }}>
+                  {rubricWarning}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Missing Rubric Warning Banner */}
-          {rubricWarning && (
-            <div style={{ marginTop: '1rem', padding: '1rem 1.25rem', backgroundColor: 'rgba(245, 158, 11, 0.08)', borderLeft: '4px solid var(--warning)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <AlertTriangle size={22} color="var(--warning)" style={{ flexShrink: 0 }} />
-              <div>
-                <h4 style={{ margin: 0, color: 'var(--warning)', fontSize: '0.95rem' }}>Marking Rubric Warning</h4>
-                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.875rem', color: 'var(--text-main)' }}>
-                  {rubricWarning}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Section 3: Question Builder */}
-        <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileCheck size={20} color="var(--primary)" /> 3. Extracted Question & Model Answer Breakdown
-            </h3>
-            <button type="button" className="btn btn-outline" onClick={handleAddQuestion} style={{ fontSize: '0.85rem' }}>
-              <Plus size={16} /> Add Question
+        {/* 3. Section 3: Question Builder (Side-by-Side Question Prompt & Model Answer Columns) */}
+        <div className="card-panel" style={{ padding: '1.35rem 1.6rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.15rem' }}>
+            <div>
+              <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <FileCheck size={18} color="var(--primary)" /> 3. Extracted Questions & Model Answers ({questions.length} Items)
+              </h3>
+              <p style={{ margin: '0.2rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.775rem' }}>
+                Review and fine-tune parsed criteria. AutoGrade+ uses model answers to index criteria into ChromaDB.
+              </p>
+            </div>
+            
+            <button type="button" className="btn btn-outline" onClick={handleAddQuestion} style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
+              <Plus size={14} /> Add Question
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {questions.map((q, idx) => (
-              <div key={q.id} style={{ background: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '10px', padding: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.95rem' }}>Question {q.question_number || `Q${idx + 1}`}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span className="label" style={{ margin: 0 }}>Max Mark:</span>
+              <div
+                key={q.id}
+                className="card-secondary"
+                style={{ padding: '0.85rem 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}
+              >
+                {/* Question Header Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: 800, color: 'var(--primary-dark)', fontSize: '0.875rem' }}>
+                      Question {q.question_number || `Q${idx + 1}`}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-muted)' }}>Max Mark:</span>
                       <input
                         type="number"
                         className="input-field"
-                        style={{ width: '70px', padding: '0.3rem 0.5rem' }}
+                        style={{ width: '60px', padding: '0.25rem 0.45rem', fontSize: '0.8rem', textAlign: 'center' }}
                         value={q.maxMark}
                         onChange={(e) => {
                           const val = e.target.value;
                           setQuestions(questions.map(item => item.id === q.id ? { ...item, maxMark: val } : item));
                         }}
                       />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>pts</span>
                     </div>
+
                     {questions.length > 1 && (
-                      <button type="button" onClick={() => handleRemoveQuestion(q.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}>
-                        <Trash2 size={18} />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveQuestion(q.id)}
+                        title="Remove question"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', display: 'flex', alignItems: 'center', padding: '0.2rem' }}
+                      >
+                        <Trash2 size={15} />
                       </button>
                     )}
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <label className="label">Question Prompt / Criteria Description</label>
-                  <textarea
-                    rows={3}
-                    className="input-field"
-                    style={{ resize: 'vertical' }}
-                    placeholder="Enter question prompt..."
-                    value={q.text}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setQuestions(questions.map(item => item.id === q.id ? { ...item, text: val } : item));
-                    }}
-                  />
-                </div>
+                {/* 2-Column Side-by-Side: Prompt on Left (50%), Model Answer on Right (50%) */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                  <div>
+                    <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                      Question Prompt / Criteria Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="input-field"
+                      style={{ resize: 'vertical', fontSize: '0.8rem', lineHeight: '1.4', padding: '0.45rem 0.65rem' }}
+                      placeholder="Enter question prompt or criteria..."
+                      value={q.text}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setQuestions(questions.map(item => item.id === q.id ? { ...item, text: val } : item));
+                      }}
+                    />
+                  </div>
 
-                <div>
-                  <label className="label">Model Answer & Marking Criteria (For ChromaDB Vector Search)</label>
-                  <textarea
-                    rows={3}
-                    className="input-field"
-                    style={{ resize: 'vertical' }}
-                    placeholder="Enter marking criteria allocation and model answer key points..."
-                    value={q.modelAnswer}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setQuestions(questions.map(item => item.id === q.id ? { ...item, modelAnswer: val } : item));
-                    }}
-                  />
+                  <div>
+                    <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                      Model Answer & Marking Allocation (ChromaDB Key)
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="input-field"
+                      style={{ resize: 'vertical', fontSize: '0.8rem', lineHeight: '1.4', padding: '0.45rem 0.65rem' }}
+                      placeholder="Enter marking rubric keywords, key points and mark allocations..."
+                      value={q.modelAnswer}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setQuestions(questions.map(item => item.id === q.id ? { ...item, modelAnswer: val } : item));
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Section 4: Human-in-the-Loop Safeguards */}
-        <div className="glass-panel" style={{ padding: '1.5rem 2rem' }}>
-          <h3 style={{ marginBottom: '1rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Settings2 size={20} color="var(--primary)" /> 4. Human-in-the-Loop Safeguards
-          </h3>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-            <div>
-              <label className="label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Random Quality Control Audit Sampling Rate</span>
-                <span style={{ color: auditPercentage > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700 }}>
-                  {auditPercentage > 0 ? `${auditPercentage}%` : '0% (OFF)'}
-                </span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="20"
-                step="5"
-                value={auditPercentage}
-                onChange={(e) => setAuditPercentage(e.target.value)}
-                style={{ width: '100%', accentColor: 'var(--primary)' }}
-              />
-              <p style={{ fontSize: '0.8rem', marginTop: '0.4rem', color: 'var(--text-muted)' }}>
-                {auditPercentage > 0
-                  ? `Randomly flags ${auditPercentage}% of papers for quality control audit. Set slider to 0% to turn OFF (close).`
-                  : 'Random Quality Control Audit is currently turned OFF (0%). Move slider to enable sampling.'}
-              </p>
-            </div>
-
-            <div>
-              <label className="label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Low Confidence Boundary Threshold</span>
-                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{confidenceThreshold}%</span>
-              </label>
-              <input
-                type="range"
-                min="50"
-                max="95"
-                step="5"
-                value={confidenceThreshold}
-                onChange={(e) => setConfidenceThreshold(e.target.value)}
-                style={{ width: '100%', accentColor: 'var(--primary)' }}
-              />
-              <p style={{ fontSize: '0.8rem', marginTop: '0.4rem', color: 'var(--text-muted)' }}>
-                Flags papers for manual review when AI evaluation confidence is under {confidenceThreshold}%.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginBottom: '2rem' }}>
-          <button type="button" className="btn btn-outline" onClick={() => navigate('/')}>
+        {/* Bottom Submission Bar */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          <button type="button" className="btn btn-outline" onClick={() => navigate('/')} style={{ fontSize: '0.85rem' }}>
             Cancel
           </button>
           <button
             type="submit"
             className="btn btn-primary"
             disabled={isSaving || isParsing || !isFormValid}
-            style={{ padding: '0.625rem 1.5rem', fontSize: '0.95rem', opacity: !isFormValid ? 0.6 : 1, cursor: !isFormValid ? 'not-allowed' : 'pointer' }}
+            style={{ padding: '0.5rem 1.35rem', fontSize: '0.875rem', opacity: !isFormValid ? 0.6 : 1, cursor: !isFormValid ? 'not-allowed' : 'pointer' }}
           >
-            {isSaving ? 'Creating...' : 'Create Assignment & Index Rubric'} <ArrowRight size={18} />
+            {isSaving ? 'Creating...' : 'Create Assignment & Index Rubric'} <ArrowRight size={15} />
           </button>
         </div>
       </form>

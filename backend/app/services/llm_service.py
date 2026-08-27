@@ -10,7 +10,7 @@ def get_openrouter_api_key() -> str:
     return os.getenv("OPENROUTER_API_KEY", "").strip()
 
 def get_llm_model() -> str:
-    return os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite").strip()
+    return os.getenv("LLM_MODEL", "google/gemini-3.5-flash-lite").strip()
 
 def get_auditor_model() -> str:
     return os.getenv("AUDITOR_MODEL", get_llm_model()).strip()

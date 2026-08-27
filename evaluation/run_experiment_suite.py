@@ -52,7 +52,16 @@ MODELS = {
         "file_tag": "Claude_4.6_Sonnet",
         "model_str": os.getenv("MODEL_C_STR", "anthropic/claude-sonnet-4.6"),
         "cost_per_1k_in": 0.0030,
-        "cost_per_1k_out": 0.0150}
+        "cost_per_1k_out": 0.0150
+    },
+    "D": {
+        "id": "D",
+        "name": "Gemini 3.5 Flash Lite",
+        "file_tag": "Gemini_3.5_Flash_Lite",
+        "model_str": os.getenv("MODEL_D_STR", "google/gemini-3.5-flash-lite"),
+        "cost_per_1k_in": 0.0001,
+        "cost_per_1k_out": 0.0004
+    }
 }
 
 # ---------------------------------------------------------
@@ -443,8 +452,8 @@ def generate_master_comparison():
 # ---------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="Evaluate models individually and generate Excel reports.")
-    parser.add_argument("--model", type=str, choices=["A", "B", "C", "all"], default="all",
-                        help="Choose 'A' (Gemini 3.1 Flash Lite), 'B' (Nemotron 3 Super 120B), 'C' (Claude 4.6 Sonnet), or 'all'.")
+    parser.add_argument("--model", type=str, choices=["A", "B", "C", "D", "all"], default="all",
+                        help="Choose 'A' (Gemini 3.1 Flash Lite), 'B' (Nemotron 3 Super 120B), 'C' (Claude 4.6 Sonnet), 'D' (Gemini 3.5 Flash Lite), or 'all'.")
     args = parser.parse_args()
 
     print("Loading datasets...")
@@ -457,6 +466,8 @@ def main():
         run_single_model("B", df_questions, df_sample)
     if args.model in ["C", "all"]:
         run_single_model("C", df_questions, df_sample)
+    if args.model in ["D", "all"]:
+        run_single_model("D", df_questions, df_sample)
 
     generate_master_comparison()
 

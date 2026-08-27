@@ -117,6 +117,8 @@ export const AssignmentProvider = ({ children }) => {
     }
   };
 
+  const [activeSubmission, setActiveSubmission] = useState(null);
+
   const currentAssignment = assignments.find(a => a.id === currentAssignmentId) || assignments[0] || null;
 
   return (
@@ -126,6 +128,8 @@ export const AssignmentProvider = ({ children }) => {
       setCurrentAssignmentId,
       currentAssignment,
       submissions,
+      activeSubmission,
+      setActiveSubmission,
       loading,
       error,
       loadAssignments,

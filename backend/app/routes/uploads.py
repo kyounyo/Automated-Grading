@@ -168,3 +168,63 @@ async def upload_submission_file(
         file_s3_url=storage_res.get("file_s3_url"),
         file_path=storage_res.get("file_path")
     )
+
+
+@router.post("/preview-submissions")
+async def preview_submissions(files: list[UploadFile] = File(...)):
+    """
+    Parses uploaded student submission files (.xlsx, .csv, .pdf, .docx) for client preview before finalizing upload.
+    Returns preview metadata and response text for the extracted students.
+    """
+    all_extracted_students = []
+
+    for file in files:
+        file_ext = Path(file.filename).suffix.lower()
+        temp_path = TEMP_UPLOAD_DIR / f"prev_{uuid.uuid4().hex[:6]}{file_ext}"
+
+        try:
+            with open(temp_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+
+            if file_ext in [".xlsx", ".xls", ".csv"]:
+                excel_rows = parse_excel_rows(str(temp_path))
+                for idx, row in enumerate(excel_rows):
+                    s_id = str(row.get("student_id", f"STU_{idx + 1}")).strip()
+                    s_name = str(row.get("student_name", f"Student {s_id}")).strip() or f"Student {s_id}"
+                    s_email = str(row.get("student_email", "N/A")).strip() or "N/A"
+                    raw_text = str(row.get("text", "")).strip()
+
+                    all_extracted_students.append({
+                        "student_id": s_id,
+                        "student_name": s_name,
+                        "student_email": s_email,
+                        "file_name": file.filename,
+                        "text": raw_text
+                    })
+            else:
+                from ..services.document_parser import extract_text_from_file
+                txt = extract_text_from_file(str(temp_path))
+                stu_name = file.filename.split('.')[0].replace('_', ' ')
+                stu_id = f"STU_{len(all_extracted_students) + 1}"
+
+                all_extracted_students.append({
+                    "student_id": stu_id,
+                    "student_name": stu_name,
+                    "student_email": "N/A",
+                    "file_name": file.filename,
+                    "text": txt
+                })
+
+            if temp_path.exists():
+                try: os.remove(temp_path)
+                except Exception: pass
+        except Exception as e:
+            print(f"[Preview Submissions Error] {file.filename}: {e}")
+
+    return {
+        "total_students": len(all_extracted_students),
+        "students": all_extracted_students,
+        "first_three_students": all_extracted_students[:3]
+    }
+
