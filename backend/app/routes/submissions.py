@@ -154,8 +154,8 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
     fb_dict = dict(sub.feedback) if isinstance(sub.feedback, dict) else {}
     if payload.updated_breakdown is not None:
         fb_dict["breakdown"] = payload.updated_breakdown
-        fb_dict["flag_reasons"] = ["Lecturer Manual Override Applied"]
-        sub.feedback = fb_dict
+    fb_dict["flag_reasons"] = []  # Cleared because lecturer manually reviewed and resolved conflicts
+    sub.feedback = fb_dict
 
     sub.score = round(final_score, 1)
     sub.status = "graded"  # Mark as finalized by lecturer override

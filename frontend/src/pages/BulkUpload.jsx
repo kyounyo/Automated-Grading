@@ -298,7 +298,7 @@ const BulkUpload = () => {
               </button>
             </div>
 
-            {/* Full-Height Clean Drop Zone */}
+            {/* Full-Height Clean Drop Zone (Same size and style as Create Assignment) */}
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -330,15 +330,74 @@ const BulkUpload = () => {
                 style={{ display: 'none' }}
               />
 
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                <UploadCloud size={28} color="var(--primary)" style={{ marginBottom: '0.15rem', opacity: 0.8 }} />
-                <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>
-                  Drag & drop Student Submission files here
-                </h4>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                  Supports <strong>.xlsx, .csv, .pdf</strong> or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Browse files</span>
-                </p>
-              </div>
+              {isProcessing || isExtracting ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--primary)' }}>
+                  <Loader2 size={24} className="spin" />
+                  <div style={{ textAlign: 'left' }}>
+                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--primary-dark)' }}>Extracting {selectedFiles.length} File(s)...</h4>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Parsing student submission datasets</p>
+                  </div>
+                </div>
+              ) : selectedFiles.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--success)' }}>
+                    <CheckCircle2 size={20} />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                      {selectedFiles.length} File(s) Attached
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {selectedFiles.map((f, i) => (
+                      <span
+                        key={f.id || i}
+                        className="status-badge"
+                        style={{
+                          backgroundColor: 'var(--success-bg)',
+                          color: 'var(--success)',
+                          fontSize: '0.75rem',
+                          padding: '0.2rem 0.5rem',
+                          border: '1px solid var(--success-border)'
+                        }}
+                      >
+                        📄 {f.name} ({f.size})
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveFile(f.id);
+                          }}
+                          title="Remove file"
+                          style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.35rem', color: 'var(--danger)' }}
+                        >
+                          ✕
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      document.getElementById('bulkFileInput').click();
+                    }}
+                    style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', marginTop: '0.2rem' }}
+                  >
+                    <Plus size={13} color="var(--primary)" /> Add More
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                  <UploadCloud size={28} color="var(--primary)" style={{ marginBottom: '0.15rem', opacity: 0.8 }} />
+                  <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>
+                    Drag & drop Student Submission files here
+                  </h4>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                    Supports <strong>.xlsx, .csv, .pdf</strong> or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Browse files</span>
+                  </p>
+                </div>
+              )}
             </div>
 
             {uploadStatus && (

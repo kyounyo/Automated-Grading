@@ -1,10 +1,11 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LayoutDashboard, FileUp, Files, CheckSquare, Sparkles, BookOpen, ChevronDown } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import './Layout.css';
 
 const Layout = () => {
+  const location = useLocation();
   const { currentAssignmentId, setCurrentAssignmentId, assignments = [] } = useAssignment();
 
   const availableAssignments = assignments.length > 0 ? assignments : [
@@ -56,20 +57,13 @@ const Layout = () => {
             </NavLink>
           </div>
         </div>
-
-        {/* Sidebar Footer: Status */}
-        <div className="sidebar-footer">
-          <div className="system-status-indicator">
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <span className="status-dot online"></span> AI Models Ready
-            </span>
-            <span style={{ fontSize: '0.675rem', opacity: 0.75, fontWeight: 500 }}>v2.4.0</span>
-          </div>
-        </div>
       </aside>
 
       {/* Main Workspace Area */}
       <main className="main-content">
+        {/* Luminous High-Class Top Navigation Glide Bar */}
+        <div key={`progress-${location.pathname}`} className="route-progress-bar" />
+
         {/* Top Header */}
         <header className="top-header">
           {/* Aesthetic Blue Assignment Selector */}
@@ -98,9 +92,11 @@ const Layout = () => {
           </div>
         </header>
 
-        {/* Page View Body */}
-        <div className="page-content animate-fade-in">
-          <Outlet />
+        {/* Page View Body with Luxury Smooth Transition */}
+        <div className="page-content">
+          <div key={location.pathname} className="route-page-transition">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
@@ -108,3 +104,4 @@ const Layout = () => {
 };
 
 export default Layout;
+

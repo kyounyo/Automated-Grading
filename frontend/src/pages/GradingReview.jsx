@@ -134,32 +134,34 @@ const GradingReview = () => {
     });
   }
 
-  // Determine Flags and Conflicted Questions
-  const isFlagged = Boolean(
-    activeSubmissionObj.status === 'flagged' ||
-    (feedback.flag_reasons && feedback.flag_reasons.length > 0) ||
-    activeSubmissionObj.is_flagged
-  );
+  // Determine Flags and Conflicted Questions:
+  // A submission is flagged ONLY if its current status is 'flagged' (not finalized by lecturer override)
+  const isFlagged = activeSubmissionObj.status === 'flagged';
 
-  let rawFlagReasons = feedback.flag_reasons || [];
+  let rawFlagReasons = isFlagged ? (feedback.flag_reasons || []) : [];
   if (isFlagged && rawFlagReasons.length === 0) {
     rawFlagReasons = ['⚠️ Flagged for Quality Audit: Score discrepancy or low AI confidence detected'];
   }
 
+  // Filter out any "Lecturer Manual Override Applied" strings from conflict reasons
+  rawFlagReasons = rawFlagReasons.filter(r => !r.toLowerCase().includes('override'));
+
   // Parse specific conflicted questions from flag reasons (e.g. "on Q6(a), Q8")
   const conflictedQuestions = new Set();
-  rawFlagReasons.forEach(reason => {
-    const match = reason.match(/(?:on|question|in)\s+([A-Za-z0-9_(),\s]+?)(?::|\(|$)/i);
-    if (match && match[1]) {
-      const parts = match[1].split(/[,&]/);
-      parts.forEach(p => {
-        const clean = p.trim();
-        if (clean.length > 0 && (clean.toLowerCase().startsWith('q') || /\d+/.test(clean))) {
-          conflictedQuestions.add(clean.toUpperCase());
-        }
-      });
-    }
-  });
+  if (isFlagged) {
+    rawFlagReasons.forEach(reason => {
+      const match = reason.match(/(?:on|question|in)\s+([A-Za-z0-9_(),\s]+?)(?::|\(|$)/i);
+      if (match && match[1]) {
+        const parts = match[1].split(/[,&]/);
+        parts.forEach(p => {
+          const clean = p.trim();
+          if (clean.length > 0 && (clean.toLowerCase().startsWith('q') || /\d+/.test(clean))) {
+            conflictedQuestions.add(clean.toUpperCase());
+          }
+        });
+      }
+    });
+  }
 
   const totalMaxScore = currentAssignment?.rubric_data
     ? currentAssignment.rubric_data.reduce((acc, q) => acc + (parseFloat(q.max_score) || 0), 0)
@@ -553,7 +555,6 @@ const GradingReview = () => {
             </span>
             <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
               Email: <strong>{activeSubmissionObj.student_email || 'N/A'}</strong> | File: <strong>{activeSubmissionObj.file_name}</strong>
-              {activeSubmissionObj.model_used && ` | Model: ${activeSubmissionObj.model_used}`}
             </span>
           </div>
 

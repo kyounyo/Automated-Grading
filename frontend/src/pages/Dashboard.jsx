@@ -34,10 +34,10 @@ const Dashboard = () => {
 
   const scoreDistribution = [
     { range: 'Unassessed', count: unassessedSubs.length },
-    { range: `0 - ${fmt(b1)} pts`, count: gradedSubs.filter(s => s.score <= b1).length },
-    { range: `${fmt(b1 + 0.1)} - ${fmt(b2)} pts`, count: gradedSubs.filter(s => s.score > b1 && s.score <= b2).length },
-    { range: `${fmt(b2 + 0.1)} - ${fmt(b3)} pts`, count: gradedSubs.filter(s => s.score > b2 && s.score <= b3).length },
-    { range: `${fmt(b3 + 0.1)} - ${fmt(maxMark)} pts`, count: gradedSubs.filter(s => s.score > b3).length },
+    { range: `0 - ${fmt(b1)} marks`, count: gradedSubs.filter(s => s.score <= b1).length },
+    { range: `${fmt(b1 + 0.1)} - ${fmt(b2)} marks`, count: gradedSubs.filter(s => s.score > b1 && s.score <= b2).length },
+    { range: `${fmt(b2 + 0.1)} - ${fmt(b3)} marks`, count: gradedSubs.filter(s => s.score > b2 && s.score <= b3).length },
+    { range: `${fmt(b3 + 0.1)} - ${fmt(maxMark)} marks`, count: gradedSubs.filter(s => s.score > b3).length },
   ];
 
   // Class Average calculated strictly from graded papers
@@ -149,7 +149,7 @@ const Dashboard = () => {
               </span>
             )}
             <span>Total Papers: <strong style={{ color: 'var(--text-main)' }}>{totalSubmissions}</strong></span>
-            {totalRubricMax && <span>Total Points: <strong style={{ color: 'var(--text-main)' }}>{totalRubricMax} pts</strong></span>}
+            {totalRubricMax && <span>Total Marks: <strong style={{ color: 'var(--text-main)' }}>{totalRubricMax} marks</strong></span>}
           </div>
         </div>
 
@@ -434,7 +434,7 @@ const Dashboard = () => {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                           <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--secondary)', minWidth: '34px' }}>{item.question_number}</span>
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Avg: <strong style={{ color: 'var(--text-main)' }}>{item.avgScore} / {item.max_score} pts</strong></span>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Avg: <strong style={{ color: 'var(--text-main)' }}>{item.avgScore} / {item.max_score} marks</strong></span>
                         </div>
                         <span style={{ fontSize: '0.775rem', fontWeight: 700, color: barColor }}>
                           {item.percentage}%
