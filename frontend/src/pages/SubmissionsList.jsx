@@ -32,6 +32,18 @@ const SubmissionsList = () => {
       .catch(err => console.warn('Could not load QC settings:', err));
   }, []);
 
+  // Smart background polling: automatically refresh every 3 seconds while submissions are pending or grading
+  useEffect(() => {
+    const hasPendingOrProcessing = submissions.some(s => s.status === 'pending' || s.status === 'processing' || s.status === 'uploaded');
+    if (!hasPendingOrProcessing || !currentAssignmentId) return;
+
+    const interval = setInterval(() => {
+      loadSubmissions(currentAssignmentId);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [submissions, currentAssignmentId]);
+
   const handleUpdateQCSettings = async (enable, rate) => {
     try {
       const res = await fetch('/api/assignments/qc-settings', {
