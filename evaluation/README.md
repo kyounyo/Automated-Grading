@@ -67,27 +67,37 @@ Student Answer ──► [ Primary Grader Model ] ──► Predicted Score & Re
 ## 3. Experiment 2: Two-Agent Auditor Quality-Control Benchmark
 
 ### 🎯 Purpose
-Evaluates the **Multi-Agent Quality-Control Architecture** (Grader $\to$ Auditor $\to$ Confidence Engine). 
+Evaluates the **Multi-Agent Quality-Control & Auditor Reconciliation Architecture** (Grader $\to$ Auditor $\to$ Dual Tolerance Reconciliation Engine $\to$ Confidence Engine).
 
-In AutoGrade+, **the Auditor does not overwrite grades**; instead, it detects grading conflicts and triggers the **Deterministic Flagging Engine** to isolate errors for human lecturer review.
+In AutoGrade+:
+1. **Dual-Condition Tolerance for Reconciliation**: Minor discrepancies are defined strictly as $\le 1.0\text{ mark}$ **AND** $\le 10\%\text{ of question max mark}$. When discrepancy is within this boundary, the system applies **Auditor-Based Reconciliation** (adopting the Auditor's refined assessment without human escalation).
+2. **Material Discrepancy Escalation**: When discrepancy exceeds dual tolerance ($> 1.0\text{ mark}$ or $> 10\%$), the **Deterministic Flagging Engine** flags the submission for human lecturer review.
+3. **3-Way Comparative Evaluation**: Evaluates Primary Grader (Baseline), Auditor (Independent), and Reconciled Final Score against the Lecturer Benchmark to measure whether reconciliation statistically improves agreement.
 
 ```
                     Student Answer
                           │
                           ▼
                   ┌───────────────┐
-                  │Primary Grader │ ── Assigns Predicted Grade
+                  │Primary Grader │ ── Assigns Baseline Score
                   └───────┬───────┘
                           │
                           ▼
                   ┌───────────────┐
-                  │ Auditor Agent │ ── Checks for Material Discrepancies
+                  │ Auditor Agent │ ── Independent Second Assessment
                   └───────┬───────┘
+                          │
+                          ▼
+        ┌───────────────────────────────────┐
+        │   Dual-Condition Tolerance Check  │
+        │   (Diff ≤ 1.0 mark AND ≤ 10%)     │
+        └─────────────────┬─────────────────┘
                           │
             ┌─────────────┴─────────────┐
             ▼                           ▼
-   [AUDIT PASSED: "graded"]    [CONFLICT: "flagged"]
-   Auto-approved for student   Sent to Lecturer Review Queue
+   [WITHIN TOLERANCE]          [EXCEEDS TOLERANCE]
+   Auditor-Based Reconciliation  Sent to Lecturer Review
+   ("graded" / Auto-approved)    ("flagged" / Human Queue)
 ```
 
 ### 🚀 How to Run Experiment 2

@@ -10,7 +10,7 @@ from .llm_service import call_llm_for_grading
 from .confidence import evaluate_confidence_and_status
 
 PROMPT_VERSION = os.getenv("PROMPT_VERSION", "v1.2-rubric-cot")
-LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-3.5-flash-lite")
+LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite")
 
 
 def is_blank_submission(text: str) -> bool:
@@ -168,6 +168,10 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         feedback_dict["flag_reasons"] = flag_list
     if llm_result.get("confidence_components"):
         feedback_dict["confidence_components"] = llm_result["confidence_components"]
+    if llm_result.get("multi_agent_audit"):
+        feedback_dict["multi_agent_audit"] = llm_result["multi_agent_audit"]
+    if llm_result.get("reconciliation_action"):
+        feedback_dict["reconciliation_action"] = llm_result["reconciliation_action"]
 
     submission.feedback = feedback_dict
     submission.highlights = llm_result.get("highlights", [])

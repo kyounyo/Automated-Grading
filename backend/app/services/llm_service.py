@@ -10,10 +10,10 @@ def get_openrouter_api_key() -> str:
     return os.getenv("OPENROUTER_API_KEY", "").strip()
 
 def get_llm_model() -> str:
-    return os.getenv("LLM_MODEL", "google/gemini-3.5-flash-lite").strip()
+    return os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite").strip()
 
 def get_auditor_model() -> str:
-    return os.getenv("AUDITOR_MODEL", get_llm_model()).strip()
+    return os.getenv("AUDITOR_MODEL", "nvidia/nemotron-3-super-120b-a12b").strip()
 
 
 
@@ -283,26 +283,32 @@ Student Submission:
 Primary AI Evaluation Result:
 {json.dumps(primary_eval, indent=2)}
 
-INDEPENDENCE REQUIREMENT:
-Do NOT simply agree with or copy the Primary AI Evaluation.
-Independently evaluate the student text per subquestion first using only:
+INDEPENDENCE & VERIFICATION REQUIREMENT:
+You are the Senior Quality Auditor and Reconciliation Verifier.
+Review the Primary Grader's score, reasoning, and per-question breakdown against:
 1. Student Submission Text
 2. Rubric Criteria & Model Answer
 
-After determining your independent scores for each subquestion, compare your scores against the Primary Grader.
-
-AUDIT TASKS:
+AUDIT & RECONCILIATION TASKS:
 1. Re-evaluate student text independently per rubric subquestion (e.g. Q6(a), Q6(b), Q8(a)).
 2. Provide your independent score for EVERY subquestion in "auditor_breakdown".
-3. Identify subquestion(s) where you have a material score disagreement (>= 1.0 mark) with the primary grader.
-4. List materially conflicting subquestions in "conflicting_questions" array.
-5. Set "audit_passed" to FALSE if you have a material subquestion disagreement (>= 1.0 mark) or if total score discrepancy is > 15%. Set TRUE if question scores align within 1.0 mark.
-6. Provide a clear explanation in "discrepancy_note" stating which question(s) had conflict and why.
+3. Compare your evaluation with the Primary Grader:
+   - If Grader's score is accurate and well-supported: set "recommendation" to "AGREEMENT" and "reconciled_score" = primary score.
+   - If Grader made an error (over-awarded / overlooked concepts): set "recommendation" to "ADOPT_AUDITOR" and "reconciled_score" = auditor score.
+4. Classify disagreement severity:
+   - "NONE": Grader == Auditor (diff = 0)
+   - "MINOR": Difference of 1 mark (within acceptable discrete grading variance, resolved by Auditor)
+   - "MAJOR": Difference of >= 2 marks (major dispute requiring lecturer inspection)
+5. Set "audit_passed" to TRUE for "NONE" or "MINOR" disagreements. Set FALSE only for "MAJOR" disagreements (>= 2 marks).
+6. Provide a clear justification in "reconciliation_reason" explaining whether the Grader was confirmed or adjusted and why.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
-  "audit_passed": false,
-  "auditor_score": 7.5,
+  "audit_passed": true,
+  "auditor_score": 5.0,
+  "reconciled_score": 5.0,
+  "recommendation": "ADOPT_AUDITOR",
+  "disagreement_severity": "MINOR",
   "auditor_breakdown": [
     {{
       "question_number": "Q6(a)",
@@ -311,12 +317,12 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     }},
     {{
       "question_number": "Q6(b)",
-      "auditor_score": 1.0,
+      "auditor_score": 2.5,
       "max_score": 2.5
     }}
   ],
-  "conflicting_questions": ["Q6(b)"],
-  "discrepancy_note": "Multi-Agent Conflict on Q6(b): Primary grader awarded 2.5 marks whereas auditor recommends 1.0 mark due to missing sol-to-gel mechanism."
+  "conflicting_questions": [],
+  "reconciliation_reason": "Primary grader deducted 1 mark on Q6(b), but student text explicitly mentions the thermal trigger mechanism required by the rubric. Reconciled to full credit."
 }}
 """
     messages = [
@@ -387,6 +393,7 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
     if auditor_res:
         audit_passed = bool(auditor_res.get("audit_passed", True))
         auditor_score = float(auditor_res.get("auditor_score", primary_res.get("overall_score", 0.0)))
+        reconciled_score = float(auditor_res.get("reconciled_score", auditor_score))
         auditor_breakdown = auditor_res.get("auditor_breakdown", [])
         if not isinstance(auditor_breakdown, list):
             auditor_breakdown = []
@@ -399,16 +406,24 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
         score_diff = abs(primary_score - auditor_score)
         max_denom = total_max_score if total_max_score > 0 else 10.0
         agreement_ratio = max(0.0, 1.0 - (score_diff / max_denom))
+        
+        recommendation = auditor_res.get("recommendation", "AGREEMENT" if score_diff == 0 else "ADOPT_AUDITOR")
+        reconciliation_reason = auditor_res.get("reconciliation_reason", auditor_res.get("discrepancy_note", ""))
+        severity = auditor_res.get("disagreement_severity", "NONE" if score_diff == 0 else ("MINOR" if score_diff <= 1.0 else "MAJOR"))
 
         primary_res["multi_agent_audit"] = {
             "auditor_passed": audit_passed,
             "auditor_score": auditor_score,
+            "reconciled_score": reconciled_score,
+            "recommendation": recommendation,
+            "disagreement_severity": severity,
             "auditor_breakdown": auditor_breakdown,
             "score_discrepancy": round(score_diff, 1),
             "agreement_ratio": round(agreement_ratio, 2),
             "conflicting_questions": conflicting_qs,
-            "audit_note": auditor_res.get("discrepancy_note", ""),
-            "model_used": get_llm_model()
+            "audit_note": reconciliation_reason,
+            "reconciliation_reason": reconciliation_reason,
+            "model_used": get_auditor_model()
         }
 
     # Step 4: Deterministic Confidence & Decision Engine
@@ -424,6 +439,25 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
     primary_res["is_borderline"] = confidence_result["is_borderline"]
     primary_res["is_audit_flagged"] = confidence_result["is_audit_flagged"]
     primary_res["confidence_components"] = confidence_result["confidence_components"]
+
+    # Auditor-Based Reconciliation:
+    # If the disagreement is resolved (diff <= 1.0 mark or confirmed) and auto-approved ("graded"),
+    # the system adopts the Auditor-reconciled final score and updates breakdown accordingly.
+    if auditor_res and confidence_result["status"] == "graded":
+        primary_res["overall_score"] = round(reconciled_score, 1)
+        primary_res["auditor_reconciled"] = (primary_score != reconciled_score)
+        primary_res["reconciliation_action"] = recommendation
+        
+        # Synchronize question breakdown with auditor scores if provided
+        if auditor_breakdown and isinstance(feedback.get("breakdown"), list):
+            from .confidence import normalize_question_number
+            auditor_map = {normalize_question_number(a.get("question_number", "")): a for a in auditor_breakdown if isinstance(a, dict)}
+            for p_item in feedback["breakdown"]:
+                norm_k = normalize_question_number(p_item.get("question_number", ""))
+                if norm_k in auditor_map:
+                    a_sc = auditor_map[norm_k].get("auditor_score")
+                    if a_sc is not None:
+                        p_item["score_awarded"] = float(a_sc)
 
     return primary_res
 

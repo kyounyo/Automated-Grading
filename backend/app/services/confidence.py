@@ -76,9 +76,12 @@ def evaluate_confidence_and_status(
                     diff = abs(p_q_score - a_q_score)
                     q_agreed = max(0.0, 1.0 - (diff / q_max))
                     
-                    # Only treat as material conflict if score difference >= 1.0 mark
-                    if diff >= 1.0:
-                        material_conflicting_qs.append(q_num)
+                    # Discrete Tolerance for Reconciliation:
+                    # Difference of <= 1.0 mark is considered acceptable grading variance (resolved by Auditor without human escalation).
+                    # A difference of >= 2.0 marks is a major disagreement that triggers a flag for human review.
+                    is_material_conflict = (diff >= 2.0 - 1e-5)
+                    if is_material_conflict:
+                        material_conflicting_qs.append(f"{q_num} (Δ{diff:.1f} pts)")
                 else:
                     if norm_key in [normalize_question_number(q) for q in raw_conflicting_qs]:
                         q_agreed = 0.5
@@ -129,12 +132,13 @@ def evaluate_confidence_and_status(
     flag_reasons: List[str] = []
 
     q_str = f" on {', '.join(material_conflicting_qs)}" if material_conflicting_qs else ""
-    discrepancy_pct = (score_discrepancy / max_sc) * 100.0
 
+    # Flag as Multi-Agent Conflict if subquestion conflict >= 2 marks OR total discrepancy >= 2 marks
+    is_total_conflict = (score_discrepancy >= 2.0 - 1e-5)
     if len(material_conflicting_qs) > 0:
-        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: Subquestion score discrepancy")
-    elif discrepancy_pct > (AUDIT_DISCREPANCY_THRESHOLD * 100.0):
-        flag_reasons.append(f"🤖 Multi-Agent Conflict: Score discrepancy of {score_discrepancy:.1f} pts ({discrepancy_pct:.1f}%)")
+        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: Major score disagreement (≥ 2 marks)")
+    elif is_total_conflict:
+        flag_reasons.append(f"🤖 Multi-Agent Conflict: Major score discrepancy of {score_discrepancy:.1f} pts (≥ 2 marks)")
 
     # Flag low confidence when below configured threshold (e.g. 75%, 80%)
     import os
