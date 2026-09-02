@@ -121,12 +121,21 @@ export async function updateQCSettings(settings) {
 }
 
 export async function uploadBulkSubmissions(assignmentId, formData) {
-  formData.append('assignment_id', assignmentId);
+  if (assignmentId && !formData.has('assignment_id')) {
+    formData.append('assignment_id', assignmentId);
+  }
   const response = await fetch(`${API_BASE_URL}/upload`, {
     method: 'POST',
     body: formData
   });
-  if (!response.ok) throw new Error('Failed to upload submissions');
+  if (!response.ok) {
+    let errorDetail = 'Failed to upload submissions';
+    try {
+      const errJson = await response.json();
+      errorDetail = errJson.detail || errorDetail;
+    } catch (_) {}
+    throw new Error(errorDetail);
+  }
   return await response.json();
 }
 
