@@ -186,12 +186,13 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     return _call_openrouter_api(messages, target_model, temperature=0.0)
 
 
-def call_primary_grading_agent(student_text: str, structured_rubric: Dict[str, Any], raw_rubric_json: list, model_answer: str, rag_context: str, total_max_score: float = 10.0, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def _build_generic_grading_prompt(student_text: str, structured_rubric: Dict[str, Any], raw_rubric_json: list, model_answer: str, rag_context: str, total_max_score: float) -> str:
     """
-    Agent 2 (Primary CoT Evaluation Agent):
-    Uses google/gemini-3.1-flash-lite to evaluate student responses against standardized rubric rules and RAG context.
+    Original question-agnostic prompt (v1.3-multi-question-highlights). Kept as the
+    fallback for any question_no that doesn't have a dedicated template below, and for
+    callers that grade a whole multi-question submission in a single request.
     """
-    prompt = f"""
+    return f"""
 You are an expert academic evaluator specializing in objective short-answer grading.
 
 {rag_context}
@@ -257,6 +258,246 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
   ]
 }}
 """
+
+
+# Q6 (Structured Short-Answer / Comparative Analysis) and Q8 (Agree/Disagree with
+# Justification) look different on the surface, but both decompose into the same
+# underlying shape: fixed groups of independently-verifiable marking criteria, each
+# criterion worth 1 mark, each group capped at its own max_score. Q6's two groups
+# have MORE criteria than their cap (a point bank you draw up to 5 marks from); Q8's
+# five groups have exactly 2 criteria each (a verdict criterion + a justification
+# criterion, conditioned on that verdict). One shared prompt template below grades
+# both by supplying only the checklist DATA that differs.
+
+_Q6_CHECKLIST_GROUPS = [
+    {
+        "group": "Q6(a)",
+        "max_score": 5.0,
+        "criteria": [
+            "Biodegradable / does not need surgical removal",
+            "Longer duration of action than lipid-based systems -> reduces dosing frequency / improves compliance",
+            "Injectable, does not require surgical implantation",
+            "No visible/palpable lump at the injection site (aesthetic benefit)",
+            "Not suitable for acid-labile drugs (limits which drugs can use this system)",
+            "Requires a skilled health worker to administer -> may exclude remote/rural patients",
+            "Complex, expensive manufacturing process",
+        ],
+    },
+    {
+        "group": "Q6(b)",
+        "max_score": 5.0,
+        "criteria": [
+            "Contains a solvent, or uses temperature-sensitive polymers",
+            "Typically made from a biodegradable polymer",
+            "Drug must be soluble in the polymer/solvent system",
+            "On injection, the solvent diffuses away from the depot",
+            "Drug is released via degradation/erosion of the polymer matrix",
+            "Correctly judges there is NO clinical benefit over microspheres (a student claiming a clinical benefit does NOT earn this criterion, though they can still earn the others)",
+            "Cheaper / easier to manufacture and sterilise than microspheres",
+            "Avoids needle blockage (a practical advantage of the solvent-based system)",
+        ],
+    },
+]
+
+_Q8_CHECKLIST_GROUPS = [
+    {
+        "group": "Q8(a)",
+        "max_score": 2.0,
+        "criteria": [
+            "Verdict: DISAGREE with the statement 'Lyophilization is the only option for preparing peptides for injectable administration.'",
+            "Reason: not necessary if the drug is stable in solution (freeze-drying is only needed for solution-unstable drugs)",
+        ],
+    },
+    {
+        "group": "Q8(b)",
+        "max_score": 2.0,
+        "criteria": [
+            "Verdict: AGREE with the statement 'Protein structure is more complex than peptides, so instability is often a greater issue.'",
+            "Reason (either is sufficient): hydrophobic regions of proteins can associate/stick to surfaces, OR tertiary structure may be disrupted by unwanted chemical reactions",
+        ],
+    },
+    {
+        "group": "Q8(c)",
+        "max_score": 2.0,
+        "criteria": [
+            "Verdict: DISAGREE with the statement 'Antibody-drug conjugates use the natural distribution of a drug to get the antibody to bind to its target on cells.'",
+            "Reason: it is the antibody that directs/targets the drug to the target cells -- the statement has the direction of targeting reversed",
+        ],
+    },
+    {
+        "group": "Q8(d)",
+        "max_score": 2.0,
+        "criteria": [
+            "Verdict: DISAGREE with the statement 'Proteins and peptides are not light sensitive, so light-protective packaging is never used.'",
+            "Reason: proteins/peptides commonly do require light protection, e.g. packaging in amber vials",
+        ],
+    },
+    {
+        "group": "Q8(e)",
+        "max_score": 2.0,
+        "criteria": [
+            "Verdict: AGREE with the statement 'Co-solvents are used to dissolve peptides to enable safe injection.'",
+            "Reason (either is sufficient): unsafe to inject if the protein/peptide is not completely dissolved, OR injectable co-solvents are acceptable to use in small amounts",
+        ],
+    },
+]
+
+
+def _build_checklist_grading_prompt(
+    student_text: str,
+    total_max_score: float,
+    groups: list,
+    matching_strictness: str = "meaning",
+    allow_half_marks: bool = False,
+) -> str:
+    """
+    Universal criterion-checklist grading prompt shared by every rubric that
+    decomposes into fixed groups of independently-verifiable marking criteria, each
+    worth 1 mark and capped at that group's own max_score. Used for both Q6 (point-
+    bank comparative analysis) and Q8 (per-item verdict+justification), and intended
+    for reuse on future short-answer/written-response questions of either shape --
+    only the `groups` checklist data and these two rubric-derived parameters differ:
+
+    matching_strictness:
+      "meaning"  -- award a criterion for any answer conveying the same meaning,
+                    even in different words (use for point-bank / comparative-list
+                    rubrics, e.g. Q6, where the source rubric itself says to accept
+                    paraphrases).
+      "explicit" -- award a criterion ONLY when the answer explicitly and clearly
+                    states it; do not award for vague or "somewhat aligned" answers
+                    (use for verdict+justification rubrics, e.g. Q8, where the source
+                    rubric is graded strictly). Getting this dial wrong per question
+                    is what caused Q8's ICC to collapse when it was graded with Q6's
+                    "meaning" leniency -- always set it from the actual rubric's own
+                    strictness, not a fixed default.
+
+    allow_half_marks: whether 0.5 can be awarded for a criterion that is partially
+    but incompletely satisfied. Off by default (most point-bank criteria are binary);
+    Q8 turns it on because its source rubric explicitly permits 0.5 marks.
+
+    Note: criteria are graded independently within a group unless the checklist text
+    itself states a dependency -- do not invent extra conditions between criteria
+    (e.g. gating a "reason" criterion on a "verdict" criterion elsewhere in the same
+    group) beyond what the checklist explicitly says, since that measurably lowers
+    agreement with human graders who scored each line item independently.
+    """
+    groups_block = ""
+    for g in groups:
+        crit_lines = "\n".join(f"    {i + 1}. {c}" for i, c in enumerate(g["criteria"]))
+        groups_block += (
+            f"\n{g['group']} (max {g['max_score']:.1f} marks -- 1 mark per criterion met, "
+            f"capped at {g['max_score']:.1f} even if more of the {len(g['criteria'])} criteria below are met):\n"
+            f"{crit_lines}\n"
+        )
+
+    group_names = ", ".join(f'"{g["group"]}"' for g in groups)
+    example_group = groups[0]["group"]
+
+    if matching_strictness == "explicit":
+        strictness_line = (
+            'STRICTLY follow the checklist. Award a criterion ONLY if the student\'s answer '
+            'explicitly and clearly states it. Do NOT award a criterion for a vague answer, or '
+            'one that merely "somewhat aligns" with it without clearly stating it.'
+        )
+    else:
+        strictness_line = (
+            "Award a criterion if the student's answer conveys the SAME MEANING as it, even in "
+            "different words -- paraphrases, synonyms, and reordered phrasing all count as a match. "
+            "Do not require exact wording."
+        )
+
+    half_mark_line = (
+        "You may award 0.5 for a criterion the student's answer partially but incompletely satisfies."
+        if allow_half_marks
+        else "Whole marks only for each criterion -- DO NOT award 0.5 marks."
+    )
+
+    return f"""
+You are an expert academic evaluator. Grade the student's submission using CRITERION
+CHECKLIST MATCHING, not holistic essay judgement. The question is organized into fixed
+groups below; each group is a list of marking criteria worth 1 mark each, and each
+group has its own mark cap that may be lower than its criteria count.
+{groups_block}
+MATCHING STRICTNESS: {strictness_line}
+
+Total Assignment Max Score: {total_max_score}
+
+Student Submission:
+{student_text}
+
+GRADING PROTOCOL:
+1. Work through the groups in order. Route the student's content to the correct group
+   by meaning and context -- students often don't label their points to match the
+   groups above.
+2. For each criterion, FIRST locate and quote the exact verbatim span of the
+   student's own text that relates to it (if any), THEN judge whether it satisfies
+   the criterion under the matching strictness above. Never award a mark without a
+   supporting quote from the student's own text.
+3. {half_mark_line} Sum the satisfied criteria within a group, but never exceed that
+   group's own max_score even if more criteria are satisfied than the cap allows.
+4. Never award the same criterion twice for two restatements of the same idea, and
+   never award a criterion using content that clearly belongs to a different group.
+5. Treat criteria within a group as independent unless the checklist text itself
+   states a dependency between them -- do not invent extra conditions beyond what's
+   written above.
+6. If the student gives no relevant content for a group, that group scores 0 -- do
+   not guess or award sympathy marks.
+7. ZERO MARK RULE: if the entire student answer is blank, '-', 'N/A', or missing,
+   award 0 for every group.
+8. Double-check every group's cap and the final sum before finalizing. Show your
+   criterion-by-criterion matching (with quotes) in "reasoning", and mirror it in
+   "feedback.breakdown" as exactly one entry per group ({group_names}), each with
+   score_awarded (capped at that group's max_score) and max_score. overall_score
+   MUST equal the sum of the group scores in "feedback.breakdown".
+
+OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
+{{
+  "overall_score": 0.0,
+  "confidence_score": 0.90,
+  "status": "graded",
+  "reasoning": "Group-by-group: quote the relevant student text for each criterion, state whether it was met or missed, then sum.",
+  "feedback": {{
+    "summary": "One-sentence overview of which groups were strong and which lost marks.",
+    "breakdown": [
+      {{"question_number": "{example_group}", "score_awarded": 0.0, "max_score": 0.0, "reasoning": "Which numbered criteria were matched and which were missed, and why, with supporting quotes."}}
+    ]
+  }},
+  "highlights": [
+    {{"text": "Exact quote copied verbatim from student submission", "question_number": "{example_group}", "score_awarded": 0.0, "max_score": 0.0, "type": "strength", "comment": "Which criteria this quote satisfies or misses."}}
+  ]
+}}
+"""
+
+
+def call_primary_grading_agent(student_text: str, structured_rubric: Dict[str, Any], raw_rubric_json: list, model_answer: str, rag_context: str, total_max_score: float = 10.0, model: Optional[str] = None, question_no: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Agent 2 (Primary CoT Evaluation Agent):
+    Evaluates student responses against standardized rubric rules and RAG context.
+
+    question_no: when "6"/"Q6" or "8"/"Q8", uses the shared checklist-matching prompt
+    (_build_checklist_grading_prompt) populated with that question's own criteria
+    groups -- one universal template for both question types, since they share the
+    same "grouped, capped, independently-verifiable criteria" marking shape. Any
+    other value (None, Q9, Q22, or a multi-question call) falls back to the original
+    generic rubric-driven prompt unchanged.
+    """
+    q_key = str(question_no).strip().upper().replace("Q", "") if question_no else None
+
+    if q_key == "6":
+        # Q6's source rubric explicitly accepts paraphrased answers and forbids half marks.
+        prompt = _build_checklist_grading_prompt(
+            student_text, total_max_score, _Q6_CHECKLIST_GROUPS,
+            matching_strictness="meaning", allow_half_marks=False,
+        )
+    elif q_key == "8":
+        # Q8's source rubric is graded strictly (explicit statements only) and allows half marks.
+        prompt = _build_checklist_grading_prompt(
+            student_text, total_max_score, _Q8_CHECKLIST_GROUPS,
+            matching_strictness="explicit", allow_half_marks=True,
+        )
+    else:
+        prompt = _build_generic_grading_prompt(student_text, structured_rubric, raw_rubric_json, model_answer, rag_context, total_max_score)
+
     messages = [
         {"role": "system", "content": "You are a precise, objective automated academic grading engine. Always respond strictly in valid JSON format."},
         {"role": "user", "content": prompt}

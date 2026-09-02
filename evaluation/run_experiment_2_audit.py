@@ -89,7 +89,7 @@ def get_stratified_dataset(samples_per_question=25, seed=42):
     df_responses.columns = df_responses.columns.str.strip()
 
     sampled_dfs = []
-    for q_no in [6, 8, 9, 22]:
+    for q_no in [6, 8]:
         q_subset = df_responses[df_responses['question_no'].astype(str).str.strip().str.replace('Q', '') == str(q_no)]
         sampled = q_subset.sample(n=min(samples_per_question, len(q_subset)), random_state=seed)
         sampled_dfs.append(sampled)
@@ -250,7 +250,8 @@ def grade_with_backend_agent(grader_model_info, question_no, question_text, rubr
         model_answer=rubric_text,
         rag_context="",
         total_max_score=float(max_score),
-        model=model_str
+        model=model_str,
+        question_no=question_no
     )
     latency_ms = round((time.time() - start_time) * 1000)
 
