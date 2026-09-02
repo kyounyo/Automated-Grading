@@ -215,7 +215,7 @@ const BulkUpload = () => {
 
   return (
     <div style={{ maxWidth: '1240px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      
+
       {/* 1. Header (Unboxed, Minimalist, No Icon) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -252,7 +252,7 @@ const BulkUpload = () => {
 
       {/* 2. SIDE-BY-SIDE SECTION: Step 1 (Target Assignment) + Step 2 (Upload Student Submissions) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '1.25rem', alignItems: 'stretch' }}>
-        
+
         {/* Column 1: Step 1 Target Assignment */}
         <div className="card-panel" style={{ padding: '1.35rem 1.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', minHeight: '235px' }}>
           <h3 style={{ marginBottom: '1.15rem', color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
@@ -486,10 +486,10 @@ const BulkUpload = () => {
               >
                 <Plus size={14} color="var(--primary)" /> Add More Files
               </button>
-              <button 
+              <button
                 type="button"
-                className="btn btn-outline" 
-                onClick={() => setSelectedFiles([])} 
+                className="btn btn-outline"
+                onClick={() => setSelectedFiles([])}
                 style={{ fontSize: '0.775rem', padding: '0.3rem 0.65rem', color: 'var(--danger)' }}
               >
                 Clear All
@@ -499,9 +499,9 @@ const BulkUpload = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.65rem' }}>
             {selectedFiles.map(file => (
-              <div 
-                key={file.id} 
-                className="card-secondary" 
+              <div
+                key={file.id}
+                className="card-secondary"
                 style={{ padding: '0.6rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
@@ -580,26 +580,24 @@ const BulkUpload = () => {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                      <strong style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--secondary)' }}>
-                        {student.student_name || `Student ${student.student_id}`}
-                      </strong>
-                      <span style={{
-                        backgroundColor: 'var(--primary-light)',
-                        color: 'var(--primary-dark)',
-                        fontWeight: 700,
-                        fontSize: '0.75rem',
-                        padding: '0.15rem 0.5rem',
-                        borderRadius: '4px',
-                        border: '1px solid #BDDAEE'
-                      }}>
-                        ID: {student.student_id}
-                      </span>
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <strong style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--secondary)' }}>
+                      {student.student_name || `Student ${student.student_id}`}
+                    </strong>
+                    <span style={{
+                      backgroundColor: 'var(--primary-light)',
+                      color: 'var(--primary-dark)',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid #BDDAEE'
+                    }}>
+                      ID: {student.student_id}
+                    </span>
                     {student.student_email && student.student_email !== 'N/A' && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {student.student_email}
+                      <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
+                        ({student.student_email})
                       </span>
                     )}
                   </div>
