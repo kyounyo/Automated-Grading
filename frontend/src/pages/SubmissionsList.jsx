@@ -131,8 +131,8 @@ const SubmissionsList = () => {
   const filteredSubmissions = submissions.filter(s => {
     const matchesFilter = filter === 'all' || s.status === filter;
     const term = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || 
-      (s.student_id && s.student_id.toLowerCase().includes(term)) || 
+    const matchesSearch = !searchTerm ||
+      (s.student_id && s.student_id.toLowerCase().includes(term)) ||
       (s.student_name && s.student_name.toLowerCase().includes(term)) ||
       (s.student_email && s.student_email.toLowerCase().includes(term));
     return matchesFilter && matchesSearch;
@@ -179,7 +179,7 @@ const SubmissionsList = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button 
+          <button
             className="btn btn-outline"
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#fff', border: '1px solid var(--border)', color: 'var(--primary-dark)', padding: '0.5rem 0.9rem', fontSize: '0.875rem', fontWeight: 600 }}
             onClick={onExportCSVClick}
@@ -188,7 +188,7 @@ const SubmissionsList = () => {
             <Download size={16} color="var(--primary)" /> Export Grades (CSV)
           </button>
 
-          <button 
+          <button
             className="btn btn-primary"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--primary)', padding: '0.5rem 1rem' }}
             onClick={handleGradeAllBatch}
@@ -196,16 +196,16 @@ const SubmissionsList = () => {
           >
             <Sparkles size={16} /> {gradingBatch ? 'Initiating Batch...' : 'Grade All Pending (AI)'}
           </button>
-          
+
           <div style={{ position: 'relative' }}>
             <Search size={18} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              className="input-field" 
-              placeholder="Search Student Name / ID..." 
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Search Student Name / ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ paddingLeft: '2.5rem', width: '220px' }} 
+              style={{ paddingLeft: '2.5rem', width: '220px' }}
             />
           </div>
         </div>
@@ -231,24 +231,19 @@ const SubmissionsList = () => {
               </tr>
             ) : (
               filteredSubmissions.map((sub) => (
-                <tr 
-                  key={sub.id} 
+                <tr
+                  key={sub.id}
                   style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background-color 0.2s', backgroundColor: sub.status === 'flagged' ? 'rgba(245, 158, 11, 0.02)' : 'transparent' }}
                   onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                   onMouseOut={(e) => e.currentTarget.style.backgroundColor = sub.status === 'flagged' ? 'rgba(245, 158, 11, 0.02)' : 'transparent'}
                   onClick={() => navigate(`/review`, { state: { submission: sub } })}
                 >
                   <td style={{ padding: '1.2rem 1.5rem' }}>
-                    <div style={{ fontSize: '1.025rem', fontWeight: 800, color: 'var(--secondary)', marginBottom: '0.15rem' }}>
-                      {sub.student_name || `Student ${sub.student_id}`}
-                    </div>
-                    <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span style={{ backgroundColor: 'var(--bg-hover)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 600, color: 'var(--text-main)' }}>
-                        ID: {sub.student_id}
-                      </span>
-                      {sub.student_email && sub.student_email !== 'N/A' && (
-                        <span>• {sub.student_email}</span>
-                      )}
+                    <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{sub.student_name || `Student ${sub.student_id}`}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+                      <span>ID: <strong>{sub.student_id}</strong></span>
+                      <span>•</span>
+                      <span>Email: <strong>{sub.student_email || 'N/A'}</strong></span>
                     </div>
                   </td>
                   <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>{sub.file_name}</td>
@@ -263,16 +258,16 @@ const SubmissionsList = () => {
                   <td style={{ padding: '1.2rem 1.5rem' }}>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       {sub.status === 'pending' && (
-                        <button 
-                          className="btn btn-primary" 
+                        <button
+                          className="btn btn-primary"
                           style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                           onClick={(e) => handleGradeSingle(e, sub.id)}
                         >
                           <Play size={14} /> Grade with AI
                         </button>
                       )}
-                      <button 
-                        className={`btn ${sub.status === 'flagged' ? 'btn-primary' : ''}`} 
+                      <button
+                        className={`btn ${sub.status === 'flagged' ? 'btn-primary' : ''}`}
                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem', background: sub.status === 'flagged' ? 'var(--warning)' : 'var(--bg-main)', color: sub.status === 'flagged' ? '#fff' : 'var(--text-main)', border: sub.status === 'flagged' ? 'none' : '1px solid var(--border)' }}
                         onClick={(e) => {
                           e.stopPropagation();
