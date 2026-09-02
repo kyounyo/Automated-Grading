@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, CheckCircle2, AlertTriangle, Play, ArrowRight, Layers, Download, Calendar, Users, Award, ShieldAlert, TrendingUp } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
@@ -6,7 +6,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Cartes
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { currentAssignment, currentAssignmentId, submissions = [], gradeAll, loading, handleExportCSV } = useAssignment();
+  const { currentAssignment, currentAssignmentId, submissions = [], gradeAll, loading, handleExportCSV, loadSubmissions, loadAssignments } = useAssignment();
+
+  // Always refresh latest submissions and assignments on Dashboard load
+  useEffect(() => {
+    if (currentAssignmentId) {
+      loadSubmissions(currentAssignmentId);
+      loadAssignments();
+    }
+  }, [currentAssignmentId]);
 
   const onExportCSVClick = () => {
     handleExportCSV(currentAssignment?.id || currentAssignmentId);

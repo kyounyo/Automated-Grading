@@ -6,7 +6,7 @@ import { uploadBulkSubmissions, triggerGradeAll, getQCSettings, updateQCSettings
 
 const BulkUpload = () => {
   const navigate = useNavigate();
-  const { assignments, currentAssignmentId, setCurrentAssignmentId } = useAssignment();
+  const { assignments, currentAssignmentId, setCurrentAssignmentId, loadSubmissions, loadAssignments } = useAssignment();
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -154,6 +154,10 @@ const BulkUpload = () => {
           status: 'Uploaded'
         }))
       );
+
+      // Refresh global context so Dashboard and Submissions reflect the new upload immediately
+      await loadSubmissions(currentAssignmentId);
+      await loadAssignments();
 
       setUploadStatus(`✅ Successfully uploaded ${res.uploaded_count || filesToUpload.length} submission(s)!`);
       return true;
