@@ -239,11 +239,16 @@ const SubmissionsList = () => {
                   onClick={() => navigate(`/review`, { state: { submission: sub } })}
                 >
                   <td style={{ padding: '1.2rem 1.5rem' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{sub.student_name || `Student ${sub.student_id}`}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
-                      <span>ID: <strong>{sub.student_id}</strong></span>
-                      <span>•</span>
-                      <span>Email: <strong>{sub.student_email || 'N/A'}</strong></span>
+                    <div style={{ fontSize: '1.025rem', fontWeight: 800, color: 'var(--secondary)', marginBottom: '0.15rem' }}>
+                      {sub.student_name || `Student ${sub.student_id}`}
+                    </div>
+                    <div style={{ fontSize: '0.775rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span style={{ backgroundColor: 'var(--bg-hover)', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid var(--border)', fontWeight: 600, color: 'var(--text-main)' }}>
+                        ID: {sub.student_id}
+                      </span>
+                      {sub.student_email && sub.student_email !== 'N/A' && (
+                        <span>• {sub.student_email}</span>
+                      )}
                     </div>
                   </td>
                   <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>{sub.file_name}</td>
