@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, RefreshCw, Download, ShieldAlert } from 'lucide-react';
+import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, RefreshCw, Download, ShieldAlert, Loader2 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
 const SubmissionsList = () => {
@@ -9,6 +9,7 @@ const SubmissionsList = () => {
   const [filter, setFilter] = useState(location.state?.filter || 'all');
   const [searchTerm, setSearchTerm] = useState('');
   const [gradingBatch, setGradingBatch] = useState(false);
+  const [gradingSubIds, setGradingSubIds] = useState(new Set());
   const [qcSettings, setQcSettings] = useState({ enable_random_qc: false, qc_audit_rate: 0.05 });
   const { currentAssignmentId, currentAssignment, submissions, triggerGradeSubmission, triggerGradeAll, loadSubmissions, handleExportCSV } = useAssignment();
 
@@ -34,7 +35,7 @@ const SubmissionsList = () => {
 
   // Smart background polling: automatically refresh every 3 seconds while submissions are pending or grading
   useEffect(() => {
-    const hasPendingOrProcessing = submissions.some(s => s.status === 'pending' || s.status === 'processing' || s.status === 'uploaded');
+    const hasPendingOrProcessing = submissions.some(s => s.status === 'pending' || s.status === 'processing' || s.status === 'uploaded' || gradingSubIds.has(s.id));
     if (!hasPendingOrProcessing || !currentAssignmentId) return;
 
     const interval = setInterval(() => {
@@ -42,7 +43,7 @@ const SubmissionsList = () => {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [submissions, currentAssignmentId]);
+  }, [submissions, currentAssignmentId, gradingSubIds]);
 
   const handleUpdateQCSettings = async (enable, rate) => {
     try {
@@ -73,20 +74,35 @@ const SubmissionsList = () => {
     return null;
   };
 
+  const isSubmissionGrading = (sub) => {
+    return gradingSubIds.has(sub.id) || sub.status === 'processing';
+  };
+
   const handleGradeSingle = async (e, subId) => {
     e.stopPropagation();
+    setGradingSubIds(prev => new Set(prev).add(subId));
     try {
       await triggerGradeSubmission(subId);
     } catch (err) {
       alert(`Grading failed: ${err.message}`);
+    } finally {
+      setGradingSubIds(prev => {
+        const next = new Set(prev);
+        next.delete(subId);
+        return next;
+      });
     }
   };
 
   const handleGradeAllBatch = async () => {
     try {
       setGradingBatch(true);
+      const pendingIds = submissions
+        .filter(s => s.status === 'pending' || s.status === 'uploaded')
+        .map(s => s.id);
+      setGradingSubIds(prev => new Set([...prev, ...pendingIds]));
       await triggerGradeAll(currentAssignmentId);
-      alert("Asynchronous batch AI grading initiated! Submissions are now processing in the background.");
+      alert("Batch AI grading initiated! Submissions are now processing with AI.");
     } catch (err) {
       alert(`Batch grading failed: ${err.message}`);
     } finally {
@@ -99,6 +115,29 @@ const SubmissionsList = () => {
   };
 
   const getStatusBadge = (sub) => {
+    const isGrading = isSubmissionGrading(sub);
+    if (isGrading) {
+      return (
+        <span
+          className="status-badge"
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.12)',
+            color: '#1d4ed8',
+            padding: '0.35rem 0.75rem',
+            borderRadius: '6px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            fontWeight: 600,
+            fontSize: '0.825rem',
+            border: '1px solid rgba(59, 130, 246, 0.35)'
+          }}
+        >
+          <Loader2 size={15} className="spin" style={{ marginRight: '6px', flexShrink: 0, color: '#2563eb' }} />
+          AI Grading in progress...
+        </span>
+      );
+    }
+
     switch (sub.status) {
       case 'graded':
         return (
@@ -111,12 +150,6 @@ const SubmissionsList = () => {
         return (
           <span className="status-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#b45309', padding: '0.35rem 0.75rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', fontWeight: 600, fontSize: '0.825rem', border: '1px solid rgba(245, 158, 11, 0.3)', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`Flagged for Audit: ${flagReason}`}>
             <AlertTriangle size={14} style={{ marginRight: '6px', flexShrink: 0 }} /> ⚠️ Flagged for Audit: {flagReason}
-          </span>
-        );
-      case 'processing':
-        return (
-          <span className="status-badge" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#2563eb', padding: '0.25rem 0.6rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center' }}>
-            <RefreshCw size={14} className="spin" style={{ marginRight: '4px' }} /> Processing...
           </span>
         );
       default:
@@ -194,7 +227,15 @@ const SubmissionsList = () => {
             onClick={handleGradeAllBatch}
             disabled={gradingBatch}
           >
-            <Sparkles size={16} /> {gradingBatch ? 'Initiating Batch...' : 'Grade All Pending (AI)'}
+            {gradingBatch ? (
+              <>
+                <Loader2 size={16} className="spin" /> Initiating Batch...
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} /> Grade All Pending (AI)
+              </>
+            )}
           </button>
 
           <div style={{ position: 'relative' }}>
@@ -230,56 +271,136 @@ const SubmissionsList = () => {
                 </td>
               </tr>
             ) : (
-              filteredSubmissions.map((sub) => (
-                <tr
-                  key={sub.id}
-                  style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background-color 0.2s', backgroundColor: sub.status === 'flagged' ? 'rgba(245, 158, 11, 0.02)' : 'transparent' }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = sub.status === 'flagged' ? 'rgba(245, 158, 11, 0.02)' : 'transparent'}
-                  onClick={() => navigate(`/review`, { state: { submission: sub } })}
-                >
-                  <td style={{ padding: '1.2rem 1.5rem' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--primary)' }}>{sub.student_name || `Student ${sub.student_id}`}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
-                      <span>ID: <strong>{sub.student_id}</strong></span>
-                      <span>•</span>
-                      <span>Email: <strong>{sub.student_email || 'N/A'}</strong></span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>{sub.file_name}</td>
-                  <td style={{ padding: '1.2rem 1.5rem', fontWeight: 600 }}>
-                    {sub.score != null ? (
-                      <span>{sub.score} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.875rem' }}>/ {getSubmissionMaxScore(sub)}</span></span>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassessed</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '1.2rem 1.5rem' }}>{getStatusBadge(sub)}</td>
-                  <td style={{ padding: '1.2rem 1.5rem' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      {sub.status === 'pending' && (
-                        <button
-                          className="btn btn-primary"
-                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                          onClick={(e) => handleGradeSingle(e, sub.id)}
-                        >
-                          <Play size={14} /> Grade with AI
-                        </button>
+              filteredSubmissions.map((sub) => {
+                const isGrading = isSubmissionGrading(sub);
+                return (
+                  <tr
+                    key={sub.id}
+                    style={{
+                      borderBottom: '1px solid var(--border)',
+                      cursor: isGrading ? 'wait' : 'pointer',
+                      transition: 'background-color 0.2s ease',
+                      backgroundColor: isGrading
+                        ? 'rgba(59, 130, 246, 0.06)'
+                        : sub.status === 'flagged'
+                        ? 'rgba(245, 158, 11, 0.02)'
+                        : 'transparent'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isGrading && sub.status !== 'flagged') e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.backgroundColor = isGrading
+                        ? 'rgba(59, 130, 246, 0.06)'
+                        : sub.status === 'flagged'
+                        ? 'rgba(245, 158, 11, 0.02)'
+                        : 'transparent';
+                    }}
+                    onClick={() => {
+                      if (!isGrading) {
+                        navigate(`/review`, { state: { submission: sub } });
+                      }
+                    }}
+                  >
+                    <td style={{ padding: '1.2rem 1.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                          {sub.student_name || `Student ${sub.student_id}`}
+                        </div>
+                        {isGrading && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.75rem',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '12px',
+                              backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                              color: '#1d4ed8',
+                              fontWeight: 600
+                            }}
+                          >
+                            <Loader2 size={12} className="spin" /> Grading AI...
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
+                        <span>ID: <strong>{sub.student_id}</strong></span>
+                        <span>•</span>
+                        <span>Email: <strong>{sub.student_email || 'N/A'}</strong></span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>{sub.file_name}</td>
+                    <td style={{ padding: '1.2rem 1.5rem', fontWeight: 600 }}>
+                      {isGrading ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#2563eb', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                          <Loader2 size={13} className="spin" /> Evaluating...
+                        </span>
+                      ) : sub.score != null ? (
+                        <span>{sub.score} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.875rem' }}>/ {getSubmissionMaxScore(sub)}</span></span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Unassessed</span>
                       )}
-                      <button
-                        className={`btn ${sub.status === 'flagged' ? 'btn-primary' : ''}`}
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem', background: sub.status === 'flagged' ? 'var(--warning)' : 'var(--bg-main)', color: sub.status === 'flagged' ? '#fff' : 'var(--text-main)', border: sub.status === 'flagged' ? 'none' : '1px solid var(--border)' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/review`, { state: { submission: sub } });
-                        }}
-                      >
-                        Review <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td style={{ padding: '1.2rem 1.5rem' }}>{getStatusBadge(sub)}</td>
+                    <td style={{ padding: '1.2rem 1.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {isGrading ? (
+                          <button
+                            className="btn"
+                            disabled
+                            style={{
+                              padding: '0.4rem 0.85rem',
+                              fontSize: '0.85rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                              color: '#1d4ed8',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              cursor: 'wait',
+                              fontWeight: 600
+                            }}
+                          >
+                            <Loader2 size={14} className="spin" /> AI Running...
+                          </button>
+                        ) : sub.status === 'pending' ? (
+                          <button
+                            className="btn btn-primary"
+                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                            onClick={(e) => handleGradeSingle(e, sub.id)}
+                          >
+                            <Play size={14} /> Grade with AI
+                          </button>
+                        ) : null}
+                        <button
+                          className={`btn ${sub.status === 'flagged' ? 'btn-primary' : ''}`}
+                          disabled={isGrading}
+                          style={{
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '0.85rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                            background: sub.status === 'flagged' ? 'var(--warning)' : 'var(--bg-main)',
+                            color: sub.status === 'flagged' ? '#fff' : 'var(--text-main)',
+                            border: sub.status === 'flagged' ? 'none' : '1px solid var(--border)',
+                            opacity: isGrading ? 0.6 : 1,
+                            cursor: isGrading ? 'not-allowed' : 'pointer'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/review`, { state: { submission: sub } });
+                          }}
+                        >
+                          Review <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

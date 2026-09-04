@@ -54,12 +54,17 @@ export const AssignmentProvider = ({ children }) => {
   const triggerGradeSubmission = async (submissionId) => {
     try {
       setLoading(true);
+      // Optimistically update status to 'processing' so any connected view immediately reflects the loading state
+      setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, status: 'processing' } : s));
       const updated = await apiGradeSubmission(submissionId);
       setSubmissions(prev => prev.map(s => s.id === submissionId ? updated : s));
       await loadAssignments(); // Refresh assignment average score
       return updated;
     } catch (err) {
       console.error(`[AssignmentContext] Error grading submission ${submissionId}:`, err);
+      if (currentAssignmentId) {
+        loadSubmissions(currentAssignmentId);
+      }
       throw err;
     } finally {
       setLoading(false);
@@ -69,12 +74,19 @@ export const AssignmentProvider = ({ children }) => {
   const triggerGradeAll = async (assignmentId) => {
     try {
       setLoading(true);
-      const res = await apiGradeAllSubmissions(assignmentId || currentAssignmentId);
+      const targetId = assignmentId || currentAssignmentId;
+      // Optimistically mark pending submissions as 'processing'
+      setSubmissions(prev => prev.map(s => (s.status === 'pending' || s.status === 'uploaded') ? { ...s, status: 'processing' } : s));
+      const res = await apiGradeAllSubmissions(targetId);
       // Refresh submissions list after triggering background task
-      setTimeout(() => loadSubmissions(assignmentId || currentAssignmentId), 1500);
+      setTimeout(() => loadSubmissions(targetId), 1500);
       return res;
     } catch (err) {
       console.error(`[AssignmentContext] Error initiating batch grading:`, err);
+      const targetId = assignmentId || currentAssignmentId;
+      if (targetId) {
+        loadSubmissions(targetId);
+      }
       throw err;
     } finally {
       setLoading(false);
@@ -90,6 +102,7 @@ export const AssignmentProvider = ({ children }) => {
       }
       const updated = await apiOverrideScore(submissionId, payload);
       setSubmissions(prev => prev.map(s => s.id === submissionId ? updated : s));
+      setActiveSubmission(updated);
       await loadAssignments();
       return updated;
     } catch (err) {

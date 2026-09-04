@@ -2,40 +2,53 @@
 
 :root {
   /* User-Defined Soft Blue Aesthetic Palette */
-  --bg-main: #EEF5FB;          /* Soft blue-gray instead of white */
-  --sidebar-bg: #DCEBF7;       /* Strong blue identity sidebar */
-  --surface: #F8FBFE;          /* Card surface - slightly lighter than bg */
+  --bg-main: #EEF5FB;
+  /* Soft blue-gray instead of white */
+  --sidebar-bg: #DCEBF7;
+  /* Strong blue identity sidebar */
+  --surface: #F8FBFE;
+  /* Card surface - slightly lighter than bg */
   --surface-hover: #FFFFFF;
-  --bg-subtle: #E8F2FA;        /* Card secondary - avoids pure white panels */
-  
-  --primary: #3B82C4;          /* Primary blue - buttons / active states */
+  --bg-subtle: #E8F2FA;
+  /* Card secondary - avoids pure white panels */
+
+  --primary: #3B82C4;
+  /* Primary blue - buttons / active states */
   --primary-hover: #2D6CA8;
-  --primary-light: #D9ECFA;    /* Light blue highlight areas */
+  --primary-light: #D9ECFA;
+  /* Light blue highlight areas */
   --primary-subtle: #C9DCEB;
   --primary-dark: #1E4E73;
   --primary-glow: rgba(59, 130, 196, 0.15);
 
-  --secondary: #1E4E73;        /* Dark blue - headings / important text */
+  --secondary: #1E4E73;
+  /* Dark blue - headings / important text */
   --accent: #3B82C4;
   --accent-light: #D9ECFA;
 
-  --success: #16A34A;          /* Emerald */
+  --success: #16A34A;
+  /* Emerald */
   --success-bg: #EAF7EE;
   --success-border: #A7E0B9;
-  
-  --warning: #D97706;          /* Amber */
+
+  --warning: #D97706;
+  /* Amber */
   --warning-bg: #FEF6E8;
   --warning-border: #FAD494;
-  
-  --danger: #DC2626;           /* Crimson */
+
+  --danger: #DC2626;
+  /* Crimson */
   --danger-bg: #FEEEEE;
 
-  --border: #C9DCEB;           /* Border - subtle separation */
+  --border: #C9DCEB;
+  /* Border - subtle separation */
   --border-light: #D8E7F3;
   --border-focus: #3B82C4;
-  
-  --text-main: #243B53;        /* Main text - softer than pure black */
-  --text-muted: #627D98;       /* Secondary text - supporting text */
+
+  --text-main: #243B53;
+  /* Main text - softer than pure black */
+  --text-muted: #627D98;
+  /* Secondary text - supporting text */
   --text-dim: #8FA4B8;
 
   /* Layout */

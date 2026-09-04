@@ -16,7 +16,8 @@ import {
   Award,
   HelpCircle,
   ShieldAlert,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
@@ -56,7 +57,10 @@ const GradingReview = () => {
     }
   }, [location.state, submissions]);
 
-  const currentSub = activeSubmission
+  const targetSubId = activeSubmission?.id || location.state?.submission?.id || location.state?.submissionId;
+  const liveSub = submissions.find(s => s.id === targetSubId);
+  const currentSub = liveSub
+    || activeSubmission
     || location.state?.submission
     || (submissions.length > 0 ? submissions[0] : null);
 
@@ -76,7 +80,7 @@ const GradingReview = () => {
       });
       setQuestionScores(initialScores);
     }
-  }, [currentSub]);
+  }, [currentSub?.id, currentSub?.status, currentSub?.score]);
 
   // Navigate to adjacent submission
   const currentIndex = submissions.findIndex(s => s.id === currentSub?.id);
@@ -245,6 +249,29 @@ const GradingReview = () => {
       setOverrideComment('');
     } catch (err) {
       alert(`Override failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApproveGrade = async () => {
+    try {
+      setSaving(true);
+      const currentScore = activeSubmissionObj.score != null ? activeSubmissionObj.score : 0.0;
+      const updated = await handleScoreOverride(
+        activeSubmissionObj.id,
+        currentScore,
+        overrideComment || "Audited and approved by lecturer",
+        activeSubmissionObj.feedback?.breakdown
+      );
+      if (updated) {
+        setActiveSubmission(updated);
+        setOverrideScore(updated.score != null ? updated.score.toString() : currentScore.toString());
+      }
+      alert(`Grade approved successfully! Audit flag resolved and submission status updated to Graded & Approved.`);
+      setOverrideComment('');
+    } catch (err) {
+      alert(`Approve failed: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -510,9 +537,40 @@ const GradingReview = () => {
           <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
             {activeSubmissionObj.status === 'pending' && (
               <button className="btn btn-primary" onClick={handleGradeWithAI} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}>
-                <Sparkles size={15} /> Run AI Grading
+                {saving ? (
+                  <>
+                    <Loader2 size={15} className="spin" /> AI Grading in progress...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={15} /> Run AI Grading
+                  </>
+                )}
               </button>
             )}
+
+            {isFlagged && (
+              <button
+                className="btn btn-primary"
+                onClick={handleApproveGrade}
+                disabled={saving}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '0.825rem',
+                  padding: '0.4rem 0.85rem',
+                  backgroundColor: 'var(--success)',
+                  borderColor: 'var(--success)',
+                  color: '#fff',
+                  fontWeight: 600
+                }}
+                title="Approve current grade and clear audit flag"
+              >
+                {saving ? <Loader2 size={14} className="spin" /> : <CheckCircle2 size={15} />} Approve & Clear Flag
+              </button>
+            )}
+
             <span
               className="status-badge"
               style={{

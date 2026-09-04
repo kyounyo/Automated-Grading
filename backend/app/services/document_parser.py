@@ -263,17 +263,11 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
 
         cols = [str(c).strip().lower() for c in df.columns]
         
-        # 1. Resolve Student Email column first
-        email_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_email", "student email", "student_gmail", "student_gma", "email", "gmail", "mail", "contact"]) or df[df.columns[i]].dropna().astype(str).str.contains('@').any()), None)
-
-        # 2. Resolve Student ID column (excluding email column)
-        stu_col = next((df.columns[i] for i, c in enumerate(cols) if df.columns[i] != email_col and any(k in c for k in ["student_id", "student_no", "stu_id", "id number", "id_number", "id", "matric"])), df.columns[0] if df.columns[0] != email_col else (df.columns[1] if len(df.columns) > 1 else df.columns[0]))
-
-        # 3. Resolve Student Name column (strictly excluding ID and Email columns)
-        name_col = next((df.columns[i] for i, c in enumerate(cols) if df.columns[i] not in [stu_col, email_col] and any(k in c for k in ["student_name", "full_name", "candidate_name", "first_name", "last_name", "name"]) and not any(ek in c for ek in ["email", "gmail", "mail", "id", "no", "matric"])), None)
-
-        q_col = next((df.columns[i] for i, c in enumerate(cols) if df.columns[i] not in [stu_col, name_col, email_col] and any(k in c for k in ["question_no", "question_n", "question", "q_no", "q_num"])), None)
-        resp_col = next((df.columns[i] for i, c in enumerate(cols) if df.columns[i] not in [stu_col, name_col, email_col, q_col] and any(k in c for k in ["response", "answer", "student_answer", "submission", "text"])), df.columns[-1])
+        stu_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_id", "student_no", "stu_id", "student", "id"])), df.columns[0])
+        email_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_gmail", "student_gma", "student_email", "gmail", "email", "gma", "mail"])), None)
+        name_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_name", "student_nam", "name", "nam"])), None)
+        q_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["question_no", "question_n", "question", "q_no", "q_num"])), None)
+        resp_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["response", "answer", "student_answer", "submission", "text"])), df.columns[-1])
 
         # Group by Student ID if question_no column exists
         if q_col:
@@ -282,19 +276,8 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
                 s_id = str(row[stu_col]).strip() if pd.notna(row[stu_col]) else f"STU{1000 + idx}"
                 if s_id.endswith(".0"): s_id = s_id[:-2]
 
-                raw_name = str(row[name_col]).strip() if (name_col and pd.notna(row[name_col]) and str(row[name_col]).strip() and str(row[name_col]).strip() != "nan") else ""
-                raw_email = str(row[email_col]).strip() if (email_col and pd.notna(row[email_col]) and str(row[email_col]).strip() and str(row[email_col]).strip() != "nan") else "N/A"
-
-                if "@" in raw_name:
-                    if raw_email == "N/A":
-                        raw_email = raw_name
-                    s_name = f"Student {s_id}"
-                elif raw_name and raw_name.lower() not in ["nan", "n/a", "none"]:
-                    s_name = raw_name
-                else:
-                    s_name = f"Student {s_id}"
-
-                s_email = raw_email
+                s_name = str(row[name_col]).strip() if (name_col and pd.notna(row[name_col]) and str(row[name_col]).strip() and str(row[name_col]).strip() != "nan") else f"Student {s_id}"
+                s_email = str(row[email_col]).strip() if (email_col and pd.notna(row[email_col]) and str(row[email_col]).strip() and str(row[email_col]).strip() != "nan") else "N/A"
 
                 q_num = str(row[q_col]).strip() if pd.notna(row[q_col]) else f"Q{idx + 1}"
                 if q_num.endswith(".0"): q_num = q_num[:-2]

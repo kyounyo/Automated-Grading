@@ -2,6 +2,7 @@ import os
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from ..database import get_db
 from ..models import Submission, Assignment, AuditLog, EvaluationLog
 from ..schemas import SubmissionResponse, ScoreOverrideRequest, AuditLogResponse
@@ -156,6 +157,7 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
         fb_dict["breakdown"] = payload.updated_breakdown
     fb_dict["flag_reasons"] = []  # Cleared because lecturer manually reviewed and resolved conflicts
     sub.feedback = fb_dict
+    flag_modified(sub, "feedback")
 
     sub.score = round(final_score, 1)
     sub.status = "graded"  # Mark as finalized by lecturer override

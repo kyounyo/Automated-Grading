@@ -580,23 +580,23 @@ const BulkUpload = () => {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                    <strong style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--secondary)' }}>
-                      {student.student_name || `Student ${student.student_id}`}
-                    </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span style={{
                       backgroundColor: 'var(--primary-light)',
                       color: 'var(--primary-dark)',
                       fontWeight: 700,
                       fontSize: '0.75rem',
-                      padding: '0.15rem 0.5rem',
+                      padding: '0.2rem 0.55rem',
                       borderRadius: '4px',
                       border: '1px solid #BDDAEE'
                     }}>
                       ID: {student.student_id}
                     </span>
+                    <strong style={{ fontSize: '0.9rem', color: 'var(--secondary)' }}>
+                      {student.student_name}
+                    </strong>
                     {student.student_email && student.student_email !== 'N/A' && (
-                      <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         ({student.student_email})
                       </span>
                     )}

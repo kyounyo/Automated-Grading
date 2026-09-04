@@ -502,28 +502,28 @@ def parse_flexible_submissions(file_path: str) -> List[Dict[str, Any]]:
 
         cols_lower = [str(c).strip().lower() for c in df.columns]
 
-        # 1. Resolve Student Email column first (or any column containing @ / email / gmail / mail / contact)
+        # 1. Resolve Student ID column
+        stu_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
+            "student_id", "student id", "student_no", "student no", "student_idx", "matric_no", "matric no", "candidate id", "stu_id", "id"
+        ])), df.columns[0])
+
+        # 2. Resolve Student Name column
+        name_col = next((df.columns[i] for i, c in enumerate(cols_lower) if c != str(stu_col).lower() and any(k == c or k in c for k in [
+            "student_name", "student name", "candidate name", "full_name", "full name", "name", "student"
+        ])), None)
+
+        # 3. Resolve Student Email column
         email_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
-            "student_email", "student email", "student_gmail", "student gmail", "student_gma", "email", "gmail", "mail", "contact"
-        ]) or (df[df.columns[i]].dropna().astype(str).str.contains('@').any())), None)
-
-        # 2. Resolve Student ID column (excluding email column)
-        stu_col = next((df.columns[i] for i, c in enumerate(cols_lower) if df.columns[i] != email_col and any(k == c or k in c for k in [
-            "student_id", "student id", "student_no", "student no", "student_idx", "matric_no", "matric no", "candidate id", "stu_id", "id number", "id_number", "id"
-        ])), df.columns[0] if df.columns[0] != email_col else (df.columns[1] if len(df.columns) > 1 else df.columns[0]))
-
-        # 3. Resolve Student Name column (strictly excluding ID and Email columns, and rejecting columns with @ or email keywords)
-        name_col = next((df.columns[i] for i, c in enumerate(cols_lower) if df.columns[i] not in [stu_col, email_col] and any(k == c or k in c for k in [
-            "student_name", "student name", "candidate name", "full_name", "full name", "first name", "last name", "name", "student_nam"
-        ]) and not any(ek in c for ek in ["email", "gmail", "mail", "id", "num", "no", "matric"])), None)
+            "student_email", "student email", "gmail", "student_gmail", "email", "mail", "contact"
+        ])), None)
 
         # 4. Check for Long Format: Question Number column + Response column
-        q_col = next((df.columns[i] for i, c in enumerate(cols_lower) if df.columns[i] not in [stu_col, name_col, email_col] and any(k == c or k in c for k in [
+        q_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
             "question_number", "question_no", "question_n", "question no", "q_no", "q_num", "question",
             "task_label", "task label", "task", "item", "q label", "question_id", "question id"
         ])), None)
 
-        resp_col = next((df.columns[i] for i, c in enumerate(cols_lower) if df.columns[i] not in [stu_col, name_col, email_col, q_col] and any(k in c for k in [
+        resp_col = next((df.columns[i] for i, c in enumerate(cols_lower) if c not in [str(stu_col).lower(), str(name_col).lower() if name_col else "", str(email_col).lower() if email_col else "", str(q_col).lower() if q_col else ""] and any(k in c for k in [
             "student_response", "student response", "student_answer", "student answer",
             "student_work", "student work", "work", "response", "answer", "submission", "text", "body", "response text"
         ])), None)
@@ -536,20 +536,8 @@ def parse_flexible_submissions(file_path: str) -> List[Dict[str, Any]]:
                 if s_id.endswith(".0"):
                     s_id = s_id[:-2]
 
-                raw_name = str(row[name_col]).strip() if (name_col and pd.notna(row.get(name_col)) and str(row.get(name_col)).strip() and str(row.get(name_col)).strip() != "nan") else ""
-                raw_email = str(row[email_col]).strip() if (email_col and pd.notna(row.get(email_col)) and str(row.get(email_col)).strip() and str(row.get(email_col)).strip() != "nan") else "N/A"
-
-                # Sanitize: If raw_name contains '@', it is an email address, not a name
-                if "@" in raw_name:
-                    if raw_email == "N/A":
-                        raw_email = raw_name
-                    s_name = f"Student {s_id}"
-                elif raw_name and raw_name.lower() not in ["nan", "n/a", "none"]:
-                    s_name = raw_name
-                else:
-                    s_name = f"Student {s_id}"
-
-                s_email = raw_email
+                s_name = str(row[name_col]).strip() if (name_col and pd.notna(row.get(name_col)) and str(row.get(name_col)).strip() and str(row.get(name_col)).strip() != "nan") else f"Student {s_id}"
+                s_email = str(row[email_col]).strip() if (email_col and pd.notna(row.get(email_col)) and str(row.get(email_col)).strip() and str(row.get(email_col)).strip() != "nan") else "N/A"
 
                 q_num = str(row[q_col]).strip() if pd.notna(row.get(q_col)) else f"Q{idx + 1}"
                 if q_num.endswith(".0"):
@@ -594,19 +582,8 @@ def parse_flexible_submissions(file_path: str) -> List[Dict[str, Any]]:
                 if s_id.endswith(".0"):
                     s_id = s_id[:-2]
 
-                raw_name = str(row[name_col]).strip() if (name_col and pd.notna(row.get(name_col)) and str(row.get(name_col)).strip() and str(row.get(name_col)).strip() != "nan") else ""
-                raw_email = str(row[email_col]).strip() if (email_col and pd.notna(row.get(email_col)) and str(row.get(email_col)).strip() and str(row.get(email_col)).strip() != "nan") else "N/A"
-
-                if "@" in raw_name:
-                    if raw_email == "N/A":
-                        raw_email = raw_name
-                    s_name = f"Student {s_id}"
-                elif raw_name and raw_name.lower() not in ["nan", "n/a", "none"]:
-                    s_name = raw_name
-                else:
-                    s_name = f"Student {s_id}"
-
-                s_email = raw_email
+                s_name = str(row[name_col]).strip() if (name_col and pd.notna(row.get(name_col)) and str(row.get(name_col)).strip() and str(row.get(name_col)).strip() != "nan") else f"Student {s_id}"
+                s_email = str(row[email_col]).strip() if (email_col and pd.notna(row.get(email_col)) and str(row.get(email_col)).strip() and str(row.get(email_col)).strip() != "nan") else "N/A"
 
                 responses = []
                 for q_c in question_cols:
