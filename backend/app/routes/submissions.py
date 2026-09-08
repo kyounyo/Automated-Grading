@@ -107,14 +107,18 @@ def _batch_grade_task(assignment_id: str):
             Submission.assignment_id == assignment_id,
             Submission.status.in_(["pending", "uploaded", "extracting_answers", "retrieving_rubric", "flagged"])
         ).all()
-        print(f"[Batch Grading] Started processing {len(pending_subs)} submission(s) for assignment {assignment_id}")
+        print(f"\n=================================================================")
+        print(f" [Batch AI Grading] Started processing {len(pending_subs)} submission(s)")
+        print(f"=================================================================")
         for idx, sub in enumerate(pending_subs):
             try:
-                print(f"[Batch Grading] ({idx+1}/{len(pending_subs)}) Grading submission {sub.id} ({sub.student_id})...")
+                print(f"\n>>> Progress: [{idx+1}/{len(pending_subs)}] ({(idx)/len(pending_subs)*100:.0f}% Completed)")
                 run_grading_pipeline(db, sub.id)
             except Exception as e:
                 print(f"[Batch Grading Error] Failed for submission {sub.id}: {e}")
-        print(f"[Batch Grading] Finished batch processing for assignment {assignment_id}")
+        print(f"\n=================================================================")
+        print(f" [Batch AI Grading] Finished all {len(pending_subs)} submission(s)!")
+        print(f"=================================================================\n")
     finally:
         db.close()
 

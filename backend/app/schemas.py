@@ -23,6 +23,12 @@ class AssignmentCreate(BaseModel):
     model_answer: Optional[str] = ""
 
 
+class AssignmentUpdate(BaseModel):
+    title: Optional[str] = None
+    course_code: Optional[str] = None
+    due_date: Optional[str] = None
+
+
 class AssignmentResponse(BaseModel):
     id: str
     title: str

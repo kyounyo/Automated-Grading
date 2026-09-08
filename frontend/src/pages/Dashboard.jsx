@@ -1,12 +1,49 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, CheckCircle2, AlertTriangle, Play, ArrowRight, Layers, Download, Calendar, Users, Award, ShieldAlert, TrendingUp } from 'lucide-react';
+import { FileText, CheckCircle2, AlertTriangle, Play, ArrowRight, Layers, Download, Calendar, Users, Award, ShieldAlert, TrendingUp, Edit2, X, Check } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import './Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { currentAssignment, currentAssignmentId, submissions = [], gradeAll, loading, handleExportCSV, loadSubmissions, loadAssignments } = useAssignment();
+  const { currentAssignment, currentAssignmentId, submissions = [], gradeAll, loading, handleExportCSV, loadSubmissions, loadAssignments, handleUpdateAssignment } = useAssignment();
+
+  // Modal state for renaming assignment
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [courseCodeInput, setCourseCodeInput] = useState('');
+  const [titleInput, setTitleInput] = useState('');
+  const [isSubmittingRename, setIsSubmittingRename] = useState(false);
+  const [renameError, setRenameError] = useState('');
+
+  const handleOpenRename = () => {
+    if (!currentAssignment) return;
+    setCourseCodeInput(currentAssignment.course_code || '');
+    setTitleInput(currentAssignment.title || '');
+    setRenameError('');
+    setIsRenameOpen(true);
+  };
+
+  const handleSaveRename = async (e) => {
+    e.preventDefault();
+    if (!titleInput.trim()) {
+      setRenameError('Assignment title cannot be empty.');
+      return;
+    }
+    try {
+      setIsSubmittingRename(true);
+      setRenameError('');
+      await handleUpdateAssignment(currentAssignment?.id || currentAssignmentId, {
+        course_code: courseCodeInput.trim(),
+        title: titleInput.trim()
+      });
+      setIsRenameOpen(false);
+    } catch (err) {
+      setRenameError(err.message || 'Failed to update assignment');
+    } finally {
+      setIsSubmittingRename(false);
+    }
+  };
 
   // Always refresh latest submissions and assignments on Dashboard load
   useEffect(() => {
@@ -147,9 +184,21 @@ const Dashboard = () => {
               </span>
             )}
           </div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--secondary)', letterSpacing: '-0.02em', margin: 0 }}>
-            {currentAssignment?.title || 'No Active Assignment'}
-          </h1>
+          <div className="title-container">
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--secondary)', letterSpacing: '-0.02em', margin: 0 }}>
+              {currentAssignment?.title || 'No Active Assignment'}
+            </h1>
+            {currentAssignment && (
+              <button
+                type="button"
+                className="rename-title-btn"
+                onClick={handleOpenRename}
+                title="Rename assignment name & unit code"
+              >
+                <Edit2 size={13} />
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginTop: '0.35rem', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
             {currentAssignment?.due_date && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -468,6 +517,88 @@ const Dashboard = () => {
         </div>
 
       </div>
+
+      {/* Pop-out Box / Modal to Rename Assignment */}
+      {isRenameOpen && (
+        <div className="dashboard-modal-overlay" onClick={() => setIsRenameOpen(false)}>
+          <div className="dashboard-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '6px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Edit2 size={14} />
+                </div>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--secondary)' }}>
+                  Rename Assessment
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRenameOpen(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRename}>
+              {renameError && (
+                <div style={{ marginBottom: '1rem', padding: '0.6rem 0.8rem', background: '#FEE2E2', color: '#991B1B', borderRadius: '6px', fontSize: '0.825rem' }}>
+                  {renameError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label className="label" style={{ marginBottom: '0.35rem' }}>
+                    Unit / Course Code
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={courseCodeInput}
+                    onChange={(e) => setCourseCodeInput(e.target.value)}
+                    placeholder="e.g. PHR1021, CS101"
+                  />
+                </div>
+
+                <div>
+                  <label className="label" style={{ marginBottom: '0.35rem' }}>
+                    Assignment Name / Title <span style={{ color: 'var(--danger)' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={titleInput}
+                    onChange={(e) => setTitleInput(e.target.value)}
+                    placeholder="e.g. Assignment 1 - Pharmacy Practicum"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setIsRenameOpen(false)}
+                  disabled={isSubmittingRename}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSubmittingRename}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Check size={16} />
+                  <span>{isSubmittingRename ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

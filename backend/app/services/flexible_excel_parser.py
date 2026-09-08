@@ -500,33 +500,31 @@ def parse_flexible_submissions(file_path: str) -> List[Dict[str, Any]]:
         if df.empty:
             return []
 
+        # Use intelligent Schema Resolver with Header + Content Scoring
+        mapping, overall_conf, is_valid = resolve_schema_mapping(df, schema_type="submission")
+        print(f"[FlexibleExcelParser] Submissions Schema Resolution: {mapping} (Confidence: {overall_conf * 100:.1f}%)")
+
+        stu_col = mapping.get("student_id")
+        name_col = mapping.get("student_name")
+        email_col = mapping.get("student_email")
+        q_col = mapping.get("question_number")
+        resp_col = mapping.get("student_response")
+
         cols_lower = [str(c).strip().lower() for c in df.columns]
 
-        # 1. Resolve Student ID column
-        stu_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
-            "student_id", "student id", "student_no", "student no", "student_idx", "matric_no", "matric no", "candidate id", "stu_id", "id"
-        ])), df.columns[0])
+        # Fallback if mapping missed any columns
+        if not stu_col and len(df.columns) > 0:
+            stu_col = df.columns[0]
 
-        # 2. Resolve Student Name column
-        name_col = next((df.columns[i] for i, c in enumerate(cols_lower) if c != str(stu_col).lower() and any(k == c or k in c for k in [
-            "student_name", "student name", "candidate name", "full_name", "full name", "name", "student"
-        ])), None)
+        if not email_col:
+            email_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
+                "student_email", "student email", "gmail", "student_gmail", "email", "mail", "contact"
+            ])), None)
 
-        # 3. Resolve Student Email column
-        email_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
-            "student_email", "student email", "gmail", "student_gmail", "email", "mail", "contact"
-        ])), None)
-
-        # 4. Check for Long Format: Question Number column + Response column
-        q_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
-            "question_number", "question_no", "question_n", "question no", "q_no", "q_num", "question",
-            "task_label", "task label", "task", "item", "q label", "question_id", "question id"
-        ])), None)
-
-        resp_col = next((df.columns[i] for i, c in enumerate(cols_lower) if c not in [str(stu_col).lower(), str(name_col).lower() if name_col else "", str(email_col).lower() if email_col else "", str(q_col).lower() if q_col else ""] and any(k in c for k in [
-            "student_response", "student response", "student_answer", "student answer",
-            "student_work", "student work", "work", "response", "answer", "submission", "text", "body", "response text"
-        ])), None)
+        if not name_col:
+            name_col = next((df.columns[i] for i, c in enumerate(cols_lower) if (not email_col or c != str(email_col).lower()) and (not stu_col or c != str(stu_col).lower()) and any(k == c or k in c for k in [
+                "student_name", "student name", "candidate name", "full_name", "full name", "name"
+            ])), None)
 
         # Mode A: Long Format (Row per question)
         if q_col and resp_col and q_col != resp_col:

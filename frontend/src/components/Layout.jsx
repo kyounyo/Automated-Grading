@@ -66,7 +66,7 @@ const Layout = () => {
 
         {/* Top Header */}
         <header className="top-header">
-          {/* Aesthetic Blue Assignment Selector */}
+          {/* Aesthetic Blue Assignment Selector Dropdown */}
           <div className="active-assignment-pill">
             <div className="assignment-badge-icon">
               <BookOpen size={16} color="var(--primary)" />

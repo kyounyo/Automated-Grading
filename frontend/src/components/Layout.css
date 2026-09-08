@@ -202,6 +202,27 @@
   border-color: var(--primary);
 }
 
+.edit-assignment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 6px;
+  background-color: #FFFFFF;
+  border: 1px solid #A8CEEA;
+  color: var(--secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.edit-assignment-btn:hover {
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
 .assignment-badge-icon {
   display: flex;
   align-items: center;

@@ -22,6 +22,16 @@ export async function createAssignment(payload) {
   return await response.json();
 }
 
+export async function updateAssignment(assignmentId, payload) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('Failed to update assignment');
+  return await response.json();
+}
+
 export async function fetchSubmissions(assignmentId) {
   const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/submissions`);
   if (!response.ok) throw new Error('Failed to fetch submissions');
@@ -133,7 +143,7 @@ export async function uploadBulkSubmissions(assignmentId, formData) {
     try {
       const errJson = await response.json();
       errorDetail = errJson.detail || errorDetail;
-    } catch (_) {}
+    } catch (_) { }
     throw new Error(errorDetail);
   }
   return await response.json();

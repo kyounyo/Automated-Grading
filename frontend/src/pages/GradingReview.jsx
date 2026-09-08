@@ -57,6 +57,19 @@ const GradingReview = () => {
     }
   }, [location.state, submissions]);
 
+  const formatStudentName = (name, id, email) => {
+    if (name && !name.includes('@') && name !== 'N/A' && !name.startsWith('Student STU')) {
+      return name;
+    }
+    const candidate = (name && name.includes('@')) ? name : (email && email.includes('@') ? email : null);
+    if (candidate) {
+      const prefix = candidate.split('@')[0];
+      const cleaned = prefix.split(/[._\s\-]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      if (cleaned) return cleaned;
+    }
+    return name && name !== 'N/A' ? name : `Student ${id || ''}`.trim();
+  };
+
   const targetSubId = activeSubmission?.id || location.state?.submission?.id || location.state?.submissionId;
   const liveSub = submissions.find(s => s.id === targetSubId);
   const currentSub = liveSub
@@ -111,7 +124,7 @@ const GradingReview = () => {
   const activeSubmissionObj = currentSub;
   const feedback = activeSubmissionObj.feedback || {};
   const breakdown = feedback.breakdown || [];
-  
+
   // Extract or synthesize highlights from breakdown reasoning if highlights array is empty
   let highlights = feedback.highlights || activeSubmissionObj.highlights || [];
   if (highlights.length === 0 && breakdown.length > 0) {
@@ -119,7 +132,7 @@ const GradingReview = () => {
       const qNum = item.question_number || `Q${idx + 1}`;
       const scoreAwarded = item.score_awarded ?? item.score ?? 0;
       const isPositive = scoreAwarded > 0;
-      
+
       const quoteMatches = (item.reasoning || '').match(/'([^']+)'|"([^"]+)"/g);
       if (quoteMatches) {
         quoteMatches.forEach(qm => {
@@ -491,10 +504,10 @@ const GradingReview = () => {
           1. PERMANENTLY FROZEN TOP HEADER & STUDENT METADATA
           ========================================================================= */}
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
-        
+
         {/* Row 1: Back Button | Quick Student Switcher | Action Status */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          
+
           <button
             type="button"
             className="btn btn-outline"
@@ -512,7 +525,7 @@ const GradingReview = () => {
               onClick={() => navigateToSubmission(prevSubmission)}
               disabled={!prevSubmission}
               style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !prevSubmission ? 0.4 : 1 }}
-              title={prevSubmission ? `Previous: ${prevSubmission.student_name || prevSubmission.student_id}` : 'First student'}
+              title={prevSubmission ? `Previous: ${formatStudentName(prevSubmission.student_name, prevSubmission.student_id, prevSubmission.student_email)}` : 'First student'}
             >
               <ChevronLeft size={15} /> Prev
             </button>
@@ -527,7 +540,7 @@ const GradingReview = () => {
               onClick={() => navigateToSubmission(nextSubmission)}
               disabled={!nextSubmission}
               style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !nextSubmission ? 0.4 : 1 }}
-              title={nextSubmission ? `Next: ${nextSubmission.student_name || nextSubmission.student_id}` : 'Last student'}
+              title={nextSubmission ? `Next: ${formatStudentName(nextSubmission.student_name, nextSubmission.student_id, nextSubmission.student_email)}` : 'Last student'}
             >
               Next <ChevronRight size={15} />
             </button>
@@ -606,7 +619,7 @@ const GradingReview = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--secondary)' }}>
-              {activeSubmissionObj.student_name || `Student ${activeSubmissionObj.student_id}`}
+              {formatStudentName(activeSubmissionObj.student_name, activeSubmissionObj.student_id, activeSubmissionObj.student_email)}
             </span>
             <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '4px', fontWeight: 600, color: 'var(--text-muted)' }}>
               ID: {activeSubmissionObj.student_id}

@@ -345,14 +345,21 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
         print("[LLM Service] OPENROUTER_API_KEY not set. Running fallback structured scoring engine.")
         return _mock_heuristic_evaluation(student_text, rubric_json)
 
+    primary_model_name = get_llm_model()
+    auditor_model_name = get_auditor_model()
+
     # Step 1: Agent 1 - Rubric & Context Parser Agent
+    print(f" │   ├─ [Agent 1: Rubric Parser] Structuring rubric rules & RAG context...")
     parser_res = call_rubric_context_parser_agent(rubric_json, model_answer, rag_context)
     structured_rubric = parser_res if parser_res else {"structured_rules": rubric_json}
+    rule_count = len(rubric_json) if isinstance(rubric_json, list) else 1
+    print(f" │   │  └─ Loaded {rule_count} rubric rule(s) & reference guidelines.")
 
     # Step 2: Agent 2 - Primary CoT Grader Agent
+    print(f" │   ├─ [Agent 2: Primary Grader ({primary_model_name})] Evaluating student submission...")
     primary_res = call_primary_grading_agent(student_text, structured_rubric, rubric_json, model_answer, rag_context, total_max_score)
     if not primary_res:
-        print("[LLM Service Warning] Primary Agent call failed. Using heuristic fallback.")
+        print(" │   │  └─ [Warning] Primary Agent call failed. Using heuristic fallback.")
         return _mock_heuristic_evaluation(student_text, rubric_json)
 
     # Ensure feedback dictionary and breakdown list exist
@@ -384,10 +391,14 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
         exact_breakdown_sum = sum(float(item.get("score_awarded", 0.0)) for item in breakdown if isinstance(item, dict))
         primary_res["overall_score"] = round(exact_breakdown_sum, 1)
 
+    primary_score = float(primary_res.get("overall_score", 0.0))
+    print(f" │   │  └─ Primary Score Awarded: {primary_score}/{total_max_score}")
+
     # Enrich highlights with question number and position in raw text
     _enrich_highlights_with_question_info(primary_res, student_text)
 
     # Step 3: Agent 3 - Auditor Verification Agent
+    print(f" │   ├─ [Agent 3: Quality Auditor ({auditor_model_name})] Performing independent verification...")
     auditor_res = call_auditor_verification_agent(student_text, rubric_json, primary_res)
 
     if auditor_res:
@@ -398,7 +409,6 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
         if not isinstance(auditor_breakdown, list):
             auditor_breakdown = []
 
-        primary_score = float(primary_res.get("overall_score", 0.0))
         conflicting_qs = auditor_res.get("conflicting_questions", [])
         if not isinstance(conflicting_qs, list):
             conflicting_qs = []
@@ -410,6 +420,9 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
         recommendation = auditor_res.get("recommendation", "AGREEMENT" if score_diff == 0 else "ADOPT_AUDITOR")
         reconciliation_reason = auditor_res.get("reconciliation_reason", auditor_res.get("discrepancy_note", ""))
         severity = auditor_res.get("disagreement_severity", "NONE" if score_diff == 0 else ("MINOR" if score_diff <= 1.0 else "MAJOR"))
+
+        print(f" │   │  ├─ Auditor Score: {auditor_score}/{total_max_score} | Discrepancy: {score_diff:.1f} pts ({severity})")
+        print(f" │   │  └─ Auditor Action: {recommendation} (Audit Passed: {audit_passed})")
 
         primary_res["multi_agent_audit"] = {
             "auditor_passed": audit_passed,
@@ -423,10 +436,11 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
             "conflicting_questions": conflicting_qs,
             "audit_note": reconciliation_reason,
             "reconciliation_reason": reconciliation_reason,
-            "model_used": get_auditor_model()
+            "model_used": auditor_model_name
         }
 
     # Step 4: Deterministic Confidence & Decision Engine
+    print(f" │   ├─ [Engine: Confidence & Reconciliation] Computing calibrated confidence...")
     confidence_result = evaluate_confidence_and_status(
         primary_res,
         student_text,
@@ -458,6 +472,8 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
                     a_sc = auditor_map[norm_k].get("auditor_score")
                     if a_sc is not None:
                         p_item["score_awarded"] = float(a_sc)
+
+    print(f" │   └─ [Reconciliation Complete] Final Status: {primary_res['status'].upper()} | Final Score: {primary_res['overall_score']}/{total_max_score} | Confidence: {primary_res['confidence_score']*100:.1f}%")
 
     return primary_res
 

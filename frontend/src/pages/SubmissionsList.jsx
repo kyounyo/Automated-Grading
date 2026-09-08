@@ -33,17 +33,34 @@ const SubmissionsList = () => {
       .catch(err => console.warn('Could not load QC settings:', err));
   }, []);
 
-  // Smart background polling: automatically refresh every 3 seconds while submissions are pending or grading
+  // Smart background polling: only poll while actively tracking grading submissions
   useEffect(() => {
-    const hasPendingOrProcessing = submissions.some(s => s.status === 'pending' || s.status === 'processing' || s.status === 'uploaded' || gradingSubIds.has(s.id));
-    if (!hasPendingOrProcessing || !currentAssignmentId) return;
+    if (!currentAssignmentId || gradingSubIds.size === 0) {
+      return;
+    }
 
     const interval = setInterval(() => {
-      loadSubmissions(currentAssignmentId);
+      loadSubmissions(currentAssignmentId, true);
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [submissions, currentAssignmentId, gradingSubIds]);
+  }, [currentAssignmentId, gradingSubIds.size, loadSubmissions]);
+
+  // Auto-clear finished submissions from local grading tracker
+  useEffect(() => {
+    if (gradingSubIds.size === 0) return;
+    setGradingSubIds(prev => {
+      const next = new Set(prev);
+      let changed = false;
+      submissions.forEach(s => {
+        if ((s.status === 'graded' || s.status === 'flagged') && next.has(s.id)) {
+          next.delete(s.id);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [submissions]);
 
   const handleUpdateQCSettings = async (enable, rate) => {
     try {
@@ -102,9 +119,8 @@ const SubmissionsList = () => {
         .map(s => s.id);
       setGradingSubIds(prev => new Set([...prev, ...pendingIds]));
       await triggerGradeAll(currentAssignmentId);
-      alert("Batch AI grading initiated! Submissions are now processing with AI.");
     } catch (err) {
-      alert(`Batch grading failed: ${err.message}`);
+      console.error(`Batch grading failed: ${err.message}`);
     } finally {
       setGradingBatch(false);
     }
@@ -161,6 +177,19 @@ const SubmissionsList = () => {
     }
   };
 
+  const formatStudentName = (name, id, email) => {
+    if (name && !name.includes('@') && name !== 'N/A' && !name.startsWith('Student STU')) {
+      return name;
+    }
+    const candidate = (name && name.includes('@')) ? name : (email && email.includes('@') ? email : null);
+    if (candidate) {
+      const prefix = candidate.split('@')[0];
+      const cleaned = prefix.split(/[._\s\-]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      if (cleaned) return cleaned;
+    }
+    return name && name !== 'N/A' ? name : `Student ${id || ''}`.trim();
+  };
+
   const filteredSubmissions = submissions.filter(s => {
     const matchesFilter = filter === 'all' || s.status === filter;
     const term = searchTerm.toLowerCase();
@@ -170,6 +199,14 @@ const SubmissionsList = () => {
       (s.student_email && s.student_email.toLowerCase().includes(term));
     return matchesFilter && matchesSearch;
   });
+
+  const totalSubmissionsCount = submissions.length;
+  const gradedCount = submissions.filter(s => s.status === 'graded').length;
+  const flaggedCount = submissions.filter(s => s.status === 'flagged').length;
+  const processingCount = submissions.filter(s => s.status === 'processing' || isSubmissionGrading(s)).length;
+  const completedCount = gradedCount + flaggedCount;
+  const isBatchActive = gradingSubIds.size > 0 || processingCount > 0;
+  const progressPercent = totalSubmissionsCount > 0 ? Math.round((completedCount / totalSubmissionsCount) * 100) : 0;
 
   return (
     <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - var(--header-height) - 4rem)', overflow: 'hidden' }}>
@@ -225,11 +262,11 @@ const SubmissionsList = () => {
             className="btn btn-primary"
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--primary)', padding: '0.5rem 1rem' }}
             onClick={handleGradeAllBatch}
-            disabled={gradingBatch}
+            disabled={isBatchActive}
           >
-            {gradingBatch ? (
+            {isBatchActive ? (
               <>
-                <Loader2 size={16} className="spin" /> Initiating Batch...
+                <Loader2 size={16} className="spin" /> Grading ({completedCount}/{totalSubmissionsCount})...
               </>
             ) : (
               <>
@@ -251,6 +288,45 @@ const SubmissionsList = () => {
           </div>
         </div>
       </div>
+
+      {/* Live AI Batch Grading Progress Banner */}
+      {isBatchActive && (
+        <div style={{
+          margin: '1rem 1.5rem 0',
+          padding: '1rem 1.25rem',
+          borderRadius: '8px',
+          backgroundColor: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          boxShadow: '0 2px 4px rgba(37, 99, 235, 0.06)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Loader2 size={18} className="spin" color="#2563eb" />
+              <strong style={{ color: '#1e40af', fontSize: '0.95rem' }}>
+                AI Multi-Agent Pipeline Active
+              </strong>
+            </div>
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e40af' }}>
+              {completedCount} / {totalSubmissionsCount} Submissions Completed ({progressPercent}%)
+            </span>
+          </div>
+
+          <div style={{ width: '100%', height: '8px', backgroundColor: '#dbeafe', borderRadius: '4px', overflow: 'hidden', marginBottom: '0.65rem' }}>
+            <div style={{ width: `${Math.max(5, progressPercent)}%`, height: '100%', backgroundColor: '#2563eb', transition: 'width 0.4s ease' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.75rem', color: '#1e40af' }}>
+            <span style={{ fontWeight: 700 }}>Active Stages:</span>
+            <span style={{ padding: '0.15rem 0.5rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>1. Text Extraction</span>
+            <span>➔</span>
+            <span style={{ padding: '0.15rem 0.5rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>2. ChromaDB RAG</span>
+            <span>➔</span>
+            <span style={{ padding: '0.15rem 0.5rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>3. Primary Grader & Auditor LLM</span>
+            <span>➔</span>
+            <span style={{ padding: '0.15rem 0.5rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid #bfdbfe', fontWeight: 600 }}>4. Confidence & Reconciliation</span>
+          </div>
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -283,8 +359,8 @@ const SubmissionsList = () => {
                       backgroundColor: isGrading
                         ? 'rgba(59, 130, 246, 0.06)'
                         : sub.status === 'flagged'
-                        ? 'rgba(245, 158, 11, 0.02)'
-                        : 'transparent'
+                          ? 'rgba(245, 158, 11, 0.02)'
+                          : 'transparent'
                     }}
                     onMouseOver={(e) => {
                       if (!isGrading && sub.status !== 'flagged') e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
@@ -293,8 +369,8 @@ const SubmissionsList = () => {
                       e.currentTarget.style.backgroundColor = isGrading
                         ? 'rgba(59, 130, 246, 0.06)'
                         : sub.status === 'flagged'
-                        ? 'rgba(245, 158, 11, 0.02)'
-                        : 'transparent';
+                          ? 'rgba(245, 158, 11, 0.02)'
+                          : 'transparent';
                     }}
                     onClick={() => {
                       if (!isGrading) {
@@ -305,7 +381,7 @@ const SubmissionsList = () => {
                     <td style={{ padding: '1.2rem 1.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                          {sub.student_name || `Student ${sub.student_id}`}
+                          {formatStudentName(sub.student_name, sub.student_id, sub.student_email)}
                         </div>
                         {isGrading && (
                           <span
@@ -365,7 +441,7 @@ const SubmissionsList = () => {
                           >
                             <Loader2 size={14} className="spin" /> AI Running...
                           </button>
-                        ) : sub.status === 'pending' ? (
+                        ) : (sub.status === 'pending' || sub.status === 'uploaded') ? (
                           <button
                             className="btn btn-primary"
                             style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}

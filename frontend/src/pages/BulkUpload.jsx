@@ -19,13 +19,19 @@ const BulkUpload = () => {
 
   // Load existing QC settings for current assignment
   useEffect(() => {
-    if (!currentAssignmentId) return;
     const fetchQc = async () => {
       try {
-        const data = await getQCSettings(currentAssignmentId);
+        const data = await getQCSettings();
         if (data) {
-          if (data.audit_percentage !== undefined) setAuditPercentage(data.audit_percentage);
-          if (data.confidence_threshold !== undefined) setConfidenceThreshold(data.confidence_threshold);
+          if (data.audit_percentage !== undefined) {
+            setAuditPercentage(data.audit_percentage);
+          } else if (data.qc_audit_rate !== undefined) {
+            setAuditPercentage(Math.round(data.qc_audit_rate * 100));
+          }
+          if (data.confidence_threshold !== undefined) {
+            const val = data.confidence_threshold <= 1.0 ? Math.round(data.confidence_threshold * 100) : data.confidence_threshold;
+            setConfidenceThreshold(val);
+          }
         }
       } catch (err) {
         console.warn('Could not load QC settings:', err.message);
@@ -35,12 +41,13 @@ const BulkUpload = () => {
   }, [currentAssignmentId]);
 
   const saveQcSettings = async () => {
-    if (!currentAssignmentId) return;
     try {
       setIsSavingQc(true);
-      await updateQCSettings(currentAssignmentId, {
+      await updateQCSettings({
+        enable_random_qc: auditPercentage > 0,
+        qc_audit_rate: auditPercentage / 100.0,
         audit_percentage: auditPercentage,
-        confidence_threshold: confidenceThreshold
+        confidence_threshold: confidenceThreshold / 100.0
       });
     } catch (err) {
       console.warn('Failed to save QC settings:', err.message);
@@ -593,7 +600,19 @@ const BulkUpload = () => {
                       ID: {student.student_id}
                     </span>
                     <strong style={{ fontSize: '0.9rem', color: 'var(--secondary)' }}>
-                      {student.student_name}
+                      {(() => {
+                        const name = student.student_name;
+                        const id = student.student_id;
+                        const email = student.student_email;
+                        if (name && !name.includes('@') && name !== 'N/A' && !name.startsWith('Student STU')) return name;
+                        const candidate = (name && name.includes('@')) ? name : (email && email.includes('@') ? email : null);
+                        if (candidate) {
+                          const prefix = candidate.split('@')[0];
+                          const cleaned = prefix.split(/[._\s\-]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+                          if (cleaned) return cleaned;
+                        }
+                        return name && name !== 'N/A' ? name : `Student ${id || ''}`.trim();
+                      })()}
                     </strong>
                     {student.student_email && student.student_email !== 'N/A' && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>

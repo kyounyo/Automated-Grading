@@ -54,6 +54,8 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         raise ValueError(f"Assignment {submission.assignment_id} not found.")
 
     # Step 1: Extract Document Text from raw_text or file_path
+    print(f"\n[Submission {submission.student_id}] ({submission.student_name})")
+    print(f" ├─ [1/4] Extracting student submission text...")
     submission.status = "extracting_answers"
     db.commit()
     extracted_text = ""
@@ -72,6 +74,8 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     # Step 2: Check for Blank / Missing Student Submission
     if is_blank_submission(extracted_text):
         duration = time.time() - start_time
+        print(f" ├─ [Blank Submission] Detected empty response ('-')")
+        print(f" └─ Status: GRADED | Score: 0.0/{total_max_score} | Confidence: 100.0% (Fast-path {duration:.2f}s)")
         submission.score = 0.0
         submission.confidence_score = 1.0
         submission.status = "graded"
@@ -122,11 +126,13 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         return submission
 
     # Step 3: Query ChromaDB for RAG context
+    print(f" ├─ [2/4] Retrieving ChromaDB rubric & question vector context...")
     submission.status = "retrieving_rubric"
     db.commit()
     rag_context = retrieve_rubric_context(assignment.id, extracted_text)
 
     # Step 4: Execute Multi-Agent LLM Grading Prompt
+    print(f" ├─ [3/4] Running Multi-Agent LLM (Primary Grader & Auditor via {LLM_MODEL})...")
     submission.status = "grading"
     db.commit()
     llm_result = call_llm_for_grading(
@@ -144,6 +150,8 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     submission.score = round(max(0.0, min(total_max_score, raw_overall_score)), 1)
     submission.confidence_score = float(llm_result.get("confidence_score", 0.85))
     submission.status = str(llm_result.get("status", "graded"))
+
+    print(f" ├─ [4/4] Confidence check ({submission.confidence_score * 100:.1f}%) & Multi-Agent Reconciliation...")
 
     feedback_dict = llm_result.get("feedback", {})
     if not isinstance(feedback_dict, dict):
@@ -207,6 +215,8 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         record_and_evaluate_submission(submission)
     except Exception as e:
         print(f"[ICC Tracker Warning] Error updating ICC tracker for submission {submission.id}: {e}")
+
+    print(f" └─ Status: {submission.status.upper()} | Score: {submission.score}/{total_max_score} | Confidence: {submission.confidence_score * 100:.1f}% | Completed in {duration:.2f}s")
 
     return submission
 

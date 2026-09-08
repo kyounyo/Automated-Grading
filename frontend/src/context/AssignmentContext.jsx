@@ -1,55 +1,52 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { fetchAssignments, fetchSubmissions, fetchSubmissionDetail, gradeSubmission as apiGradeSubmission, gradeAllSubmissions as apiGradeAllSubmissions, overrideScore as apiOverrideScore, downloadGradesCSV } from '../api/client';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { fetchAssignments, fetchSubmissions, fetchSubmissionDetail, gradeSubmission as apiGradeSubmission, gradeAllSubmissions as apiGradeAllSubmissions, overrideScore as apiOverrideScore, downloadGradesCSV, updateAssignment as apiUpdateAssignment } from '../api/client';
 
 export const AssignmentContext = createContext();
 
 export const AssignmentProvider = ({ children }) => {
   const [assignments, setAssignments] = useState([]);
-  const [currentAssignmentId, setCurrentAssignmentId] = useState('assign-101');
+  const [currentAssignmentId, setCurrentAssignmentId] = useState('');
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Load assignments from FastAPI backend on mount
-  const loadAssignments = async () => {
+  const loadAssignments = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await fetchAssignments();
       setAssignments(data);
-      if (data.length > 0 && (!currentAssignmentId || !data.some(a => a.id === currentAssignmentId))) {
-        setCurrentAssignmentId(data[0].id);
+      if (data && data.length > 0) {
+        setCurrentAssignmentId(prev => (prev && data.some(a => a.id === prev)) ? prev : data[0].id);
       }
     } catch (err) {
-      console.warn('[AssignmentContext] Failed to fetch from backend API. Using local state fallback:', err);
-    } finally {
-      setLoading(false);
+      console.warn('[AssignmentContext] Failed to fetch from backend API:', err);
     }
-  };
+  }, []);
 
   // Load submissions whenever currentAssignmentId changes
-  const loadSubmissions = async (assignId) => {
+  const loadSubmissions = useCallback(async (assignId, isSilent = true) => {
     const idToUse = assignId || currentAssignmentId;
     if (!idToUse) return;
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const data = await fetchSubmissions(idToUse);
       setSubmissions(data);
     } catch (err) {
       console.warn(`[AssignmentContext] Failed to load submissions for ${idToUse}:`, err);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  };
+  }, [currentAssignmentId]);
 
   useEffect(() => {
     loadAssignments();
-  }, []);
+  }, [loadAssignments]);
 
   useEffect(() => {
     if (currentAssignmentId) {
-      loadSubmissions(currentAssignmentId);
+      loadSubmissions(currentAssignmentId, false);
     }
-  }, [currentAssignmentId]);
+  }, [currentAssignmentId, loadSubmissions]);
 
   const triggerGradeSubmission = async (submissionId) => {
     try {
@@ -78,8 +75,6 @@ export const AssignmentProvider = ({ children }) => {
       // Optimistically mark pending submissions as 'processing'
       setSubmissions(prev => prev.map(s => (s.status === 'pending' || s.status === 'uploaded') ? { ...s, status: 'processing' } : s));
       const res = await apiGradeAllSubmissions(targetId);
-      // Refresh submissions list after triggering background task
-      setTimeout(() => loadSubmissions(targetId), 1500);
       return res;
     } catch (err) {
       console.error(`[AssignmentContext] Error initiating batch grading:`, err);
@@ -130,6 +125,22 @@ export const AssignmentProvider = ({ children }) => {
     }
   };
 
+  const handleUpdateAssignment = async (assignmentId, payload) => {
+    const idToUse = assignmentId || currentAssignmentId;
+    if (!idToUse) throw new Error("No assignment selected to update");
+    try {
+      setLoading(true);
+      const updated = await apiUpdateAssignment(idToUse, payload);
+      await loadAssignments();
+      return updated;
+    } catch (err) {
+      console.error(`[AssignmentContext] Error updating assignment ${idToUse}:`, err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [activeSubmission, setActiveSubmission] = useState(null);
 
   const currentAssignment = assignments.find(a => a.id === currentAssignmentId) || assignments[0] || null;
@@ -147,6 +158,7 @@ export const AssignmentProvider = ({ children }) => {
       error,
       loadAssignments,
       loadSubmissions,
+      handleUpdateAssignment,
       triggerGradeSubmission,
       triggerGradeAll,
       handleScoreOverride,

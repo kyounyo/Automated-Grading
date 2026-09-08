@@ -263,9 +263,9 @@ def parse_excel_rows(file_path: str) -> List[Dict[str, Any]]:
 
         cols = [str(c).strip().lower() for c in df.columns]
         
-        stu_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_id", "student_no", "stu_id", "student", "id"])), df.columns[0])
-        email_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_gmail", "student_gma", "student_email", "gmail", "email", "gma", "mail"])), None)
-        name_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_name", "student_nam", "name", "nam"])), None)
+        email_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["student_gmail", "student_gma", "student_email", "gmail", "email", "mail"])), None)
+        stu_col = next((df.columns[i] for i, c in enumerate(cols) if (not email_col or c != str(email_col).lower()) and any(k in c for k in ["student_id", "student_no", "stu_id", "matric", "id"])), df.columns[0])
+        name_col = next((df.columns[i] for i, c in enumerate(cols) if (not email_col or c != str(email_col).lower()) and (not stu_col or c != str(stu_col).lower()) and any(k in c for k in ["student_name", "student_nam", "full_name", "full name", "name", "candidate"])), None)
         q_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["question_no", "question_n", "question", "q_no", "q_num"])), None)
         resp_col = next((df.columns[i] for i, c in enumerate(cols) if any(k in c for k in ["response", "answer", "student_answer", "submission", "text"])), df.columns[-1])
 

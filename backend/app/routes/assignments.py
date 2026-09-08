@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, s
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Assignment, Submission
-from ..schemas import AssignmentCreate, AssignmentResponse
+from ..schemas import AssignmentCreate, AssignmentResponse, AssignmentUpdate
 from ..services.embedding import embedding_service
 from ..services.document_parser import (
     extract_text_from_file, 
@@ -44,7 +44,31 @@ def get_assignment_detail(assignment_id: str, db: Session = Depends(get_db)):
     subs = db.query(Submission).filter(Submission.assignment_id == assign.id).all()
     assign.total_submissions = len(subs)
     scores = [s.score for s in subs if s.score is not None]
+    return assign
+
+
+@router.patch("/{assignment_id}", response_model=AssignmentResponse)
+def update_assignment(assignment_id: str, payload: AssignmentUpdate, db: Session = Depends(get_db)):
+    """Renames or updates an assignment's title (name), course_code (unit), or due_date."""
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if payload.title is not None and payload.title.strip():
+        assign.title = payload.title.strip()
+    if payload.course_code is not None and payload.course_code.strip():
+        assign.course_code = payload.course_code.strip()
+    if payload.due_date is not None:
+        assign.due_date = payload.due_date.strip()
+
+    db.commit()
+    db.refresh(assign)
+
+    subs = db.query(Submission).filter(Submission.assignment_id == assign.id).all()
+    assign.total_submissions = len(subs)
+    scores = [s.score for s in subs if s.score is not None]
     assign.average_score = round(sum(scores) / len(scores), 1) if scores else 0.0
+
     return assign
 
 
@@ -57,16 +81,31 @@ def get_qc_settings():
     return {
         "enable_random_qc": enable_qc,
         "qc_audit_rate": qc_rate,
-        "confidence_threshold": conf_thresh
+        "audit_percentage": int(round(qc_rate * 100)) if enable_qc else 0,
+        "confidence_threshold": int(round(conf_thresh * 100)) if conf_thresh <= 1.0 else int(conf_thresh)
     }
 
 
 @router.post("/qc-settings")
 def update_qc_settings(data: dict):
     """Update Quality Control Audit settings and Low Confidence Threshold."""
-    enable_qc = bool(data.get("enable_random_qc", False))
-    qc_rate = float(data.get("qc_audit_rate", 0.05))
-    conf_thresh = float(data.get("confidence_threshold", 0.75))
+    if not isinstance(data, dict):
+        data = {}
+
+    # Support audit_percentage (0-100), enable_random_qc (bool), and qc_audit_rate (0.0-1.0)
+    if "audit_percentage" in data:
+        audit_pct = float(data["audit_percentage"])
+        enable_qc = audit_pct > 0
+        qc_rate = audit_pct / 100.0
+    elif "qc_audit_rate" in data:
+        qc_rate = float(data.get("qc_audit_rate", 0.05))
+        enable_qc = bool(data.get("enable_random_qc", qc_rate > 0))
+    else:
+        enable_qc = bool(data.get("enable_random_qc", False))
+        qc_rate = float(data.get("qc_audit_rate", 0.05))
+
+    conf_thresh_raw = float(data.get("confidence_threshold", 75))
+    conf_thresh = conf_thresh_raw / 100.0 if conf_thresh_raw > 1.0 else conf_thresh_raw
 
     os.environ["ENABLE_RANDOM_QC_AUDIT"] = "true" if enable_qc else "false"
     os.environ["QC_AUDIT_RATE"] = str(qc_rate)
@@ -76,7 +115,8 @@ def update_qc_settings(data: dict):
         "message": "Quality Control Audit & Confidence settings updated successfully",
         "enable_random_qc": enable_qc,
         "qc_audit_rate": qc_rate,
-        "confidence_threshold": conf_thresh
+        "audit_percentage": int(round(qc_rate * 100)) if enable_qc else 0,
+        "confidence_threshold": int(round(conf_thresh * 100))
     }
 
 

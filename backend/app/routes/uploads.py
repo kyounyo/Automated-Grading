@@ -16,6 +16,20 @@ TEMP_UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "t
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def clean_student_name(s_name: str, s_id: str, s_email: str = "") -> str:
+    s_name = (s_name or "").strip()
+    if s_name and "@" not in s_name and s_name.lower() != "nan" and s_name != "N/A":
+        return s_name
+    candidate = s_name if (s_name and "@" in s_name) else (s_email if (s_email and "@" in s_email) else "")
+    if candidate:
+        import re
+        prefix = candidate.split("@")[0]
+        words = [w.capitalize() for w in re.split(r'[._\s\-]+', prefix) if w]
+        if words:
+            return " ".join(words)
+    return f"Student {s_id}" if s_id else "Student"
+
+
 @router.post("", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_submission_file(
     file: Optional[UploadFile] = File(None),
@@ -38,21 +52,21 @@ async def upload_submission_file(
     upload_list: List[UploadFile] = []
     if files:
         upload_list.extend(files)
-    if file and file not in upload_list:
+    if file and (not files or file not in upload_list):
         upload_list.append(file)
 
     if not upload_list:
-        raise HTTPException(status_code=400, detail="No submission files provided in upload request.")
+        raise HTTPException(status_code=400, detail="No submission files provided for upload.")
 
     batch_id = f"batch-{uuid.uuid4().hex[:6]}"
-    created_ids = []
+    created_ids: List[str] = []
     total_processed_students = 0
     last_storage_res = {}
-    last_filename = upload_list[0].filename
+    last_filename = ""
 
     for uploaded_file in upload_list:
         file_ext = Path(uploaded_file.filename).suffix.lower()
-        unique_filename = f"{assignment_id}_{uuid.uuid4().hex[:6]}{file_ext}"
+        unique_filename = f"{uuid.uuid4().hex[:6]}_{uploaded_file.filename}"
         temp_path = TEMP_UPLOAD_DIR / unique_filename
         last_filename = uploaded_file.filename
 
@@ -75,8 +89,9 @@ async def upload_submission_file(
             if len(excel_rows) > 0:
                 for idx, item in enumerate(excel_rows):
                     s_id = str(item.get("student_id", f"STU{100 + idx}")).strip()
-                    s_name = str(item.get("student_name", f"Student {s_id}")).strip() or f"Student {s_id}"
+                    raw_s_name = str(item.get("student_name", f"Student {s_id}")).strip()
                     s_email = str(item.get("student_email", "N/A")).strip() or "N/A"
+                    s_name = clean_student_name(raw_s_name, s_id, s_email)
                     raw_text_content = item.get("text") or ""
 
                     # Uniqueness Check: Upsert by (student_id, assignment_id)
@@ -210,8 +225,9 @@ async def preview_submissions(files: list[UploadFile] = File(...)):
                 excel_rows = parse_excel_rows(str(temp_path))
                 for idx, row in enumerate(excel_rows):
                     s_id = str(row.get("student_id", f"STU_{idx + 1}")).strip()
-                    s_name = str(row.get("student_name", f"Student {s_id}")).strip() or f"Student {s_id}"
+                    raw_s_name = str(row.get("student_name", f"Student {s_id}")).strip()
                     s_email = str(row.get("student_email", "N/A")).strip() or "N/A"
+                    s_name = clean_student_name(raw_s_name, s_id, s_email)
                     raw_text = str(row.get("text", "")).strip()
 
                     all_extracted_students.append({
