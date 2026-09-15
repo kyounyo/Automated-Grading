@@ -67,7 +67,7 @@ def get_stratified_dataset(samples_per_question=25, seed=42):
     df_responses.columns = df_responses.columns.str.strip()
 
     sampled_dfs = []
-    for q_no in [6, 8, 9, 22]:
+    for q_no in [22]:
         q_subset = df_responses[df_responses['question_no'].astype(str).str.strip().str.replace('Q', '') == str(q_no)]
         sampled = q_subset.sample(n=min(samples_per_question, len(q_subset)), random_state=seed)
         sampled_dfs.append(sampled)
@@ -291,7 +291,7 @@ def save_model_excel(df_model_res, model_name, excel_file):
         with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
             # Sheet 1: Summary by Question & Overall
             summary_rows = []
-            for q_name in ["Q6", "Q8", "Q9", "Q22"]:
+            for q_name in ["Q22"]:
                 q_df = df_model_res[df_model_res['question_no'] == q_name]
                 if q_df.empty:
                     continue
@@ -341,7 +341,7 @@ def save_model_excel(df_model_res, model_name, excel_file):
             df_summary.to_excel(writer, sheet_name="Summary_Metrics", index=False)
 
             # Sheets 2-5: Individual Question tabs
-            for q_name in ["Q6", "Q8", "Q9", "Q22"]:
+            for q_name in ["Q22"]:
                 q_df = df_model_res[df_model_res['question_no'] == q_name].copy()
                 if not q_df.empty:
                     clean_q_cols = ["response_id", "human_score", "predicted_score", "absolute_error", "difference (AI - Human)", "latency_ms", "reasoning", "student_answer"]
@@ -405,7 +405,7 @@ def generate_master_comparison():
         for m_name, df_m in model_data.items():
             row = {"Model": m_name}
             q_iccs = []
-            for q_name in ["Q6", "Q8", "Q9", "Q22"]:
+            for q_name in ["Q22"]:
                 q_df = df_m[df_m['question_no'] == q_name]
                 q_icc = compute_metrics(q_df).get("ICC", 0.0) if not q_df.empty else 0.0
                 row[f"{q_name} ICC"] = q_icc
@@ -421,7 +421,7 @@ def generate_master_comparison():
         for m_name, df_m in model_data.items():
             row = {"Model": m_name}
             q_maes = []
-            for q_name in ["Q6", "Q8", "Q9", "Q22"]:
+            for q_name in ["Q22"]:
                 q_df = df_m[df_m['question_no'] == q_name]
                 q_mae = compute_metrics(q_df).get("MAE", 0.0) if not q_df.empty else 0.0
                 row[f"{q_name} MAE"] = q_mae
