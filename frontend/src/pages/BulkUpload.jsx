@@ -1,21 +1,40 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { UploadCloud, CheckCircle2, FileText, Trash2, ArrowRight, Loader2, Plus, Settings2, Play, Download, ShieldCheck, Users, UserCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { UploadCloud, CheckCircle2, FileText, Trash2, ArrowRight, Loader2, Plus, Settings2, Play, Download, ShieldCheck, Users, UserCheck, ChevronDown, ChevronUp, Target, FileSpreadsheet, Sparkles, HelpCircle } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
-import { uploadBulkSubmissions, triggerGradeAll, getQCSettings, updateQCSettings, previewSubmissions } from '../api/client';
+import { uploadBulkSubmissions, triggerGradeAll, getQCSettings, updateQCSettings, previewSubmissions, importGradedCalibrationFile, downloadCalibrationTemplate } from '../api/client';
 
 const BulkUpload = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { assignments, currentAssignmentId, setCurrentAssignmentId, loadSubmissions, loadAssignments } = useAssignment();
+  
+  // Tab Mode: 'standard' (ungraded submissions) vs 'graded' (pre-graded calibration baseline)
+  const queryMode = new URLSearchParams(location.search).get('mode');
+  const [activeUploadTab, setActiveUploadTab] = useState(queryMode === 'import_graded' ? 'graded' : 'standard');
+
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
 
+  // Graded Submissions Import State
+  const [gradedFile, setGradedFile] = useState(null);
+  const [isImportingGraded, setIsImportingGraded] = useState(false);
+  const [importGradedResult, setImportGradedResult] = useState(null);
+  const [importGradedError, setImportGradedError] = useState(null);
+
   // Human-in-the-Loop Safeguards Settings
   const [auditPercentage, setAuditPercentage] = useState(10);
   const [confidenceThreshold, setConfidenceThreshold] = useState(70);
   const [isSavingQc, setIsSavingQc] = useState(false);
+
+  useEffect(() => {
+    const qMode = new URLSearchParams(location.search).get('mode');
+    if (qMode === 'import_graded') {
+      setActiveUploadTab('graded');
+    }
+  }, [location.search]);
 
   // Load existing QC settings for current assignment
   useEffect(() => {
@@ -139,6 +158,57 @@ const BulkUpload = () => {
     document.body.removeChild(link);
   };
 
+  const handleDownloadGradedTemplate = async () => {
+    if (!currentAssignmentId) {
+      alert('Please select a target assignment first.');
+      return;
+    }
+    try {
+      await downloadCalibrationTemplate(currentAssignmentId);
+    } catch (err) {
+      alert(`Could not download calibration template: ${err.message}`);
+    }
+  };
+
+  const handleGradedFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setGradedFile(e.target.files[0]);
+      setImportGradedResult(null);
+      setImportGradedError(null);
+    }
+  };
+
+  const handleImportGraded = async () => {
+    if (!currentAssignmentId) {
+      alert('Please select a target assignment first.');
+      return;
+    }
+    if (!gradedFile) {
+      alert('Please select a pre-graded Excel or CSV file first.');
+      return;
+    }
+
+    try {
+      setIsImportingGraded(true);
+      setImportGradedError(null);
+      setImportGradedResult(null);
+
+      const formData = new FormData();
+      formData.append('file', gradedFile);
+
+      const res = await importGradedCalibrationFile(currentAssignmentId, formData);
+      setImportGradedResult(res);
+
+      // Refresh submissions and assignments context so data is immediately updated
+      await loadSubmissions(currentAssignmentId);
+      await loadAssignments();
+    } catch (err) {
+      setImportGradedError(err.message || 'Failed to import graded submissions');
+    } finally {
+      setIsImportingGraded(false);
+    }
+  };
+
   const uploadStagedFilesToBackend = async () => {
     if (selectedFiles.length === 0) return false;
     const filesToUpload = selectedFiles.filter(f => f.status !== 'Uploaded' && f.file).map(f => f.file);
@@ -217,6 +287,32 @@ const BulkUpload = () => {
     }
   };
 
+  const selectedAssignment = assignments.find(a => String(a.id) === String(currentAssignmentId));
+  const isCalibrationEnabled = Boolean(selectedAssignment?.calibration_enabled);
+
+  const handleProceedToCalibration = async () => {
+    if (!currentAssignmentId) {
+      alert('Please select a target assignment first.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await saveQcSettings();
+      // Upload any un-uploaded staged files first
+      const hasUnuploaded = selectedFiles.some(f => f.status !== 'Uploaded' && f.file);
+      if (hasUnuploaded) {
+        const success = await uploadStagedFilesToBackend();
+        if (!success) return;
+      }
+      navigate('/submissions', { state: { filter: 'calibration' } });
+    } catch (err) {
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const unuploadedCount = selectedFiles.filter(f => f.status !== 'Uploaded').length;
   const uploadedCount = selectedFiles.filter(f => f.status === 'Uploaded').length;
 
@@ -230,32 +326,73 @@ const BulkUpload = () => {
             Submissions Upload
           </h2>
           <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-            Stage and upload student submission files (Excel .xlsx/.csv or PDF). Configure audit thresholds and launch AI grading.
+            {isCalibrationEnabled
+              ? 'Stage and upload student submission files (Excel .xlsx/.csv or PDF). Uploaded files will be sampled for examiner calibration.'
+              : 'Stage and upload student submission files (Excel .xlsx/.csv or PDF). Configure audit thresholds and launch AI grading.'}
           </p>
         </div>
-
-        {/* Quick Actions in Header */}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={handleConfirmUploadOnly}
-            disabled={isProcessing || selectedFiles.length === 0}
-            style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
-          >
-            {isProcessing ? 'Processing...' : 'Upload Files Only'}
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleUploadAndGrade}
-            disabled={isProcessing || !currentAssignmentId}
-            style={{ fontSize: '0.8rem', padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-          >
-            {isProcessing ? 'Grading...' : <><Play size={14} /> Launch AI Grading Batch</>}
-          </button>
-        </div>
       </div>
+
+      {/* Calibration Workflow Guidance Banner */}
+      {isCalibrationEnabled && (
+        <div style={{
+          padding: '1rem 1.25rem',
+          borderRadius: '8px',
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(124, 58, 237, 0.05) 100%)',
+          border: '1px solid rgba(99, 102, 241, 0.25)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.5rem' }}>🎯</span>
+            <div>
+              <strong style={{ fontSize: '0.925rem', color: '#4338ca' }}>
+                Examiner Calibration Mode Active
+              </strong>
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                You can establish calibration exemplars using either method:
+                <strong> (1) Import Existing Grades</strong> from Excel/CSV (if already marked in Moodle/Excel), or
+                <strong> (2) Mark Calibration Samples</strong> interactively in the Grading Studio before running full AI batch grading.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => setActiveUploadTab('graded')}
+              style={{
+                fontSize: '0.78rem',
+                padding: '0.35rem 0.75rem',
+                backgroundColor: activeUploadTab === 'graded' ? '#4f46e5' : '#fff',
+                color: activeUploadTab === 'graded' ? '#fff' : '#4f46e5',
+                border: '1px solid rgba(99, 102, 241, 0.4)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+            >
+              <Target size={13} /> Import Graded Spreadsheet
+            </button>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              padding: '0.35rem 0.65rem',
+              backgroundColor: '#fff',
+              borderRadius: '6px',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              color: '#4f46e5'
+            }}>
+              Target: {selectedAssignment?.calibration_sample_size || 3} Samples
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* 2. SIDE-BY-SIDE SECTION: Step 1 (Target Assignment) + Step 2 (Upload Student Submissions) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '1.25rem', alignItems: 'stretch' }}>
@@ -291,129 +428,394 @@ const BulkUpload = () => {
           </div>
         </div>
 
-        {/* Column 2: Step 2 Upload Student Submissions */}
+        {/* Column 2: Step 2 Upload Submissions (Tabbed: Ungraded vs Pre-Graded) */}
         <div className="card-panel" style={{ padding: '1.35rem 1.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '235px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                <UploadCloud size={18} color="var(--primary)" /> 2. Upload Student Submissions <span style={{ color: 'var(--danger)', fontSize: '0.775rem', fontWeight: 600 }}>*Required</span>
+                <UploadCloud size={18} color="var(--primary)" /> 2. Upload Submissions <span style={{ color: 'var(--danger)', fontSize: '0.775rem', fontWeight: 600 }}>*Required</span>
               </h3>
 
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={downloadSubmissionsTemplate}
-                style={{ fontSize: '0.775rem', padding: '0.3rem 0.7rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-              >
-                <Download size={14} color="var(--primary)" /> Template (.csv)
-              </button>
+              {/* Segmented Mode Switcher */}
+              <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: 'var(--bg-main)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveUploadTab('standard')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    backgroundColor: activeUploadTab === 'standard' ? '#fff' : 'transparent',
+                    color: activeUploadTab === 'standard' ? 'var(--primary)' : 'var(--text-muted)',
+                    boxShadow: activeUploadTab === 'standard' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                  }}
+                >
+                  <UploadCloud size={13} /> Ungraded Papers
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveUploadTab('graded')}
+                  style={{
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    backgroundColor: activeUploadTab === 'graded' ? '#fff' : 'transparent',
+                    color: activeUploadTab === 'graded' ? '#4f46e5' : 'var(--text-muted)',
+                    boxShadow: activeUploadTab === 'graded' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                  }}
+                  title="Upload spreadsheet with existing lecturer scores & feedback"
+                >
+                  <Target size={13} color="#4f46e5" />
+                  Import Graded
+                  <span style={{
+                    fontSize: '0.65rem',
+                    backgroundColor: '#e0e7ff',
+                    color: '#4338ca',
+                    padding: '0.05rem 0.35rem',
+                    borderRadius: '3px',
+                    fontWeight: 700
+                  }}>
+                    Exemplars
+                  </span>
+                </button>
+              </div>
             </div>
 
-            {/* Full-Height Clean Drop Zone (Same size and style as Create Assignment) */}
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onClick={() => document.getElementById('bulkFileInput').click()}
-              style={{
-                border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--border)'}`,
-                borderRadius: '8px',
-                padding: '1.35rem 1.15rem',
-                textAlign: 'center',
-                backgroundColor: isDragging ? 'var(--primary-light)' : 'var(--bg-main)',
-                cursor: 'pointer',
-                flex: 1,
-                minHeight: '140px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all var(--transition-fast)'
-              }}
-            >
-              <input
-                id="bulkFileInput"
-                type="file"
-                multiple
-                accept=".xlsx,.xls,.csv,.pdf"
-                onClick={(e) => e.stopPropagation()}
-                onChange={handleFileInput}
-                style={{ display: 'none' }}
-              />
-
-              {isProcessing || isExtracting ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--primary)' }}>
-                  <Loader2 size={24} className="spin" />
-                  <div style={{ textAlign: 'left' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--primary-dark)' }}>Extracting {selectedFiles.length} File(s)...</h4>
-                    <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Parsing student submission datasets</p>
+            {activeUploadTab === 'graded' ? (
+              /* TAB B: Import Pre-Graded Submissions */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                <div style={{
+                  padding: '0.75rem 1rem',
+                  borderRadius: '6px',
+                  backgroundColor: '#f5f3ff',
+                  border: '1px solid #ddd6fe',
+                  fontSize: '0.78rem',
+                  color: '#4c1d95',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{ maxWidth: '420px' }}>
+                    <strong>Upload Previously Graded Papers:</strong> Already evaluated student answers in Excel or Moodle?
+                    Upload your spreadsheet with scores and feedback to directly inject them as calibration exemplars.
                   </div>
-                </div>
-              ) : selectedFiles.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--success)' }}>
-                    <CheckCircle2 size={20} />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      {selectedFiles.length} File(s) Attached
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    {selectedFiles.map((f, i) => (
-                      <span
-                        key={f.id || i}
-                        className="status-badge"
-                        style={{
-                          backgroundColor: 'var(--success-bg)',
-                          color: 'var(--success)',
-                          fontSize: '0.75rem',
-                          padding: '0.2rem 0.5rem',
-                          border: '1px solid var(--success-border)'
-                        }}
-                      >
-                        📄 {f.name} ({f.size})
-                        <span
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveFile(f.id);
-                          }}
-                          title="Remove file"
-                          style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.35rem', color: 'var(--danger)' }}
-                        >
-                          ✕
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-
                   <button
                     type="button"
                     className="btn btn-outline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      document.getElementById('bulkFileInput').click();
+                    onClick={handleDownloadGradedTemplate}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.65rem',
+                      backgroundColor: '#fff',
+                      borderColor: '#c4b5fd',
+                      color: '#5b21b6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem'
                     }}
-                    style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', marginTop: '0.2rem' }}
                   >
-                    <Plus size={13} color="var(--primary)" /> Add More
+                    <Download size={13} /> Download Template (.csv)
                   </button>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                  <UploadCloud size={28} color="var(--primary)" style={{ marginBottom: '0.15rem', opacity: 0.8 }} />
-                  <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>
-                    Drag & drop Student Submission files here
-                  </h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                    Supports <strong>.xlsx, .csv, .pdf</strong> or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Browse files</span>
-                  </p>
-                </div>
-              )}
-            </div>
 
-            {uploadStatus && (
-              <div style={{ marginTop: '0.65rem', color: 'var(--primary)', fontWeight: 600, fontSize: '0.8rem', textAlign: 'center' }}>
-                {uploadStatus}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      setGradedFile(e.dataTransfer.files[0]);
+                      setImportGradedResult(null);
+                      setImportGradedError(null);
+                    }
+                  }}
+                  onClick={() => document.getElementById('gradedFileInput').click()}
+                  style={{
+                    border: '2px dashed #a5b4fc',
+                    borderRadius: '8px',
+                    padding: '1.25rem 1.15rem',
+                    textAlign: 'center',
+                    backgroundColor: '#faf5ff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: '130px',
+                    transition: 'all var(--transition-fast)'
+                  }}
+                >
+                  <input
+                    id="gradedFileInput"
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={handleGradedFileChange}
+                    style={{ display: 'none' }}
+                  />
+
+                  {isImportingGraded ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#4f46e5' }}>
+                      <Loader2 size={24} className="spin" />
+                      <div style={{ textAlign: 'left' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#312e81' }}>Importing Graded Exemplars...</h4>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#6366f1' }}>Registering submissions and calibration exemplars</p>
+                      </div>
+                    </div>
+                  ) : gradedFile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4f46e5' }}>
+                        <FileSpreadsheet size={22} />
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e1b4b' }}>
+                          {gradedFile.name}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                          ({(gradedFile.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.725rem', color: '#6b7280' }}>
+                        Ready to import! Click below to confirm, or click here to choose another file.
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                      <UploadCloud size={28} color="#6366f1" style={{ marginBottom: '0.15rem' }} />
+                      <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: '#312e81', fontWeight: 700 }}>
+                        Drag & drop Pre-Graded Spreadsheet here
+                      </h4>
+                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>
+                        Supports <strong>.xlsx, .xls, .csv</strong> containing Student ID, Question, Score, & Feedback
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Graded file action row */}
+                {gradedFile && !isImportingGraded && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => { setGradedFile(null); setImportGradedResult(null); setImportGradedError(null); }}
+                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', color: 'var(--danger)' }}
+                    >
+                      Remove
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleImportGraded}
+                      style={{
+                        fontSize: '0.8rem',
+                        padding: '0.4rem 1rem',
+                        background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                        border: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)'
+                      }}
+                    >
+                      <Sparkles size={14} /> Import as Calibration Exemplars
+                    </button>
+                  </div>
+                )}
+
+                {/* Error Banner */}
+                {importGradedError && (
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: '6px',
+                    backgroundColor: '#fee2e2',
+                    border: '1px solid #fca5a5',
+                    color: '#b91c1c',
+                    fontSize: '0.8rem'
+                  }}>
+                    ⚠️ <strong>Import Error:</strong> {importGradedError}
+                  </div>
+                )}
+
+                {/* Success Banner */}
+                {importGradedResult && (
+                  <div style={{
+                    padding: '0.85rem 1.15rem',
+                    borderRadius: '6px',
+                    backgroundColor: '#ecfdf5',
+                    border: '1px solid #6ee7b7',
+                    color: '#065f46',
+                    fontSize: '0.825rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CheckCircle2 size={18} color="#059669" />
+                      <strong style={{ fontSize: '0.875rem' }}>
+                        {importGradedResult.message || 'Successfully imported graded submissions!'}
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#047857', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                      <span>Questions covered:</span>
+                      {importGradedResult.questions_covered?.map(q => (
+                        <span key={q} style={{ backgroundColor: '#d1fae5', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
+                          {q}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => navigate('/submissions?filter=calibration')}
+                        style={{ fontSize: '0.775rem', padding: '0.35rem 0.8rem', backgroundColor: '#059669', border: 'none' }}
+                      >
+                        🎯 View Calibration Samples in Submissions List →
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => navigate('/submissions')}
+                        style={{ fontSize: '0.775rem', padding: '0.35rem 0.8rem', borderColor: '#059669', color: '#065f46' }}
+                      >
+                        Go to Submissions Overview
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* TAB A: Standard Ungraded Submissions Drop Zone */
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={downloadSubmissionsTemplate}
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <Download size={13} color="var(--primary)" /> Template (.csv)
+                  </button>
+                </div>
+
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => document.getElementById('bulkFileInput').click()}
+                  style={{
+                    border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--border)'}`,
+                    borderRadius: '8px',
+                    padding: '1.35rem 1.15rem',
+                    textAlign: 'center',
+                    backgroundColor: isDragging ? 'var(--primary-light)' : 'var(--bg-main)',
+                    cursor: 'pointer',
+                    flex: 1,
+                    minHeight: '140px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all var(--transition-fast)'
+                  }}
+                >
+                  <input
+                    id="bulkFileInput"
+                    type="file"
+                    multiple
+                    accept=".xlsx,.xls,.csv,.pdf"
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={handleFileInput}
+                    style={{ display: 'none' }}
+                  />
+
+                  {isProcessing || isExtracting ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--primary)' }}>
+                      <Loader2 size={24} className="spin" />
+                      <div style={{ textAlign: 'left' }}>
+                        <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--primary-dark)' }}>Extracting {selectedFiles.length} File(s)...</h4>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Parsing student submission datasets</p>
+                      </div>
+                    </div>
+                  ) : selectedFiles.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--success)' }}>
+                        <CheckCircle2 size={20} />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                          {selectedFiles.length} File(s) Attached
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {selectedFiles.map((f, i) => (
+                          <span
+                            key={f.id || i}
+                            className="status-badge"
+                            style={{
+                              backgroundColor: 'var(--success-bg)',
+                              color: 'var(--success)',
+                              fontSize: '0.75rem',
+                              padding: '0.2rem 0.5rem',
+                              border: '1px solid var(--success-border)'
+                            }}
+                          >
+                            📄 {f.name} ({f.size})
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveFile(f.id);
+                              }}
+                              title="Remove file"
+                              style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.35rem', color: 'var(--danger)' }}
+                            >
+                              ✕
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          document.getElementById('bulkFileInput').click();
+                        }}
+                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', marginTop: '0.2rem' }}
+                      >
+                        <Plus size={13} color="var(--primary)" /> Add More
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                      <UploadCloud size={28} color="var(--primary)" style={{ marginBottom: '0.15rem', opacity: 0.8 }} />
+                      <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>
+                        Drag & drop Student Submission files here
+                      </h4>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                        Supports <strong>.xlsx, .csv, .pdf</strong> or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Browse files</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {uploadStatus && (
+                  <div style={{ marginTop: '0.65rem', color: 'var(--primary)', fontWeight: 600, fontSize: '0.8rem', textAlign: 'center' }}>
+                    {uploadStatus}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -650,25 +1052,133 @@ const BulkUpload = () => {
       )}
 
       {/* 5. Bottom Submission Bar */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.5rem' }}>
-        <button
-          type="button"
-          className="btn btn-outline"
-          onClick={handleConfirmUploadOnly}
-          disabled={isProcessing || selectedFiles.length === 0}
-          style={{ fontSize: '0.85rem' }}
-        >
-          {isProcessing ? 'Processing...' : 'Upload Files Only'}
-        </button>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={handleUploadAndGrade}
-          disabled={isProcessing || !currentAssignmentId}
-          style={{ padding: '0.5rem 1.35rem', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
-        >
-          {isProcessing ? 'Grading...' : <><Play size={15} /> Launch AI Grading Batch</>}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.5rem', alignItems: 'center' }}>
+        {activeUploadTab === 'graded' ? (
+          <>
+            {importGradedResult ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => navigate('/submissions?filter=calibration')}
+                style={{
+                  padding: '0.5rem 1.35rem',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  backgroundColor: '#059669',
+                  border: 'none',
+                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.3)'
+                }}
+              >
+                <Target size={15} /> View Calibration Samples in Submissions List →
+              </button>
+            ) : gradedFile ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => { setGradedFile(null); setImportGradedResult(null); setImportGradedError(null); }}
+                  style={{ fontSize: '0.85rem' }}
+                >
+                  Clear File
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleImportGraded}
+                  disabled={isImportingGraded || !currentAssignmentId}
+                  style={{
+                    padding: '0.5rem 1.35rem',
+                    fontSize: '0.875rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                    border: 'none',
+                    boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)'
+                  }}
+                >
+                  {isImportingGraded ? (
+                    <><Loader2 size={15} className="spin" /> Importing...</>
+                  ) : (
+                    <><Sparkles size={15} /> Import as Calibration Exemplars</>
+                  )}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => navigate('/submissions?filter=calibration')}
+                style={{
+                  padding: '0.5rem 1.35rem',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                  border: 'none'
+                }}
+              >
+                <Target size={15} /> View Calibration Studio →
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={handleConfirmUploadOnly}
+              disabled={isProcessing || selectedFiles.length === 0}
+              style={{ fontSize: '0.85rem' }}
+            >
+              {isProcessing ? 'Processing...' : 'Upload Files Only'}
+            </button>
+            {isCalibrationEnabled ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleProceedToCalibration}
+                disabled={isProcessing || !currentAssignmentId}
+                style={{
+                  padding: '0.5rem 1.35rem',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem',
+                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                  border: 'none',
+                  boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)'
+                }}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 size={15} className="spin" /> Processing...
+                  </>
+                ) : (
+                  <>
+                    <Target size={15} />
+                    {unuploadedCount > 0 || selectedFiles.length === 0
+                      ? 'Upload & Proceed to Calibration'
+                      : 'Proceed to Calibration Samples →'}
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleUploadAndGrade}
+                disabled={isProcessing || !currentAssignmentId}
+                style={{ padding: '0.5rem 1.35rem', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+              >
+                {isProcessing ? 'Grading...' : <><Play size={15} /> Launch AI Grading Batch</>}
+              </button>
+            )}
+          </>
+        )}
       </div>
 
     </div>

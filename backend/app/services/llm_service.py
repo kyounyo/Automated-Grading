@@ -186,11 +186,67 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     return _call_openrouter_api(messages, target_model, temperature=0.0)
 
 
-def call_primary_grading_agent(student_text: str, structured_rubric: Dict[str, Any], raw_rubric_json: list, model_answer: str, rag_context: str, total_max_score: float = 10.0, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def format_question_few_shots(question_few_shots: Optional[Dict[str, List[Dict]]]) -> str:
+    """
+    Builds structured, question-matched examiner calibration exemplar blocks.
+    Strictly pairs exemplars under their respective question number.
+    """
+    if not question_few_shots:
+        return ""
+
+    sections = []
+    for q_no, examples in sorted(question_few_shots.items()):
+        if not examples:
+            continue
+        ex_texts = []
+        for idx, ex in enumerate(examples):
+            anchor = (ex.get("anchor_type") or "borderline").capitalize()
+            stu_t = (ex.get("student_text") or "").strip()
+            sc = ex.get("examiner_score", 0.0)
+            mx = ex.get("max_score", 0.0)
+            fb = (ex.get("examiner_feedback") or "Evaluated according to course marking standard.").strip()
+
+            ex_texts.append(
+                f"  [Examiner Benchmark Example {idx+1} ({anchor} Anchor) - Score: {sc}/{mx}]\n"
+                f"  Student Response: \"{stu_t}\"\n"
+                f"  Examiner Justification: \"{fb}\""
+            )
+
+        sections.append(
+            f"--- EXAMINER CALIBRATION BENCHMARKS FOR QUESTION {q_no} ---\n"
+            f"Use the following examiner-marked examples as the authoritative baseline for marking strictness, concept depth, and partial-credit deductions for {q_no}:\n\n"
+            + "\n\n".join(ex_texts)
+        )
+
+    if not sections:
+        return ""
+
+    return (
+        "\n\n=================================================================\n"
+        "EXAMINER-CALIBRATED FEW-SHOT BENCHMARKS (COURSE EXAMINER STANDARDS)\n"
+        "=================================================================\n"
+        + "\n\n".join(sections)
+        + "\n=================================================================\n"
+    )
+
+
+def call_primary_grading_agent(
+    student_text: str, 
+    structured_rubric: Dict[str, Any], 
+    raw_rubric_json: list, 
+    model_answer: str, 
+    rag_context: str, 
+    total_max_score: float = 10.0, 
+    model: Optional[str] = None,
+    question_few_shots: Optional[Dict[str, List[Dict]]] = None
+) -> Optional[Dict[str, Any]]:
     """
     Agent 2 (Primary CoT Evaluation Agent):
-    Uses google/gemini-3.1-flash-lite to evaluate student responses against standardized rubric rules and RAG context.
+    Uses google/gemini-3.1-flash-lite to evaluate student responses against standardized rubric rules, RAG context,
+    and optional question-matched examiner calibration few-shot examples.
     """
+    few_shots_block = format_question_few_shots(question_few_shots)
+
     prompt = f"""
 You are an expert academic evaluator specializing in objective short-answer grading.
 
@@ -206,7 +262,7 @@ Total Assignment Max Score: {total_max_score}
 
 Model Answer / Marking Scheme:
 {model_answer or "Evaluate answer based on clarity, technical accuracy, and completeness."}
-
+{few_shots_block}
 Student Submission:
 {student_text}
 
@@ -219,6 +275,7 @@ GRADING PROTOCOL (v1.3-multi-question-highlights):
 6. DETAILED EXPLANATION REQUIREMENT: Each highlight comment MUST state:
    (a) Exact marks awarded and key concepts matched (e.g. 'Awarded 1 mark for mentioning prolonged therapeutic effect in (a)').
    (b) Specific rubric points missed or failed (e.g. 'Failed to address specific advantages (biodegradability) and disadvantages required by rubric').
+7. QUESTION-MATCHED EXAMINER CALIBRATION: If Examiner Calibration Benchmarks are provided above for a question, you MUST align your marking strictness and partial-credit thresholds strictly to match the examiner's demonstrated standard for that specific question. Questions without calibration examples must be evaluated directly from the standard rubric rules.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
@@ -262,7 +319,7 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
         {"role": "user", "content": prompt}
     ]
     target_model = model or get_llm_model()
-    return _call_openrouter_api(messages, target_model, temperature=0.1)
+    return _call_openrouter_api(messages, target_model, temperature=0.0)
 
 
 def call_auditor_verification_agent(student_text: str, rubric_json: list, primary_eval: Dict[str, Any], model: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -333,11 +390,18 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     return _call_openrouter_api(messages, target_model, temperature=0.0)
 
 
-def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str, rag_context: str, total_max_score: float = 10.0) -> Dict[str, Any]:
+def call_llm_for_grading(
+    student_text: str, 
+    rubric_json: list, 
+    model_answer: str, 
+    rag_context: str, 
+    total_max_score: float = 10.0,
+    question_few_shots: Optional[Dict[str, List[Dict]]] = None
+) -> Dict[str, Any]:
     """
     Orchestrates Multi-Agent Grading Pipeline using google/gemini-3.1-flash-lite across 3 agents:
     - Agent 1: Rubric & RAG Context Parser Agent
-    - Agent 2: Primary CoT Evaluation Agent
+    - Agent 2: Primary CoT Evaluation Agent (with optional question-matched few-shots)
     - Agent 3: Auditor Verification Agent
     - Step 4: Deterministic Confidence & Audit Engine
     """
@@ -356,8 +420,17 @@ def call_llm_for_grading(student_text: str, rubric_json: list, model_answer: str
     print(f" │   │  └─ Loaded {rule_count} rubric rule(s) & reference guidelines.")
 
     # Step 2: Agent 2 - Primary CoT Grader Agent
-    print(f" │   ├─ [Agent 2: Primary Grader ({primary_model_name})] Evaluating student submission...")
-    primary_res = call_primary_grading_agent(student_text, structured_rubric, rubric_json, model_answer, rag_context, total_max_score)
+    mode_tag = f"Few-Shot ({sum(len(v) for v in question_few_shots.values())} exemplars)" if question_few_shots else "Zero-Shot"
+    print(f" │   ├─ [Agent 2: Primary Grader ({primary_model_name})] Evaluating submission in {mode_tag} mode...")
+    primary_res = call_primary_grading_agent(
+        student_text=student_text,
+        structured_rubric=structured_rubric,
+        raw_rubric_json=rubric_json,
+        model_answer=model_answer,
+        rag_context=rag_context,
+        total_max_score=total_max_score,
+        question_few_shots=question_few_shots
+    )
     if not primary_res:
         print(" │   │  └─ [Warning] Primary Agent call failed. Using heuristic fallback.")
         return _mock_heuristic_evaluation(student_text, rubric_json)

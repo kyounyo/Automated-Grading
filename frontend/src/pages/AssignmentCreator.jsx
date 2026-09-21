@@ -16,6 +16,8 @@ const AssignmentCreator = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [calibrationEnabled, setCalibrationEnabled] = useState(false);
+  const [calibrationSampleSize, setCalibrationSampleSize] = useState(3);
 
   // Question List State starting with a blank question
   const [questions, setQuestions] = useState([
@@ -152,7 +154,9 @@ const AssignmentCreator = () => {
         title: assignmentTitle.trim(),
         course_code: courseCode.trim(),
         rubric_data: rubricData,
-        model_answer: ""
+        model_answer: "",
+        calibration_enabled: calibrationEnabled,
+        calibration_sample_size: parseInt(calibrationSampleSize, 10) || 3
       };
 
       const created = await createAssignment(payload);
@@ -235,6 +239,60 @@ const AssignmentCreator = () => {
                   placeholder="e.g. Pharmacokinetics Assignment 1"
                   required
                 />
+              </div>
+
+              {/* Examiner Calibration Settings Box */}
+              <div style={{
+                marginTop: '0.25rem',
+                padding: '0.75rem 0.85rem',
+                background: 'rgba(99, 102, 241, 0.04)',
+                borderRadius: '8px',
+                border: '1px solid rgba(99, 102, 241, 0.2)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem'
+              }}>
+                <label style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.825rem',
+                  fontWeight: 600,
+                  color: 'var(--secondary)',
+                  cursor: 'pointer'
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={calibrationEnabled}
+                    onChange={(e) => setCalibrationEnabled(e.target.checked)}
+                    style={{ width: '15px', height: '15px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  />
+                  Enable Examiner Calibration for New Questions
+                </label>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '1.4rem' }}>
+                  Recommended for new or subjective questions to align AI grading with examiner standards.
+                </div>
+                {calibrationEnabled && (
+                  <div style={{ marginTop: '0.35rem', marginLeft: '1.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.775rem', color: 'var(--secondary)' }}>Baseline sample size:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={calibrationSampleSize}
+                      onChange={(e) => setCalibrationSampleSize(Math.max(1, Math.min(5, parseInt(e.target.value) || 3)))}
+                      style={{
+                        width: '50px',
+                        padding: '0.2rem 0.35rem',
+                        fontSize: '0.8rem',
+                        borderRadius: '4px',
+                        border: '1px solid var(--border-color)',
+                        textAlign: 'center'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>submissions per cohort</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

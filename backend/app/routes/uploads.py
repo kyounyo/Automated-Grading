@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from ..database import get_db
 from ..models import Submission, Assignment
 from ..schemas import UploadResponse
@@ -14,6 +15,15 @@ router = APIRouter(prefix="/api/upload", tags=["Uploads"])
 
 TEMP_UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "temp"
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def clean_student_id(val) -> str:
+    if val is None:
+        return ""
+    s = str(val).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s.strip()
 
 
 def clean_student_name(s_name: str, s_id: str, s_email: str = "") -> str:
@@ -88,7 +98,8 @@ async def upload_submission_file(
             excel_rows = parse_excel_rows(str(temp_path))
             if len(excel_rows) > 0:
                 for idx, item in enumerate(excel_rows):
-                    s_id = str(item.get("student_id", f"STU{100 + idx}")).strip()
+                    raw_id = item.get("student_id", f"STU{100 + idx}")
+                    s_id = clean_student_id(raw_id) or f"STU{100 + idx}"
                     raw_s_name = str(item.get("student_name", f"Student {s_id}")).strip()
                     s_email = str(item.get("student_email", "N/A")).strip() or "N/A"
                     s_name = clean_student_name(raw_s_name, s_id, s_email)
@@ -96,11 +107,19 @@ async def upload_submission_file(
 
                     # Uniqueness Check: Upsert by (student_id, assignment_id)
                     existing_sub = db.query(Submission).filter(
-                        Submission.student_id == s_id,
-                        Submission.assignment_id == assignment_id
+                        Submission.assignment_id == assignment_id,
+                        (Submission.student_id == s_id) | (func.lower(Submission.student_id) == s_id.lower())
                     ).first()
 
                     if existing_sub:
+                        # PRESERVE EXAMINER CALIBRATION GRADES!
+                        if existing_sub.is_calibration_sample and existing_sub.status == "graded" and existing_sub.score is not None:
+                            if raw_text_content and not existing_sub.raw_text:
+                                existing_sub.raw_text = raw_text_content
+                            created_ids.append(existing_sub.id)
+                            total_processed_students += 1
+                            continue
+
                         existing_sub.batch_id = batch_id
                         existing_sub.student_name = s_name
                         existing_sub.student_email = s_email
@@ -147,14 +166,25 @@ async def upload_submission_file(
             pass
 
         stu_name = student_name if student_name != "AUTO" else uploaded_file.filename.split('.')[0].replace('_', ' ')
-        stu_id = student_id if student_id != "AUTO" else f"STU_{len(created_ids) + 1}"
+        raw_stu_id = student_id if student_id != "AUTO" else f"STU_{len(created_ids) + 1}"
+        stu_id = clean_student_id(raw_stu_id) or f"STU_{len(created_ids) + 1}"
 
         existing_sub = db.query(Submission).filter(
-            Submission.student_id == stu_id,
-            Submission.assignment_id == assignment_id
+            Submission.assignment_id == assignment_id,
+            (Submission.student_id == stu_id) | (func.lower(Submission.student_id) == stu_id.lower())
         ).first()
 
         if existing_sub:
+            if existing_sub.is_calibration_sample and existing_sub.status == "graded" and existing_sub.score is not None:
+                if extracted_doc_text and not existing_sub.raw_text:
+                    existing_sub.raw_text = extracted_doc_text
+                created_ids.append(existing_sub.id)
+                total_processed_students += 1
+                if temp_path.exists():
+                    try: os.remove(temp_path)
+                    except Exception: pass
+                continue
+
             existing_sub.batch_id = batch_id
             existing_sub.student_name = stu_name
             existing_sub.file_name = uploaded_file.filename
@@ -191,7 +221,20 @@ async def upload_submission_file(
 
     # Commit all created submissions and update assignment submission count
     db.commit()
-    assign.total_submissions = db.query(Submission).filter(Submission.assignment_id == assignment_id).count()
+    all_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).order_by(Submission.created_at.asc()).all()
+    assign.total_submissions = len(all_subs)
+
+    # Subsampling strategy: If calibration is enabled on the assignment, designate initial k submissions
+    if assign.calibration_enabled and len(all_subs) > 0:
+        current_cal_samples = [s for s in all_subs if s.is_calibration_sample]
+        target_sample_size = assign.calibration_sample_size or 3
+        if len(current_cal_samples) < target_sample_size:
+            needed = target_sample_size - len(current_cal_samples)
+            # Pick from non-calibration samples
+            candidates = [s for s in all_subs if not s.is_calibration_sample]
+            for s in candidates[:needed]:
+                s.is_calibration_sample = True
+
     db.commit()
 
     return UploadResponse(

@@ -6,8 +6,16 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Assignment, Submission
-from ..schemas import AssignmentCreate, AssignmentResponse, AssignmentUpdate
+from ..models import Assignment, Submission, CalibrationSet, CalibrationExample
+from ..schemas import (
+    AssignmentCreate, 
+    AssignmentResponse, 
+    AssignmentUpdate, 
+    CalibrationExampleCreate, 
+    CalibrationExampleResponse, 
+    CalibrationStatusResponse, 
+    CalibrationQuestionStatus
+)
 from ..services.embedding import embedding_service
 from ..services.document_parser import (
     extract_text_from_file, 
@@ -16,6 +24,7 @@ from ..services.document_parser import (
     parse_excel_rubric,
     parse_separate_question_and_rubric_docs
 )
+from ..services.calibration_importer import import_graded_calibration_data
 
 router = APIRouter(prefix="/api/assignments", tags=["Assignments"])
 
@@ -49,7 +58,7 @@ def get_assignment_detail(assignment_id: str, db: Session = Depends(get_db)):
 
 @router.patch("/{assignment_id}", response_model=AssignmentResponse)
 def update_assignment(assignment_id: str, payload: AssignmentUpdate, db: Session = Depends(get_db)):
-    """Renames or updates an assignment's title (name), course_code (unit), or due_date."""
+    """Renames or updates an assignment's title, course_code, due_date, or calibration settings."""
     assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assign:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -60,6 +69,12 @@ def update_assignment(assignment_id: str, payload: AssignmentUpdate, db: Session
         assign.course_code = payload.course_code.strip()
     if payload.due_date is not None:
         assign.due_date = payload.due_date.strip()
+    if payload.calibration_enabled is not None:
+        assign.calibration_enabled = payload.calibration_enabled
+    if payload.calibration_sample_size is not None:
+        assign.calibration_sample_size = payload.calibration_sample_size
+    if payload.calibration_settings is not None:
+        assign.calibration_settings = payload.calibration_settings
 
     db.commit()
     db.refresh(assign)
@@ -212,7 +227,10 @@ def create_assignment(payload: AssignmentCreate, db: Session = Depends(get_db)):
         model_answer="",
         status="active",
         total_submissions=0,
-        average_score=0.0
+        average_score=0.0,
+        calibration_enabled=payload.calibration_enabled or False,
+        calibration_sample_size=payload.calibration_sample_size or 3,
+        calibration_settings=payload.calibration_settings
     )
     db.add(new_assign)
     db.commit()
@@ -225,6 +243,355 @@ def create_assignment(payload: AssignmentCreate, db: Session = Depends(get_db)):
     )
 
     return new_assign
+
+
+# =====================================================================
+# QUESTION-LEVEL CALIBRATION & FEW-SHOT EXEMPLAR ENDPOINTS
+# =====================================================================
+
+@router.get("/{assignment_id}/calibration", response_model=CalibrationStatusResponse)
+def get_assignment_calibration_status(assignment_id: str, db: Session = Depends(get_db)):
+    """
+    Returns question-level calibration status, versioning, exemplar lists, and designated calibration sample submissions.
+    """
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    # Determine question keys from rubric_data
+    rubric_items = assign.rubric_data or []
+    question_keys = []
+    for idx, item in enumerate(rubric_items):
+        q_num = item.get("question_number") or f"Q{idx + 1}"
+        question_keys.append(q_num.strip().upper())
+
+    # Fallback if no rubric items yet: extract distinct from calibration examples
+    all_examples = db.query(CalibrationExample).filter(
+        CalibrationExample.assignment_id == assignment_id
+    ).order_by(CalibrationExample.created_at.asc()).all()
+
+    for ex in all_examples:
+        q_k = ex.question_number.strip().upper()
+        if q_k not in question_keys:
+            question_keys.append(q_k)
+
+    target_size = assign.calibration_sample_size or 3
+    cal_sets = {
+        cs.question_number.strip().upper(): cs 
+        for cs in db.query(CalibrationSet).filter(CalibrationSet.assignment_id == assignment_id).all()
+    }
+
+    questions_status = []
+    for q_no in question_keys:
+        q_examples = [ex for ex in all_examples if ex.question_number.strip().upper() == q_no]
+        count = len(q_examples)
+        c_set = cal_sets.get(q_no)
+        c_version = c_set.version if c_set else 1
+
+        if count == 0:
+            status_label = "zero_shot"
+        elif count < target_size:
+            status_label = "few_shot_available"
+        else:
+            status_label = "calibrated"
+
+        questions_status.append(CalibrationQuestionStatus(
+            question_number=q_no,
+            sample_count=count,
+            target_count=target_size,
+            status=status_label,
+            version=c_version,
+            examples=q_examples
+        ))
+
+    # Retrieve all submissions tagged as calibration samples
+    cal_sub_ids = [
+        s.id for s in db.query(Submission).filter(
+            Submission.assignment_id == assignment_id,
+            Submission.is_calibration_sample == True
+        ).all()
+    ]
+
+    return CalibrationStatusResponse(
+        assignment_id=assignment_id,
+        calibration_enabled=bool(assign.calibration_enabled),
+        calibration_sample_size=target_size,
+        total_calibrated_examples=len(all_examples),
+        questions=questions_status,
+        calibration_sample_submission_ids=cal_sub_ids
+    )
+
+
+@router.post("/{assignment_id}/calibration/settings")
+def update_assignment_calibration_settings(assignment_id: str, payload: dict, db: Session = Depends(get_db)):
+    """Update calibration settings (enable/disable, target sample size)."""
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if "calibration_enabled" in payload:
+        assign.calibration_enabled = bool(payload["calibration_enabled"])
+    if "calibration_sample_size" in payload:
+        assign.calibration_sample_size = max(1, min(10, int(payload["calibration_sample_size"])))
+    if "calibration_settings" in payload:
+        assign.calibration_settings = payload["calibration_settings"]
+
+    db.commit()
+    return {
+        "message": "Calibration settings updated successfully",
+        "assignment_id": assignment_id,
+        "calibration_enabled": assign.calibration_enabled,
+        "calibration_sample_size": assign.calibration_sample_size
+    }
+
+
+@router.post("/{assignment_id}/calibration/examples", response_model=CalibrationExampleResponse)
+def save_calibration_example(assignment_id: str, payload: CalibrationExampleCreate, db: Session = Depends(get_db)):
+    """
+    Saves an examiner-marked response as an official calibration example for a specific question.
+    Updates the question-level CalibrationSet version for strict audit reproducibility.
+    """
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    clean_q_no = payload.question_number.strip().upper()
+
+    # Find or initialize question-level CalibrationSet
+    cal_set = db.query(CalibrationSet).filter(
+        CalibrationSet.assignment_id == assignment_id,
+        CalibrationSet.question_number == clean_q_no
+    ).first()
+
+    if not cal_set:
+        cal_set = CalibrationSet(
+            assignment_id=assignment_id,
+            question_number=clean_q_no,
+            version=1,
+            is_active=True
+        )
+        db.add(cal_set)
+        db.commit()
+        db.refresh(cal_set)
+    else:
+        # Increment version whenever a new example is added
+        cal_set.version += 1
+        db.commit()
+        db.refresh(cal_set)
+
+    new_example = CalibrationExample(
+        assignment_id=assignment_id,
+        calibration_set_id=cal_set.id,
+        submission_id=payload.submission_id,
+        question_number=clean_q_no,
+        student_text=payload.student_text.strip(),
+        examiner_score=round(float(payload.examiner_score), 2),
+        max_score=round(float(payload.max_score), 2),
+        examiner_feedback=(payload.examiner_feedback or "").strip(),
+        anchor_type=(payload.anchor_type or "borderline").lower(),
+        version=cal_set.version
+    )
+    db.add(new_example)
+    db.commit()
+    db.refresh(new_example)
+
+    return new_example
+
+
+@router.delete("/{assignment_id}/calibration/examples/{example_id}")
+def delete_calibration_example(assignment_id: str, example_id: int, db: Session = Depends(get_db)):
+    """
+    Deletes a calibration example and increments question-level calibration version.
+    """
+    ex = db.query(CalibrationExample).filter(
+        CalibrationExample.id == example_id,
+        CalibrationExample.assignment_id == assignment_id
+    ).first()
+
+    if not ex:
+        raise HTTPException(status_code=404, detail="Calibration example not found")
+
+    clean_q_no = ex.question_number.strip().upper()
+    cal_set = db.query(CalibrationSet).filter(
+        CalibrationSet.assignment_id == assignment_id,
+        CalibrationSet.question_number == clean_q_no
+    ).first()
+
+    if cal_set:
+        cal_set.version += 1
+
+    db.delete(ex)
+    db.commit()
+
+    return {
+        "message": f"Calibration example {example_id} deleted successfully",
+        "question_number": clean_q_no,
+        "new_version": cal_set.version if cal_set else 1
+    }
+
+
+@router.post("/{assignment_id}/calibration/import-graded")
+async def import_graded_submissions(
+    assignment_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Imports already-graded student submissions from Excel (.xlsx/.xls) or CSV (.csv).
+    Automatically registers submissions as calibration samples,
+    and creates authoritative CalibrationExample records for few-shot prompt injection.
+    """
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise HTTPException(status_code=404, detail=f"Assignment '{assignment_id}' not found")
+
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in [".xlsx", ".xls", ".csv"]:
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload an Excel (.xlsx/.xls) or CSV (.csv) file.")
+
+    temp_filename = f"cal_import_{uuid.uuid4().hex[:6]}_{file.filename}"
+    temp_path = TEMP_DIR / temp_filename
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+
+        result = import_graded_calibration_data(
+            file_path=str(temp_path),
+            assignment_id=assignment_id,
+            original_filename=file.filename,
+            db=db
+        )
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to import graded submissions: {str(e)}")
+    finally:
+        if temp_path.exists():
+            try: os.remove(temp_path)
+            except Exception: pass
+
+
+@router.get("/{assignment_id}/calibration/template")
+def get_calibration_template(assignment_id: str, db: Session = Depends(get_db)):
+    """
+    Generates a pre-formatted downloadable CSV calibration template matching the assignment's rubric questions.
+    """
+    from fastapi.responses import Response
+    import io
+    import csv
+
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    rubric_data = assign.rubric_data or []
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row
+    writer.writerow([
+        "Student ID", "Student Name", "Student Email",
+        "Question", "Student Response", "Lecturer Score",
+        "Max Score", "Feedback", "Anchor Type"
+    ])
+
+    if rubric_data:
+        for idx, item in enumerate(rubric_data):
+            q_num = item.get("question_number", f"Q{idx + 1}")
+            max_sc = item.get("max_score", item.get("maxMark", 10.0))
+            # Sample rows for this question
+            writer.writerow([
+                f"STU_{1001 + idx}",
+                f"Student {1001 + idx}",
+                f"student{1001 + idx}@university.edu",
+                q_num,
+                f"Sample response explaining key concepts for {q_num}...",
+                round(float(max_sc) * 0.85, 1),
+                max_sc,
+                f"Well-explained answer adhering to {q_num} criteria.",
+                "high"
+            ])
+            writer.writerow([
+                f"STU_{1002 + idx}",
+                f"Student {1002 + idx}",
+                f"student{1002 + idx}@university.edu",
+                q_num,
+                f"Partial response addressing part of {q_num}...",
+                round(float(max_sc) * 0.55, 1),
+                max_sc,
+                f"Identified core mechanism but omitted technical derivation.",
+                "borderline"
+            ])
+            writer.writerow([
+                f"STU_{1003 + idx}",
+                f"Student {1003 + idx}",
+                f"student{1003 + idx}@university.edu",
+                q_num,
+                f"Brief response with misconceptions for {q_num}...",
+                round(float(max_sc) * 0.2, 1),
+                max_sc,
+                f"Incorrect assumptions and missing primary steps.",
+                "low"
+            ])
+    else:
+        # Default sample rows
+        writer.writerow([
+            "STU_1001", "Alice Smith", "alice@university.edu",
+            "Q1", "Virtual memory allows the execution of processes not completely in memory.",
+            9.0, 10.0, "Clear and accurate definition with core mechanism.", "high"
+        ])
+        writer.writerow([
+            "STU_1002", "Bob Jones", "bob@university.edu",
+            "Q1", "Virtual memory swaps pages to disk when RAM is full.",
+            6.0, 10.0, "Identified paging mechanism but omitted address translation.", "borderline"
+        ])
+        writer.writerow([
+            "STU_1003", "Charlie Brown", "charlie@university.edu",
+            "Q1", "It makes the computer run faster by adding more RAM.",
+            2.0, 10.0, "Common misconception confusing RAM with virtual memory.", "low"
+        ])
+
+    csv_content = output.getvalue()
+    clean_course = (assign.course_code or 'assignment').replace(' ', '_')
+    filename = f"calibration_template_{clean_course}_{assignment_id[:6]}.csv"
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+
+@router.post("/{assignment_id}/calibration/swap-sample")
+def swap_calibration_sample(assignment_id: str, payload: dict, db: Session = Depends(get_db)):
+    """
+    Allows the examiner to manually replace a calibration sample submission with a chosen alternative.
+    """
+    remove_id = payload.get("remove_submission_id")
+    add_id = payload.get("add_submission_id")
+
+    if not remove_id or not add_id:
+        raise HTTPException(status_code=400, detail="Both 'remove_submission_id' and 'add_submission_id' are required")
+
+    sub_remove = db.query(Submission).filter(Submission.id == remove_id, Submission.assignment_id == assignment_id).first()
+    sub_add = db.query(Submission).filter(Submission.id == add_id, Submission.assignment_id == assignment_id).first()
+
+    if not sub_remove or not sub_add:
+        raise HTTPException(status_code=404, detail="One or both submissions not found in assignment")
+
+    sub_remove.is_calibration_sample = False
+    sub_add.is_calibration_sample = True
+    db.commit()
+
+    return {
+        "message": "Calibration sample replaced successfully",
+        "removed_submission_id": remove_id,
+        "added_submission_id": add_id
+    }
 
 
 @router.post("/parse-rubric-file")

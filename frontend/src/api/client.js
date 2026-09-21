@@ -165,3 +165,82 @@ export async function previewSubmissions(formData) {
   return await response.json();
 }
 
+// Calibration API Helpers
+export async function fetchCalibrationStatus(assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration`);
+  if (!response.ok) throw new Error('Failed to fetch calibration status');
+  return await response.json();
+}
+
+export async function updateCalibrationSettings(assignmentId, payload) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) throw new Error('Failed to update calibration settings');
+  return await response.json();
+}
+
+export async function saveCalibrationExample(assignmentId, payload) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration/examples`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || 'Failed to save calibration example');
+  }
+  return await response.json();
+}
+
+export async function deleteCalibrationExample(assignmentId, exampleId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration/examples/${exampleId}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Failed to delete calibration example');
+  return await response.json();
+}
+
+export async function swapCalibrationSample(assignmentId, removeSubmissionId, addSubmissionId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration/swap-sample`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      remove_submission_id: removeSubmissionId,
+      add_submission_id: addSubmissionId
+    })
+  });
+  if (!response.ok) throw new Error('Failed to swap calibration sample');
+  return await response.json();
+}
+
+export async function importGradedCalibrationFile(assignmentId, formData) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration/import-graded`, {
+    method: 'POST',
+    body: formData
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || 'Failed to import graded calibration submissions');
+  }
+  return await response.json();
+}
+
+export async function downloadCalibrationTemplate(assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration/template`);
+  if (!response.ok) throw new Error('Failed to download calibration template');
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `calibration_template_${assignmentId.slice(0, 8)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+
+

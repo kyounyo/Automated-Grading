@@ -46,39 +46,80 @@ SUBMISSION_ALIASES = {
         "high": [
             "student id", "student_id", "student number", "student_no", 
             "matric no", "matric_no", "candidate id", "candidate index",
-            "candidate number", "stu_id", "student_idx", "mat_no"
+            "candidate number", "stu_id", "student_idx", "mat_no",
+            "id number", "id_number", "id num", "id_num", "id no", "id_no",
+            "id"
         ],
-        "ambiguous": ["id", "student", "num", "identifier"]
+        "ambiguous": ["student", "num", "identifier"]
     },
     "student_name": {
         "high": [
             "student name", "student_name", "full name", "full_name", 
-            "candidate name", "student_nam", "fullname"
+            "candidate name", "student_nam", "student nam", "fullname"
         ],
         "ambiguous": ["name", "student"]
     },
     "student_email": {
         "high": [
             "student email", "student_email", "email", "gmail", 
-            "student_gmail", "student_gma", "contact email", "mail"
+            "student_gmail", "student_gma", "student gma", "contact email", "mail"
         ],
         "ambiguous": ["contact", "address"]
     },
     "question_number": {
         "high": [
             "question no", "question_no", "question_n", "q_no", "q_num",
-            "question number", "question label", "q num", "q no"
+            "question number", "question label", "q num", "q no", "question_id"
         ],
         "ambiguous": ["question", "item", "task", "q"]
     },
     "student_response": {
         "high": [
             "student response", "student_response", "student answer", "student_answer",
-            "student work", "submission text", "student submission", "response text"
+            "student work", "submission text", "student submission", "response text",
+            "response", "answer"
         ],
-        "ambiguous": ["response", "answer", "submission", "text", "body", "work"]
+        "ambiguous": ["submission", "text", "body", "work"]
     }
 }
+
+CALIBRATION_ALIASES = {
+    "student_id": SUBMISSION_ALIASES["student_id"],
+    "student_name": SUBMISSION_ALIASES["student_name"],
+    "student_email": SUBMISSION_ALIASES["student_email"],
+    "question_number": SUBMISSION_ALIASES["question_number"],
+    "student_response": SUBMISSION_ALIASES["student_response"],
+    "examiner_score": {
+        "high": [
+            "score", "human score", "human_score", "human mark", "human grade",
+            "human score dataset", "lecturer score", "lecturer_score",
+            "examiner score", "examiner_score", "marks", "mark", "awarded score",
+            "points", "grade"
+        ],
+        "ambiguous": ["result", "val", "value", "sc"]
+    },
+    "max_score": {
+        "high": [
+            "max score", "max_score", "max mark", "max_mark", "total marks",
+            "max points", "out of", "maximum mark"
+        ],
+        "ambiguous": ["max", "total"]
+    },
+    "examiner_feedback": {
+        "high": [
+            "feedback", "examiner feedback", "examiner_feedback", "comment", "comments",
+            "justification", "reasoning", "marker notes", "notes", "rubric rationale"
+        ],
+        "ambiguous": ["remark", "remarks", "rationale", "note"]
+    },
+    "anchor_type": {
+        "high": [
+            "anchor", "anchor type", "anchor_type", "classification", "anchor classification"
+        ],
+        "ambiguous": ["tier", "level", "category", "band"]
+    }
+}
+
 
 
 # =====================================================================
@@ -270,6 +311,17 @@ def evaluate_content_evidence(field_name: str, samples: List[Any]) -> float:
             return 0.70
         return 0.30
 
+    elif field_name == "examiner_score":
+        valid_scores = 0
+        for s in clean_samples:
+            try:
+                val = float(re.sub(r'[^\d\.]', '', s))
+                if 0.0 <= val <= 200.0:
+                    valid_scores += 1
+            except Exception:
+                pass
+        return 0.95 if (valid_scores / n) >= 0.7 else 0.30
+
     return 0.50
 
 
@@ -319,7 +371,12 @@ def resolve_schema_mapping(df: pd.DataFrame, schema_type: str = "rubric") -> Tup
     Returns:
         (mapping_dict, overall_confidence, is_valid)
     """
-    schema_dict = RUBRIC_ALIASES if schema_type == "rubric" else SUBMISSION_ALIASES
+    if schema_type == "rubric":
+        schema_dict = RUBRIC_ALIASES
+    elif schema_type == "calibration":
+        schema_dict = CALIBRATION_ALIASES
+    else:
+        schema_dict = SUBMISSION_ALIASES
     target_fields = list(schema_dict.keys())
     cols = list(df.columns)
 
@@ -373,6 +430,25 @@ def resolve_schema_mapping(df: pd.DataFrame, schema_type: str = "rubric") -> Tup
         is_valid = bool(
             resolved_mapping.get("question_number") and 
             (resolved_mapping.get("text") or resolved_mapping.get("model_answer"))
+        )
+
+    elif schema_type == "calibration":
+        # Mandatory: student_id, student_response, examiner_score
+        if not resolved_mapping.get("student_id") and len(cols) >= 1:
+            first_col = str(cols[0])
+            if first_col not in assigned_cols:
+                resolved_mapping["student_id"] = first_col
+                field_confidences["student_id"] = 0.50
+
+        if not resolved_mapping.get("student_response"):
+            unassigned = [c for c in cols if c not in assigned_cols and c != resolved_mapping.get("examiner_score")]
+            if unassigned:
+                resolved_mapping["student_response"] = str(unassigned[-1])
+                field_confidences["student_response"] = 0.50
+
+        is_valid = bool(
+            resolved_mapping.get("student_response") and 
+            resolved_mapping.get("examiner_score")
         )
 
     else:  # submission
@@ -614,4 +690,178 @@ def parse_flexible_submissions(file_path: str) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"[FlexibleExcelParser Error] Submissions parsing failed on {file_path}: {e}")
         return []
+
+
+def determine_anchor_type(score: float, max_score: float, explicit_anchor: Optional[str] = None) -> str:
+    """Classifies a score into an anchor type: high, borderline, or low."""
+    if explicit_anchor:
+        clean = str(explicit_anchor).strip().lower()
+        if clean in ["high", "borderline", "low", "other"]:
+            return clean
+        if "high" in clean: return "high"
+        if "low" in clean: return "low"
+        if "border" in clean or "mid" in clean: return "borderline"
+
+    if max_score <= 0:
+        return "borderline"
+
+    ratio = score / max_score
+    if ratio >= 0.8:
+        return "high"
+    elif ratio <= 0.4:
+        return "low"
+    return "borderline"
+
+
+def parse_flexible_calibration(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Template-tolerant parser for Excel/CSV Graded Calibration datasets.
+    Supports identical column formats and header tolerances as ungraded submissions:
+    - Long Format: Multiple rows per student with Question, Response, and Score columns.
+      (e.g., ID Number | student_gma | student_nam | question_no | Response | Score)
+    - Wide / General Format with Student, Question/Text, and Score.
+    """
+    try:
+        header_row = detect_header_row(file_path)
+        ext = Path(file_path).suffix.lower()
+
+        if ext == ".csv":
+            df = pd.read_csv(file_path, skiprows=header_row)
+        else:
+            df = pd.read_excel(file_path, skiprows=header_row)
+
+        df = df.dropna(how="all")
+        if df.empty:
+            return []
+
+        # Resolve Schema with intelligent Header + Content Scoring
+        mapping, overall_conf, is_valid = resolve_schema_mapping(df, schema_type="calibration")
+        print(f"[FlexibleExcelParser] Calibration Schema Resolution: {mapping} (Confidence: {overall_conf * 100:.1f}%)")
+
+        stu_col = mapping.get("student_id")
+        name_col = mapping.get("student_name")
+        email_col = mapping.get("student_email")
+        q_col = mapping.get("question_number")
+        resp_col = mapping.get("student_response")
+        score_col = mapping.get("examiner_score")
+        max_sc_col = mapping.get("max_score")
+        fb_col = mapping.get("examiner_feedback")
+        anchor_col = mapping.get("anchor_type")
+
+        cols_lower = [str(c).strip().lower() for c in df.columns]
+
+        # Positional and alias fallbacks matching ungraded submissions
+        if not stu_col and len(df.columns) > 0:
+            stu_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k in c for k in [
+                "id number", "id_number", "id num", "id_num", "id no", "id_no",
+                "student_id", "student id", "student_no", "matric", "id"
+            ])), df.columns[0])
+
+        if not email_col:
+            email_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k == c or k in c for k in [
+                "student_email", "student email", "gmail", "student_gmail", "student_gma", "student gma", "email", "mail", "contact"
+            ])), None)
+
+        if not name_col:
+            name_col = next((df.columns[i] for i, c in enumerate(cols_lower) if (not email_col or c != str(email_col).lower()) and (not stu_col or c != str(stu_col).lower()) and any(k == c or k in c for k in [
+                "student_name", "student name", "student_nam", "student nam", "candidate name", "full_name", "full name", "name"
+            ])), None)
+
+        if not q_col:
+            q_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k in c for k in [
+                "question_no", "question_n", "question no", "question", "q_no", "q_num"
+            ])), None)
+
+        if not resp_col:
+            resp_col = next((df.columns[i] for i, c in enumerate(cols_lower) if (not score_col or c != str(score_col).lower()) and any(k in c for k in [
+                "response", "answer", "student_answer", "student_response", "submission", "text", "work"
+            ])), None)
+
+        if not score_col:
+            score_col = next((df.columns[i] for i, c in enumerate(cols_lower) if any(k in c for k in [
+                "score", "human_score", "human score", "lecturer_score", "lecturer score",
+                "examiner_score", "examiner score", "marks", "mark", "grade", "points"
+            ])), None)
+
+        if not resp_col or not score_col:
+            print(f"[FlexibleExcelParser] Missing required columns in {file_path}: resp_col={resp_col}, score_col={score_col}")
+            return []
+
+        rows = []
+        for idx, row in df.iterrows():
+            # 1. Student ID
+            raw_id = row.get(stu_col)
+            s_id = str(raw_id).strip() if pd.notna(raw_id) else f"STU_{1001 + idx}"
+            if s_id.endswith(".0"):
+                s_id = s_id[:-2]
+            if not s_id or s_id.lower() == "nan":
+                s_id = f"STU_{1001 + idx}"
+
+            # 2. Student Name
+            raw_name = row.get(name_col) if name_col else None
+            s_name = str(raw_name).strip() if pd.notna(raw_name) and str(raw_name).strip() and str(raw_name).strip().lower() != "nan" else f"Student {s_id}"
+
+            # 3. Student Email
+            raw_email = row.get(email_col) if email_col else None
+            s_email = str(raw_email).strip() if pd.notna(raw_email) and str(raw_email).strip() and str(raw_email).strip().lower() != "nan" else "N/A"
+
+            # 4. Question Number (normalized e.g. 6 -> Q6, Q8 -> Q8)
+            raw_q = str(row.get(q_col)).strip() if q_col and pd.notna(row.get(q_col)) else f"Q{idx + 1}"
+            if raw_q.endswith(".0"):
+                raw_q = raw_q[:-2]
+            clean_q = raw_q.upper()
+            if not clean_q.startswith("Q") and clean_q.isdigit():
+                clean_q = f"Q{clean_q}"
+
+            # 5. Response Text
+            raw_resp = row.get(resp_col)
+            stu_text = str(raw_resp).strip() if pd.notna(raw_resp) else ""
+            if stu_text.lower() == "nan":
+                stu_text = ""
+
+            # 6. Score
+            raw_sc = row.get(score_col)
+            try:
+                score_val = round(float(raw_sc), 2)
+            except (ValueError, TypeError):
+                score_val = 0.0
+
+            # 7. Max Score
+            raw_max = row.get(max_sc_col) if max_sc_col else None
+            if pd.notna(raw_max):
+                try:
+                    max_sc_val = round(float(raw_max), 2)
+                except (ValueError, TypeError):
+                    max_sc_val = 10.0
+            else:
+                max_sc_val = 10.0
+
+            # 8. Feedback
+            raw_fb = str(row.get(fb_col)).strip() if fb_col and pd.notna(row.get(fb_col)) else ""
+            if raw_fb.lower() == "nan":
+                raw_fb = ""
+            if not raw_fb:
+                raw_fb = f"Examiner baseline standard for {clean_q}. Awarded {score_val}/{max_sc_val} marks."
+
+            # 9. Anchor Type
+            explicit_anchor = str(row.get(anchor_col)).strip() if anchor_col and pd.notna(row.get(anchor_col)) else None
+            anchor_val = determine_anchor_type(score_val, max_sc_val, explicit_anchor)
+
+            rows.append({
+                "student_id": s_id,
+                "student_name": s_name,
+                "student_email": s_email,
+                "question_number": clean_q,
+                "student_text": stu_text,
+                "examiner_score": score_val,
+                "max_score": max_sc_val,
+                "examiner_feedback": raw_fb,
+                "anchor_type": anchor_val
+            })
+
+        return rows
+    except Exception as e:
+        print(f"[FlexibleExcelParser Error] Calibration parsing failed on {file_path}: {e}")
+        return []
+
 

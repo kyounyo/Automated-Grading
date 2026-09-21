@@ -3,7 +3,7 @@ import os
 import random
 import datetime
 from sqlalchemy.orm import Session
-from ..models import Submission, Assignment, EvaluationLog
+from ..models import Submission, Assignment, EvaluationLog, CalibrationExample, CalibrationSet
 from .document_parser import extract_text_from_file
 from .rag import retrieve_rubric_context
 from .llm_service import call_llm_for_grading
@@ -131,8 +131,34 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     db.commit()
     rag_context = retrieve_rubric_context(assignment.id, extracted_text)
 
+    # Step 3.5: Query Question-Matched Calibration Examples for Assignment
+    cal_examples = db.query(CalibrationExample).filter(
+        CalibrationExample.assignment_id == assignment.id
+    ).all()
+    
+    question_few_shots = {}
+    if cal_examples:
+        for ex in cal_examples:
+            q_num_clean = (ex.question_number or "").strip().upper()
+            if not q_num_clean:
+                continue
+            if q_num_clean not in question_few_shots:
+                question_few_shots[q_num_clean] = []
+            question_few_shots[q_num_clean].append({
+                "student_text": ex.student_text,
+                "examiner_score": ex.examiner_score,
+                "max_score": ex.max_score,
+                "examiner_feedback": ex.examiner_feedback,
+                "anchor_type": ex.anchor_type,
+                "version": ex.version
+            })
+
+    total_cal_count = sum(len(v) for v in question_few_shots.values())
+    grading_mode = "few_shot" if total_cal_count > 0 else "zero_shot"
+    max_cal_version = max((ex.version for ex in cal_examples), default=1) if cal_examples else None
+
     # Step 4: Execute Multi-Agent LLM Grading Prompt
-    print(f" ├─ [3/4] Running Multi-Agent LLM (Primary Grader & Auditor via {LLM_MODEL})...")
+    print(f" ├─ [3/4] Running Multi-Agent LLM ({grading_mode.upper()} mode, {total_cal_count} exemplars via {LLM_MODEL})...")
     submission.status = "grading"
     db.commit()
     llm_result = call_llm_for_grading(
@@ -140,7 +166,8 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         rubric_json=rubric_data,
         model_answer=assignment.model_answer or "",
         rag_context=rag_context,
-        total_max_score=total_max_score
+        total_max_score=total_max_score,
+        question_few_shots=question_few_shots if total_cal_count > 0 else None
     )
 
     # Step 5: Save Record to PostgreSQL
@@ -181,21 +208,27 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     if llm_result.get("reconciliation_action"):
         feedback_dict["reconciliation_action"] = llm_result["reconciliation_action"]
 
+    # Ensure pure academic feedback is stored on submission (no technical provenance clutter)
     submission.feedback = feedback_dict
     submission.highlights = llm_result.get("highlights", [])
     submission.grading_duration = round(duration, 2)
     submission.model_used = LLM_MODEL
-    submission.prompt_version = PROMPT_VERSION
+    submission.prompt_version = f"{PROMPT_VERSION}-{grading_mode}"
     submission.graded_at = datetime.datetime.utcnow()
 
-    # Step 7: Create EvaluationLog Entry
+    # Step 7: Create EvaluationLog Entry with dedicated technical provenance
     eval_log = EvaluationLog(
         submission_id=submission.id,
+        assignment_id=assignment.id,
+        question_number="ALL",
+        grading_mode=grading_mode,
+        calibration_version=max_cal_version,
+        calibration_examples_count=total_cal_count,
         ai_score=submission.score,
         confidence_score=submission.confidence_score,
         latency_seconds=round(duration, 2),
         cost_estimate=0.002,  # Nominal LLM token cost estimate
-        prompt_version=PROMPT_VERSION,
+        prompt_version=f"{PROMPT_VERSION}-{grading_mode}",
         model_used=LLM_MODEL
     )
     db.add(eval_log)

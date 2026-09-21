@@ -174,15 +174,15 @@ def compute_quality_control_metrics(df_res):
         return {}
 
     total_n = len(df_res)
-    # Ground Truth Error: |Grader - Human| > 1.0 mark (discrepancy exceeding acceptable +/-1 mark tolerance)
-    if 'actual_error_gt_1mark' in df_res:
-        actual_errors = df_res['actual_error_gt_1mark'].values
-    elif 'grader_absolute_error' in df_res:
-        actual_errors = (df_res['grader_absolute_error'] > 1.0 + 1e-5).values
-    elif 'grader_score' in df_res and 'human_score' in df_res:
-        actual_errors = (abs(df_res['grader_score'] - df_res['human_score']) > 1.0 + 1e-5).values
-    else:
+    # Ground Truth Error: |Grader - Human| >= 1.0 mark (standardized threshold)
+    if 'actual_error_ge_1mark' in df_res:
         actual_errors = df_res['actual_error_ge_1mark'].values
+    elif 'grader_absolute_error' in df_res:
+        actual_errors = (df_res['grader_absolute_error'] >= 1.0 - 1e-5).values
+    elif 'grader_score' in df_res and 'human_score' in df_res:
+        actual_errors = (abs(df_res['grader_score'] - df_res['human_score']) >= 1.0 - 1e-5).values
+    else:
+        actual_errors = (abs(df_res['grader_score'] - df_res['human_score']) >= 1.0 - 1e-5).values
 
     flagged = (df_res['status'] == 'flagged').values
     
@@ -220,6 +220,111 @@ def compute_quality_control_metrics(df_res):
         "Leakage_FN_Pct": round(fn_leakage_rate, 1) if not pd.isna(fn_leakage_rate) else "N/A",
         "Overflag_FP_Pct": round(fp_overflag_rate, 1) if not pd.isna(fp_overflag_rate) else "N/A"
     }
+
+def compute_tolerance_sensitivity_table(df_res):
+    """
+    Evaluates Multi-Agent discrepancy tolerance thresholds.
+
+    Auto-approved:
+        |Grader - Auditor| <= tolerance * Max Mark
+
+    Actual AI grading error:
+        |Grader - Human| >= 1.0 mark
+    """
+    if df_res.empty:
+        return pd.DataFrame()
+
+    df = df_res.copy()
+
+    # 1. Multi-agent discrepancy
+    df['diff_pts'] = (df['grader_score'] - df['auditor_score']).abs()
+    df['diff_pct'] = df['diff_pts'] / df['max_score']
+
+    # 2. Ground-truth AI error (>= 1.0 mark)
+    df['actual_error'] = (df['grader_score'] - df['human_score']).abs() >= 1.0 - 1e-5
+
+    # 3. Tolerance levels
+    thresholds = [
+        ('Exact Match (0%)', 0.00),
+        ('5% Tolerance', 0.05),
+        ('10% Tolerance', 0.10),
+        ('15% Tolerance', 0.15)
+    ]
+
+    rows = []
+    for label, tol_pct in thresholds:
+        # 4. Auto-approve / flag decision strictly by tolerance threshold
+        flagged = df['diff_pct'] > tol_pct + 1e-5
+        auto_approved = ~flagged
+
+        # 5. Confusion matrix
+        tp = int((flagged & df['actual_error']).sum())
+        fp = int((flagged & ~df['actual_error']).sum())
+        tn = int((auto_approved & ~df['actual_error']).sum())
+        fn = int((auto_approved & df['actual_error']).sum())
+
+        n_total = len(df)
+        n_flagged = tp + fp
+        n_auto = tn + fn
+
+        # 6. Metrics
+        automation_rate = (n_auto / n_total * 100.0) if n_total else 0.0
+        flag_rate = (n_flagged / n_total * 100.0) if n_total else 0.0
+        recall = (tp / (tp + fn) * 100.0) if (tp + fn) else 0.0
+        precision = (tp / (tp + fp) * 100.0) if (tp + fp) else 0.0
+        f1 = (2.0 * precision * recall / (precision + recall)) if (precision + recall) else 0.0
+        leakage = (fn / (tp + fn) * 100.0) if (tp + fn) else 0.0
+        overflag = (fp / (fp + tn) * 100.0) if (fp + tn) else 0.0
+        auto_error_rate = (fn / n_auto * 100.0) if n_auto else 0.0
+
+        # 7. Auto-approved grading quality
+        auto_df = df[auto_approved].copy()
+        auto_mae = (auto_df['grader_score'] - auto_df['human_score']).abs().mean() if len(auto_df) > 0 else float("nan")
+        auto_icc = float("nan")
+
+        if len(auto_df) >= 3:
+            try:
+                df_long = pd.melt(
+                    auto_df.reset_index(),
+                    id_vars=['index'],
+                    value_vars=['human_score', 'grader_score'],
+                    var_name='rater',
+                    value_name='score'
+                )
+                icc = pg.intraclass_corr(
+                    data=df_long,
+                    targets='index',
+                    raters='rater',
+                    ratings='score'
+                )
+                auto_icc = float(icc.set_index('Type').loc['ICC(A,1)', 'ICC'])
+            except Exception as e:
+                print(f"Warning calculating auto-approved ICC: {e}")
+
+        # 8. Store result
+        rows.append({
+            'Tolerance Threshold': label,
+            'Tolerance (%)': f'{tol_pct * 100:.0f}%',
+            'Total N': n_total,
+            'Auto-Approved (N)': n_auto,
+            'Automation Rate (%)': f'{automation_rate:.1f}%',
+            'Flagged (N)': n_flagged,
+            'Flag Rate (%)': f'{flag_rate:.1f}%',
+            'TP': tp,
+            'FP': fp,
+            'TN': tn,
+            'FN': fn,
+            'Error Recall (%)': f'{recall:.1f}%',
+            'Flag Precision (%)': f'{precision:.1f}%',
+            'Flagging F1-Score (%)': f'{f1:.1f}%',
+            'Leakage Rate (%)': f'{leakage:.1f}%',
+            'Over-flag Rate (%)': f'{overflag:.1f}%',
+            'Auto-Approved Error Rate (%)': f'{auto_error_rate:.1f}%',
+            'Auto-Approved MAE': round(auto_mae, 2) if not pd.isna(auto_mae) else "N/A",
+            'Auto-Approved ICC': round(auto_icc, 3) if not pd.isna(auto_icc) else "N/A"
+        })
+
+    return pd.DataFrame(rows)
 
 # ---------------------------------------------------------
 # AGENT 2: PRIMARY GRADER RUNNER
@@ -439,8 +544,8 @@ def run_manual_audit_experiment(grader_model_info, auditor_model_info, df_questi
             final_reconciled_score = a_reconciled_score
             reconciliation_action = recommendation
 
-        # Ground truth error definition: Was there an actual human-AI error (> 1.0 mark)?
-        actual_error = abs(grader_score - human_score) > 1.0 + 1e-5
+        # Ground truth error definition: Was there an actual human-AI error (>= 1.0 mark)?
+        actual_error = abs(grader_score - human_score) >= 1.0 - 1e-5
 
         rec = {
             "response_id": resp_id,
@@ -458,8 +563,7 @@ def run_manual_audit_experiment(grader_model_info, auditor_model_info, df_questi
             "confidence_score": confidence_score,
             "status": status,
             "flag_reasons": flag_reasons,
-            "actual_error_gt_1mark": actual_error,
-            "actual_error_ge_1mark": abs(grader_score - human_score) >= 1.0,
+            "actual_error_ge_1mark": actual_error,
             "grader_absolute_error": round(abs(grader_score - human_score), 2),
             "auditor_absolute_error": round(abs(auditor_score - human_score), 2),
             "reconciled_absolute_error": round(abs(final_reconciled_score - human_score), 2),
@@ -593,7 +697,12 @@ def save_audit_excel(df_res, pair_title, arch_type, excel_file):
             df_comp = pd.DataFrame(comp_rows)
             df_comp.to_excel(writer, sheet_name="3Way_Score_Comparison", index=False)
 
-            # 3. Individual Question Tabs
+            # 3. Tolerance Sensitivity Sweep (Exact vs 5% vs 10% vs 15%)
+            df_tol = compute_tolerance_sensitivity_table(df_res)
+            if not df_tol.empty:
+                df_tol.to_excel(writer, sheet_name="Tolerance_Sensitivity", index=False)
+
+            # 4. Individual Question Tabs
             for q_name in ["Q6", "Q8", "Q9", "Q22"]:
                 q_df = df_res[df_res['question_no'] == q_name].copy()
                 if not q_df.empty:
@@ -601,20 +710,23 @@ def save_audit_excel(df_res, pair_title, arch_type, excel_file):
                     available_cols = [c for c in q_cols if c in q_df.columns]
                     q_df[available_cols].to_excel(writer, sheet_name=f"{q_name}_Audit", index=False)
 
-            # 4. Flagged Review Queue (Submissions sent to lecturer)
+            # 5. Flagged Review Queue (Submissions sent to lecturer)
             flagged_df = df_res[df_res['status'] == 'flagged'].copy()
             if not flagged_df.empty:
                 f_cols = ["response_id", "question_no", "human_score", "grader_score", "auditor_score", "reconciled_score", "score_discrepancy", "flag_reasons", "audit_note", "student_answer"]
                 available_f_cols = [c for c in f_cols if c in flagged_df.columns]
                 flagged_df[available_f_cols].to_excel(writer, sheet_name="Flagged_For_Lecturer", index=False)
 
-            # 5. Full Dataset
+            # 6. Full Dataset
             df_res.to_excel(writer, sheet_name="All_Responses", index=False)
 
         print(f"✅ Excel saved: {excel_file}")
         print("\n" + df_sum.to_string(index=False))
         print("\n--- 📊 3-Way Score Stream Comparison ---")
         print(df_comp.to_string(index=False))
+        if not df_tol.empty:
+            print("\n--- 🎯 Multi-Agent Discrepancy Tolerance Sensitivity (Exact vs 5% vs 10% vs 15%) ---")
+            print(df_tol.to_string(index=False))
     except Exception as e:
         print(f"  ⚠️ Warning saving Excel: {e}")
 
@@ -709,6 +821,27 @@ def generate_master_audit_comparison():
         
         df_comp_leaderboard = pd.DataFrame(comp_leaderboard_rows)
         df_comp_leaderboard.to_excel(writer, sheet_name="3Way_Stream_Comparison", index=False)
+
+        # 3. Master Tolerance Sensitivity Comparison
+        master_tol_rows = []
+        for csv_path in sorted(csv_files):
+            file_name = os.path.basename(csv_path)
+            tag = file_name.replace("results_exp2_", "").replace(".csv", "")
+            parts = tag.split("_to_")
+            g_tag = parts[0] if len(parts) > 0 else tag
+            a_tag = parts[1] if len(parts) > 1 else tag
+            title = f"{g_tag.replace('_', ' ')} ➔ {a_tag.replace('_', ' ')}"
+            try:
+                df_c = pd.read_csv(csv_path)
+                tol_t = compute_tolerance_sensitivity_table(df_c)
+                if not tol_t.empty:
+                    tol_t.insert(0, "Architecture", title)
+                    master_tol_rows.append(tol_t)
+            except Exception:
+                pass
+        if master_tol_rows:
+            df_master_tol = pd.concat(master_tol_rows, ignore_index=True)
+            df_master_tol.to_excel(writer, sheet_name="Tolerance_Sensitivity_Master", index=False)
 
     print(f"🌟 Master Experiment 2 Excel saved: {master_excel}")
     print("\n--- 🏆 Experiment 2: Multi-Agent Auditor Leaderboard ---")
