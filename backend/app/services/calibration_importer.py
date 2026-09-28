@@ -14,14 +14,14 @@ from .flexible_excel_parser import parse_flexible_calibration, detect_header_row
 COLUMN_ALIASES = {
     "student_id": [
         "id number", "id_number", "id num", "id_num", "id no", "id_no",
-        "student id", "student_id", "student no", "student_no",
+        "id no.", "id num.", "student id", "student_id", "student no", "student_no",
         "matric no", "matric_no", "matric", "candidate id", "candidate_id",
         "candidate index", "candidate number", "id", "student number", "stu_id",
-        "student_idx", "mat_no"
+        "student_idx", "mat_no", "student"
     ],
     "student_name": [
         "student name", "student_name", "student nam", "student_nam",
-        "full name", "full_name", "fullname", "name", "candidate name"
+        "full name", "full_name", "fullname", "name", "candidate name", "student"
     ],
     "student_email": [
         "student email", "student_email", "email", "gmail",
@@ -29,26 +29,30 @@ COLUMN_ALIASES = {
     ],
     "question_number": [
         "question", "question number", "question_no", "question no",
-        "question_n", "q_no", "q_num", "q no", "q num", "question_id", "q"
+        "question_n", "q_no", "q_num", "q no", "q num", "question_id", "question id",
+        "q", "q#", "question#", "qid", "question no.", "q num.", "item", "problem", "task"
     ],
     "student_text": [
         "response", "response text", "student response", "student_response",
         "student answer", "student_answer", "answer", "submission text",
-        "student text", "text", "student work", "submission"
+        "student text", "student_text", "text", "student work", "submission",
+        "student essay", "essay", "content", "solution", "solution text", "work"
     ],
     "examiner_score": [
         "score", "human score", "human_score", "human mark", "human grade", "human score (dataset)",
         "lecturer score", "lecturer_score", "examiner score", "examiner_score",
-        "marks", "mark", "grade", "points", "awarded score"
+        "marks", "mark", "grade", "points", "awarded score", "score awarded",
+        "awarded", "pts", "pt", "marks awarded", "mark awarded"
     ],
     "max_score": [
         "max score", "max_score", "max mark", "max_mark",
-        "total marks", "max points", "max", "out of", "maximum mark"
+        "total marks", "max points", "max", "out of", "maximum mark", "max pts", "total pts", "total mark"
     ],
     "examiner_feedback": [
         "feedback", "justification", "comments", "comment",
         "reasoning", "examiner feedback", "examiner_feedback",
-        "rubric rationale", "notes", "marker notes", "remarks"
+        "rubric rationale", "notes", "marker notes", "remarks", "remark",
+        "examiner notes", "marker feedback", "evaluator comments"
     ],
     "anchor_type": [
         "anchor", "anchor type", "anchor_type", "classification", "anchor classification"
@@ -210,11 +214,10 @@ def parse_graded_file(file_path: str) -> List[Dict[str, Any]]:
         else:
             max_sc_val = 10.0
 
-        # Examiner Feedback
-        fb_val = str(row[fb_col]).strip() if fb_col and not pd.isna(row[fb_col]) else ""
-        if fb_val.lower() == "nan": fb_val = ""
-        if not fb_val:
-            fb_val = f"Examiner baseline standard for {clean_q}. Awarded {score_val}/{max_sc_val} marks."
+        # Examiner Feedback (Optional)
+        raw_fb_val = str(row[fb_col]).strip() if fb_col and not pd.isna(row[fb_col]) else ""
+        if raw_fb_val.lower() == "nan": raw_fb_val = ""
+        fb_val = raw_fb_val if raw_fb_val else f"Examiner baseline standard for {clean_q}. Awarded {score_val}/{max_sc_val} marks."
 
         # Anchor Type
         explicit_anchor = str(row[anchor_col]).strip() if anchor_col and not pd.isna(row[anchor_col]) else None
@@ -229,10 +232,100 @@ def parse_graded_file(file_path: str) -> List[Dict[str, Any]]:
             "examiner_score": score_val,
             "max_score": max_sc_val,
             "examiner_feedback": fb_val,
+            "examiner_feedback_raw": raw_fb_val,
             "anchor_type": anchor_val
         })
 
     return parsed_rows
+
+
+def preview_graded_file(file_path: str, assignment_id: str, db: Session) -> Dict[str, Any]:
+    """
+    Parses an uploaded calibration Excel/CSV file and returns detected column mappings,
+    total counts, distinct questions, and extracted sample rows for user confirmation.
+    """
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise ValueError(f"Assignment '{assignment_id}' not found.")
+
+    header_row = detect_header_row(file_path)
+    ext = Path(file_path).suffix.lower()
+    if ext == ".csv":
+        df = pd.read_csv(file_path, skiprows=header_row)
+    else:
+        df = pd.read_excel(file_path, skiprows=header_row)
+
+    df = df.dropna(how="all")
+    if df.empty:
+        raise ValueError("The uploaded spreadsheet contains no data rows.")
+
+    df.columns = [str(c).strip() for c in df.columns]
+    col_map = map_columns(list(df.columns))
+
+    rows = parse_graded_file(file_path)
+    if not rows:
+        raise ValueError(
+            "Could not extract calibration rows. Please ensure your file has columns for Student Answer/Response and Score/Marks."
+        )
+
+    # Match rubric max scores if available
+    rubric_items = assign.rubric_data or []
+    rubric_max_map = {}
+    for item in rubric_items:
+        q_k = str(item.get("question_number", "")).strip().upper()
+        if q_k:
+            val = float(item.get("max_score", item.get("maxMark", 10.0)))
+            rubric_max_map[q_k] = val
+            if q_k.startswith("Q") and q_k[1:].isdigit():
+                rubric_max_map[q_k[1:]] = val
+            elif q_k.isdigit():
+                rubric_max_map[f"Q{q_k}"] = val
+
+    for r in rows:
+        q_k = r["question_number"]
+        clean_num = q_k[1:] if (q_k.startswith("Q") and q_k[1:].isdigit()) else q_k
+        matching_max = rubric_max_map.get(q_k) or rubric_max_map.get(clean_num)
+        if matching_max:
+            r["max_score"] = matching_max
+            r["anchor_type"] = determine_anchor_type(r["examiner_score"], r["max_score"])
+
+    preview_samples = []
+    has_feedback = False
+    for r in rows[:5]:
+        raw_fb = r.get("examiner_feedback_raw") or ""
+        if raw_fb:
+            has_feedback = True
+        preview_samples.append({
+            "student_id": r["student_id"],
+            "student_name": r.get("student_name", f"Student {r['student_id']}"),
+            "question_number": r["question_number"],
+            "student_text": r["student_text"][:220] + ("…" if len(r["student_text"]) > 220 else ""),
+            "examiner_score": r["examiner_score"],
+            "max_score": r["max_score"],
+            "examiner_feedback": raw_fb if raw_fb else "(Optional — None provided)",
+            "has_custom_feedback": bool(raw_fb),
+            "anchor_type": r.get("anchor_type", "full_credit")
+        })
+
+    distinct_questions = list(sorted(set(r["question_number"] for r in rows)))
+    distinct_students = len(set(r["student_id"] for r in rows))
+
+    return {
+        "success": True,
+        "total_rows": len(rows),
+        "distinct_questions": distinct_questions,
+        "distinct_students": distinct_students,
+        "columns_detected": {
+            "question_number": col_map.get("question_number") or "Auto-detected",
+            "student_response": col_map.get("student_text") or "Auto-detected",
+            "examiner_score": col_map.get("examiner_score") or "Auto-detected",
+            "examiner_feedback": col_map.get("examiner_feedback") or "Not provided (Optional)",
+            "student_id": col_map.get("student_id") or "Auto-generated",
+            "max_score": col_map.get("max_score") or "From Rubric / Default (10)"
+        },
+        "has_feedback": has_feedback or any(bool(r.get("examiner_feedback_raw")) for r in rows),
+        "preview_examples": preview_samples
+    }
 
 
 def import_graded_calibration_data(

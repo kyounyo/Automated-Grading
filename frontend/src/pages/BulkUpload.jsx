@@ -1,79 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { UploadCloud, CheckCircle2, FileText, Trash2, ArrowRight, Loader2, Plus, Settings2, Play, Download, ShieldCheck, Users, UserCheck, ChevronDown, ChevronUp, Target, FileSpreadsheet, Sparkles, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { UploadCloud, CheckCircle2, FileText, Trash2, ArrowRight, Loader2, Plus, Download, Users, UserCheck, ChevronDown, ChevronUp, FileSpreadsheet, Sparkles, Sliders, Info, AlertTriangle } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
-import { uploadBulkSubmissions, triggerGradeAll, getQCSettings, updateQCSettings, previewSubmissions, importGradedCalibrationFile, downloadCalibrationTemplate } from '../api/client';
+import { uploadBulkSubmissions, triggerGradeAll, previewSubmissions } from '../api/client';
+
+const TOLERANCE_STEPS = [
+  { val: 0.0, label: 'Strict (0%)', desc: 'Flags any paper if the two AI evaluators have any score difference at all.' },
+  { val: 0.05, label: 'High Precision (5%)', desc: 'Flags papers if the two AI scores differ by more than 5% of total marks.' },
+  { val: 0.10, label: 'Balanced (10%)', desc: 'Recommended default. Small differences (≤10%) pass automatically; larger discrepancies require your review.' },
+  { val: 0.20, label: 'Relaxed (20%)', desc: 'Grants AI more latitude. Only large score discrepancies (>20%) will be flagged for review.' }
+];
 
 const BulkUpload = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { assignments, currentAssignmentId, setCurrentAssignmentId, loadSubmissions, loadAssignments } = useAssignment();
-  
-  // Tab Mode: 'standard' (ungraded submissions) vs 'graded' (pre-graded calibration baseline)
-  const queryMode = new URLSearchParams(location.search).get('mode');
-  const [activeUploadTab, setActiveUploadTab] = useState(queryMode === 'import_graded' ? 'graded' : 'standard');
+  const { assignments, currentAssignmentId, setCurrentAssignmentId, currentAssignment, loadSubmissions, loadAssignments, submissions, handleUpdateAssignment, isAssignmentCreationPending, setIsAssignmentCreationPending } = useAssignment();
+
+  const [toleranceVal, setToleranceVal] = useState(0.10);
+  const [savingTolerance, setSavingTolerance] = useState(false);
+
+  useEffect(() => {
+    if (currentAssignment?.tolerance_rate != null) {
+      setToleranceVal(currentAssignment.tolerance_rate);
+    }
+  }, [currentAssignment?.tolerance_rate]);
+
+  const handleToleranceChange = async (newVal) => {
+    setToleranceVal(newVal);
+    if (!currentAssignmentId) return;
+    try {
+      setSavingTolerance(true);
+      await handleUpdateAssignment(currentAssignmentId, { tolerance_rate: newVal });
+    } catch (e) {
+      console.warn('Failed to update tolerance rate:', e);
+    } finally {
+      setSavingTolerance(false);
+    }
+  };
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-
-  // Graded Submissions Import State
-  const [gradedFile, setGradedFile] = useState(null);
-  const [isImportingGraded, setIsImportingGraded] = useState(false);
-  const [importGradedResult, setImportGradedResult] = useState(null);
-  const [importGradedError, setImportGradedError] = useState(null);
-
-  // Human-in-the-Loop Safeguards Settings
-  const [auditPercentage, setAuditPercentage] = useState(10);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(70);
-  const [isSavingQc, setIsSavingQc] = useState(false);
-
-  useEffect(() => {
-    const qMode = new URLSearchParams(location.search).get('mode');
-    if (qMode === 'import_graded') {
-      setActiveUploadTab('graded');
-    }
-  }, [location.search]);
-
-  // Load existing QC settings for current assignment
-  useEffect(() => {
-    const fetchQc = async () => {
-      try {
-        const data = await getQCSettings();
-        if (data) {
-          if (data.audit_percentage !== undefined) {
-            setAuditPercentage(data.audit_percentage);
-          } else if (data.qc_audit_rate !== undefined) {
-            setAuditPercentage(Math.round(data.qc_audit_rate * 100));
-          }
-          if (data.confidence_threshold !== undefined) {
-            const val = data.confidence_threshold <= 1.0 ? Math.round(data.confidence_threshold * 100) : data.confidence_threshold;
-            setConfidenceThreshold(val);
-          }
-        }
-      } catch (err) {
-        console.warn('Could not load QC settings:', err.message);
-      }
-    };
-    fetchQc();
-  }, [currentAssignmentId]);
-
-  const saveQcSettings = async () => {
-    try {
-      setIsSavingQc(true);
-      await updateQCSettings({
-        enable_random_qc: auditPercentage > 0,
-        qc_audit_rate: auditPercentage / 100.0,
-        audit_percentage: auditPercentage,
-        confidence_threshold: confidenceThreshold / 100.0
-      });
-    } catch (err) {
-      console.warn('Failed to save QC settings:', err.message);
-    } finally {
-      setIsSavingQc(false);
-    }
-  };
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -158,57 +125,6 @@ const BulkUpload = () => {
     document.body.removeChild(link);
   };
 
-  const handleDownloadGradedTemplate = async () => {
-    if (!currentAssignmentId) {
-      alert('Please select a target assignment first.');
-      return;
-    }
-    try {
-      await downloadCalibrationTemplate(currentAssignmentId);
-    } catch (err) {
-      alert(`Could not download calibration template: ${err.message}`);
-    }
-  };
-
-  const handleGradedFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setGradedFile(e.target.files[0]);
-      setImportGradedResult(null);
-      setImportGradedError(null);
-    }
-  };
-
-  const handleImportGraded = async () => {
-    if (!currentAssignmentId) {
-      alert('Please select a target assignment first.');
-      return;
-    }
-    if (!gradedFile) {
-      alert('Please select a pre-graded Excel or CSV file first.');
-      return;
-    }
-
-    try {
-      setIsImportingGraded(true);
-      setImportGradedError(null);
-      setImportGradedResult(null);
-
-      const formData = new FormData();
-      formData.append('file', gradedFile);
-
-      const res = await importGradedCalibrationFile(currentAssignmentId, formData);
-      setImportGradedResult(res);
-
-      // Refresh submissions and assignments context so data is immediately updated
-      await loadSubmissions(currentAssignmentId);
-      await loadAssignments();
-    } catch (err) {
-      setImportGradedError(err.message || 'Failed to import graded submissions');
-    } finally {
-      setIsImportingGraded(false);
-    }
-  };
-
   const uploadStagedFilesToBackend = async () => {
     if (selectedFiles.length === 0) return false;
     const filesToUpload = selectedFiles.filter(f => f.status !== 'Uploaded' && f.file).map(f => f.file);
@@ -252,43 +168,11 @@ const BulkUpload = () => {
       alert('Please select a target assignment first.');
       return;
     }
-    await saveQcSettings();
     const success = await uploadStagedFilesToBackend();
     if (success) {
-      alert('Files uploaded and registered in the database! You can launch grading now or return later.');
+      alert('Files uploaded and registered in the database! You can proceed to Calibration or Submissions List.');
     }
   };
-
-  const handleUploadAndGrade = async () => {
-    if (!currentAssignmentId) {
-      alert('Please select a target assignment first.');
-      return;
-    }
-
-    try {
-      setIsProcessing(true);
-      await saveQcSettings();
-      // Upload any un-uploaded staged files first
-      const hasUnuploaded = selectedFiles.some(f => f.status !== 'Uploaded' && f.file);
-      if (hasUnuploaded) {
-        const success = await uploadStagedFilesToBackend();
-        if (!success) return;
-      }
-
-      setUploadStatus('Launching Multi-Agent AI Auto-Grading Batch...');
-      await triggerGradeAll(currentAssignmentId);
-      alert('Batch AI grading job launched asynchronously! Redirecting to Submissions list...');
-      navigate('/submissions');
-    } catch (err) {
-      alert(`Batch grading failed: ${err.message}`);
-    } finally {
-      setIsProcessing(false);
-      setUploadStatus('');
-    }
-  };
-
-  const selectedAssignment = assignments.find(a => String(a.id) === String(currentAssignmentId));
-  const isCalibrationEnabled = Boolean(selectedAssignment?.calibration_enabled);
 
   const handleProceedToCalibration = async () => {
     if (!currentAssignmentId) {
@@ -298,20 +182,45 @@ const BulkUpload = () => {
 
     try {
       setIsProcessing(true);
-      await saveQcSettings();
-      // Upload any un-uploaded staged files first
       const hasUnuploaded = selectedFiles.some(f => f.status !== 'Uploaded' && f.file);
       if (hasUnuploaded) {
         const success = await uploadStagedFilesToBackend();
         if (!success) return;
       }
-      navigate('/submissions', { state: { filter: 'calibration' } });
+      navigate('/calibration');
     } catch (err) {
       alert(`Upload failed: ${err.message}`);
     } finally {
       setIsProcessing(false);
     }
   };
+
+  const handleProceedToSubmissions = async () => {
+    if (!currentAssignmentId) {
+      alert('Please select a target assignment first.');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const hasUnuploaded = selectedFiles.some(f => f.status !== 'Uploaded' && f.file);
+      if (hasUnuploaded) {
+        const success = await uploadStagedFilesToBackend();
+        if (!success) return;
+      }
+      navigate('/submissions');
+    } catch (err) {
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const selectedAssignment = assignments.find(a => String(a.id) === String(currentAssignmentId));
+  const rubricQuestions = selectedAssignment?.rubric_data || [];
+  const totalMaxMarks = rubricQuestions.length > 0
+    ? rubricQuestions.reduce((acc, item) => acc + (parseFloat(item.max_score || item.maxMark) || 0), 0)
+    : 20;
 
   const unuploadedCount = selectedFiles.filter(f => f.status !== 'Uploaded').length;
   const uploadedCount = selectedFiles.filter(f => f.status === 'Uploaded').length;
@@ -326,70 +235,52 @@ const BulkUpload = () => {
             Submissions Upload
           </h2>
           <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-            {isCalibrationEnabled
-              ? 'Stage and upload student submission files (Excel .xlsx/.csv or PDF). Uploaded files will be sampled for examiner calibration.'
-              : 'Stage and upload student submission files (Excel .xlsx/.csv or PDF). Configure audit thresholds and launch AI grading.'}
+            Upload student submissions (Excel .xlsx, .csv or PDF files). Once uploaded, proceed to calibration or directly to the submissions list.
           </p>
         </div>
       </div>
 
-      {/* Calibration Workflow Guidance Banner */}
-      {isCalibrationEnabled && (
+      {/* Alert if lecturer navigated from Create Assignment without clicking create */}
+      {isAssignmentCreationPending && (
         <div style={{
-          padding: '1rem 1.25rem',
+          padding: '0.85rem 1.15rem',
+          backgroundColor: '#FEF2F2',
+          border: '1px solid #FCA5A5',
           borderRadius: '8px',
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(124, 58, 237, 0.05) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.25)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '0.75rem'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.5rem' }}>🎯</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <AlertTriangle size={20} color="#DC2626" style={{ flexShrink: 0 }} />
             <div>
-              <strong style={{ fontSize: '0.925rem', color: '#4338ca' }}>
-                Examiner Calibration Mode Active
+              <strong style={{ color: '#991B1B', fontSize: '0.875rem' }}>
+                Step 1 Incomplete: No new assignment was created.
               </strong>
-              <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                You can establish calibration exemplars using either method:
-                <strong> (1) Import Existing Grades</strong> from Excel/CSV (if already marked in Moodle/Excel), or
-                <strong> (2) Mark Calibration Samples</strong> interactively in the Grading Studio before running full AI batch grading.
+              <p style={{ margin: 0, fontSize: '0.775rem', color: '#B91C1C', lineHeight: 1.45 }}>
+                You opened "Create Assignment" but navigated to Submissions Upload without clicking the create button. Any files uploaded here will attach to <strong>"{selectedAssignment?.title || 'the current assignment'}"</strong>.
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button
               type="button"
-              onClick={() => setActiveUploadTab('graded')}
-              style={{
-                fontSize: '0.78rem',
-                padding: '0.35rem 0.75rem',
-                backgroundColor: activeUploadTab === 'graded' ? '#4f46e5' : '#fff',
-                color: activeUploadTab === 'graded' ? '#fff' : '#4f46e5',
-                border: '1px solid rgba(99, 102, 241, 0.4)',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem'
-              }}
+              className="btn btn-outline"
+              onClick={() => setIsAssignmentCreationPending(false)}
+              style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', borderColor: '#FCA5A5', color: '#991B1B', backgroundColor: '#fff' }}
             >
-              <Target size={13} /> Import Graded Spreadsheet
+              Use Current Assignment
             </button>
-            <span style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              padding: '0.35rem 0.65rem',
-              backgroundColor: '#fff',
-              borderRadius: '6px',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              color: '#4f46e5'
-            }}>
-              Target: {selectedAssignment?.calibration_sample_size || 3} Samples
-            </span>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => navigate('/create-assignment')}
+              style={{ fontSize: '0.75rem', padding: '0.35rem 0.85rem', backgroundColor: '#DC2626', border: 'none', color: '#fff', fontWeight: 600 }}
+            >
+              Go Back to Step 1 & Create →
+            </button>
           </div>
         </div>
       )}
@@ -436,445 +327,132 @@ const BulkUpload = () => {
                 <UploadCloud size={18} color="var(--primary)" /> 2. Upload Submissions <span style={{ color: 'var(--danger)', fontSize: '0.775rem', fontWeight: 600 }}>*Required</span>
               </h3>
 
-              {/* Segmented Mode Switcher */}
-              <div style={{ display: 'flex', gap: '0.25rem', backgroundColor: 'var(--bg-main)', padding: '0.2rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                <button
-                  type="button"
-                  onClick={() => setActiveUploadTab('standard')}
-                  style={{
-                    padding: '0.3rem 0.65rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    backgroundColor: activeUploadTab === 'standard' ? '#fff' : 'transparent',
-                    color: activeUploadTab === 'standard' ? 'var(--primary)' : 'var(--text-muted)',
-                    boxShadow: activeUploadTab === 'standard' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
-                  }}
-                >
-                  <UploadCloud size={13} /> Ungraded Papers
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveUploadTab('graded')}
-                  style={{
-                    padding: '0.3rem 0.65rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    backgroundColor: activeUploadTab === 'graded' ? '#fff' : 'transparent',
-                    color: activeUploadTab === 'graded' ? '#4f46e5' : 'var(--text-muted)',
-                    boxShadow: activeUploadTab === 'graded' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
-                  }}
-                  title="Upload spreadsheet with existing lecturer scores & feedback"
-                >
-                  <Target size={13} color="#4f46e5" />
-                  Import Graded
-                  <span style={{
-                    fontSize: '0.65rem',
-                    backgroundColor: '#e0e7ff',
-                    color: '#4338ca',
-                    padding: '0.05rem 0.35rem',
-                    borderRadius: '3px',
-                    fontWeight: 700
-                  }}>
-                    Exemplars
-                  </span>
-                </button>
-              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={downloadSubmissionsTemplate}
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Download size={13} color="var(--primary)" /> Template (.csv)
+              </button>
             </div>
 
-            {activeUploadTab === 'graded' ? (
-              /* TAB B: Import Pre-Graded Submissions */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                <div style={{
-                  padding: '0.75rem 1rem',
-                  borderRadius: '6px',
-                  backgroundColor: '#f5f3ff',
-                  border: '1px solid #ddd6fe',
-                  fontSize: '0.78rem',
-                  color: '#4c1d95',
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => document.getElementById('bulkFileInput').click()}
+                style={{
+                  border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: '8px',
+                  padding: '1.35rem 1.15rem',
+                  textAlign: 'center',
+                  backgroundColor: isDragging ? 'var(--primary-light)' : 'var(--bg-main)',
+                  cursor: 'pointer',
+                  flex: 1,
+                  minHeight: '140px',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem'
-                }}>
-                  <div style={{ maxWidth: '420px' }}>
-                    <strong>Upload Previously Graded Papers:</strong> Already evaluated student answers in Excel or Moodle?
-                    Upload your spreadsheet with scores and feedback to directly inject them as calibration exemplars.
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={handleDownloadGradedTemplate}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.65rem',
-                      backgroundColor: '#fff',
-                      borderColor: '#c4b5fd',
-                      color: '#5b21b6',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem'
-                    }}
-                  >
-                    <Download size={13} /> Download Template (.csv)
-                  </button>
-                </div>
+                  justifyContent: 'center',
+                  transition: 'all var(--transition-fast)'
+                }}
+              >
+                <input
+                  id="bulkFileInput"
+                  type="file"
+                  multiple
+                  accept=".xlsx,.xls,.csv,.pdf"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={handleFileInput}
+                  style={{ display: 'none' }}
+                />
 
-                <div
-                  onDragOver={(e) => { e.preventDefault(); }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                      setGradedFile(e.dataTransfer.files[0]);
-                      setImportGradedResult(null);
-                      setImportGradedError(null);
-                    }
-                  }}
-                  onClick={() => document.getElementById('gradedFileInput').click()}
-                  style={{
-                    border: '2px dashed #a5b4fc',
-                    borderRadius: '8px',
-                    padding: '1.25rem 1.15rem',
-                    textAlign: 'center',
-                    backgroundColor: '#faf5ff',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: '130px',
-                    transition: 'all var(--transition-fast)'
-                  }}
-                >
-                  <input
-                    id="gradedFileInput"
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={handleGradedFileChange}
-                    style={{ display: 'none' }}
-                  />
-
-                  {isImportingGraded ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: '#4f46e5' }}>
-                      <Loader2 size={24} className="spin" />
-                      <div style={{ textAlign: 'left' }}>
-                        <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#312e81' }}>Importing Graded Exemplars...</h4>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#6366f1' }}>Registering submissions and calibration exemplars</p>
-                      </div>
+                {isProcessing || isExtracting ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--primary)' }}>
+                    <Loader2 size={24} className="spin" />
+                    <div style={{ textAlign: 'left' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--primary-dark)' }}>Extracting {selectedFiles.length} File(s)...</h4>
+                      <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Parsing student submission datasets</p>
                     </div>
-                  ) : gradedFile ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4f46e5' }}>
-                        <FileSpreadsheet size={22} />
-                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e1b4b' }}>
-                          {gradedFile.name}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                          ({(gradedFile.size / 1024).toFixed(1)} KB)
-                        </span>
-                      </div>
-                      <span style={{ fontSize: '0.725rem', color: '#6b7280' }}>
-                        Ready to import! Click below to confirm, or click here to choose another file.
+                  </div>
+                ) : selectedFiles.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--success)' }}>
+                      <CheckCircle2 size={20} />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        {selectedFiles.length} File(s) Attached
                       </span>
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                      <UploadCloud size={28} color="#6366f1" style={{ marginBottom: '0.15rem' }} />
-                      <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: '#312e81', fontWeight: 700 }}>
-                        Drag & drop Pre-Graded Spreadsheet here
-                      </h4>
-                      <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>
-                        Supports <strong>.xlsx, .xls, .csv</strong> containing Student ID, Question, Score, & Feedback
-                      </p>
-                    </div>
-                  )}
-                </div>
 
-                {/* Graded file action row */}
-                {gradedFile && !isImportingGraded && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', alignItems: 'center' }}>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => { setGradedFile(null); setImportGradedResult(null); setImportGradedError(null); }}
-                      style={{ fontSize: '0.75rem', padding: '0.3rem 0.65rem', color: 'var(--danger)' }}
-                    >
-                      Remove
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleImportGraded}
-                      style={{
-                        fontSize: '0.8rem',
-                        padding: '0.4rem 1rem',
-                        background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                        border: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)'
-                      }}
-                    >
-                      <Sparkles size={14} /> Import as Calibration Exemplars
-                    </button>
-                  </div>
-                )}
-
-                {/* Error Banner */}
-                {importGradedError && (
-                  <div style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: '6px',
-                    backgroundColor: '#fee2e2',
-                    border: '1px solid #fca5a5',
-                    color: '#b91c1c',
-                    fontSize: '0.8rem'
-                  }}>
-                    ⚠️ <strong>Import Error:</strong> {importGradedError}
-                  </div>
-                )}
-
-                {/* Success Banner */}
-                {importGradedResult && (
-                  <div style={{
-                    padding: '0.85rem 1.15rem',
-                    borderRadius: '6px',
-                    backgroundColor: '#ecfdf5',
-                    border: '1px solid #6ee7b7',
-                    color: '#065f46',
-                    fontSize: '0.825rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.5rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <CheckCircle2 size={18} color="#059669" />
-                      <strong style={{ fontSize: '0.875rem' }}>
-                        {importGradedResult.message || 'Successfully imported graded submissions!'}
-                      </strong>
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: '#047857', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
-                      <span>Questions covered:</span>
-                      {importGradedResult.questions_covered?.map(q => (
-                        <span key={q} style={{ backgroundColor: '#d1fae5', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
-                          {q}
+                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {selectedFiles.map((f, i) => (
+                        <span
+                          key={f.id || i}
+                          className="status-badge"
+                          style={{
+                            backgroundColor: 'var(--success-bg)',
+                            color: 'var(--success)',
+                            fontSize: '0.75rem',
+                            padding: '0.2rem 0.5rem',
+                            border: '1px solid var(--success-border)'
+                          }}
+                        >
+                          📄 {f.name} ({f.size})
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFile(f.id);
+                            }}
+                            title="Remove file"
+                            style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.35rem', color: 'var(--danger)' }}
+                          >
+                            ✕
+                          </span>
                         </span>
                       ))}
                     </div>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => navigate('/submissions?filter=calibration')}
-                        style={{ fontSize: '0.775rem', padding: '0.35rem 0.8rem', backgroundColor: '#059669', border: 'none' }}
-                      >
-                        🎯 View Calibration Samples in Submissions List →
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => navigate('/submissions')}
-                        style={{ fontSize: '0.775rem', padding: '0.35rem 0.8rem', borderColor: '#059669', color: '#065f46' }}
-                      >
-                        Go to Submissions Overview
-                      </button>
-                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        document.getElementById('bulkFileInput').click();
+                      }}
+                      style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', marginTop: '0.2rem' }}
+                    >
+                      <Plus size={13} color="var(--primary)" /> Add More
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                    <UploadCloud size={28} color="var(--primary)" style={{ marginBottom: '0.15rem', opacity: 0.8 }} />
+                    <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>
+                      Drag & drop Student Submission files here
+                    </h4>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                      Supports <strong>.xlsx, .csv, .pdf</strong> or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Browse files</span>
+                    </p>
                   </div>
                 )}
               </div>
-            ) : (
-              /* TAB A: Standard Ungraded Submissions Drop Zone */
-              <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={downloadSubmissionsTemplate}
-                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                  >
-                    <Download size={13} color="var(--primary)" /> Template (.csv)
-                  </button>
+
+              {uploadStatus && (
+                <div style={{ marginTop: '0.65rem', color: 'var(--primary)', fontWeight: 600, fontSize: '0.8rem', textAlign: 'center' }}>
+                  {uploadStatus}
                 </div>
-
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => document.getElementById('bulkFileInput').click()}
-                  style={{
-                    border: `2px dashed ${isDragging ? 'var(--primary)' : 'var(--border)'}`,
-                    borderRadius: '8px',
-                    padding: '1.35rem 1.15rem',
-                    textAlign: 'center',
-                    backgroundColor: isDragging ? 'var(--primary-light)' : 'var(--bg-main)',
-                    cursor: 'pointer',
-                    flex: 1,
-                    minHeight: '140px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all var(--transition-fast)'
-                  }}
-                >
-                  <input
-                    id="bulkFileInput"
-                    type="file"
-                    multiple
-                    accept=".xlsx,.xls,.csv,.pdf"
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={handleFileInput}
-                    style={{ display: 'none' }}
-                  />
-
-                  {isProcessing || isExtracting ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--primary)' }}>
-                      <Loader2 size={24} className="spin" />
-                      <div style={{ textAlign: 'left' }}>
-                        <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--primary-dark)' }}>Extracting {selectedFiles.length} File(s)...</h4>
-                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>Parsing student submission datasets</p>
-                      </div>
-                    </div>
-                  ) : selectedFiles.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--success)' }}>
-                        <CheckCircle2 size={20} />
-                        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                          {selectedFiles.length} File(s) Attached
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                        {selectedFiles.map((f, i) => (
-                          <span
-                            key={f.id || i}
-                            className="status-badge"
-                            style={{
-                              backgroundColor: 'var(--success-bg)',
-                              color: 'var(--success)',
-                              fontSize: '0.75rem',
-                              padding: '0.2rem 0.5rem',
-                              border: '1px solid var(--success-border)'
-                            }}
-                          >
-                            📄 {f.name} ({f.size})
-                            <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveFile(f.id);
-                              }}
-                              title="Remove file"
-                              style={{ cursor: 'pointer', fontWeight: 700, marginLeft: '0.35rem', color: 'var(--danger)' }}
-                            >
-                              ✕
-                            </span>
-                          </span>
-                        ))}
-                      </div>
-
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          document.getElementById('bulkFileInput').click();
-                        }}
-                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', marginTop: '0.2rem' }}
-                      >
-                        <Plus size={13} color="var(--primary)" /> Add More
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
-                      <UploadCloud size={28} color="var(--primary)" style={{ marginBottom: '0.15rem', opacity: 0.8 }} />
-                      <h4 style={{ margin: '0 0 0.15rem 0', fontSize: '0.875rem', color: 'var(--secondary)', fontWeight: 700 }}>
-                        Drag & drop Student Submission files here
-                      </h4>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                        Supports <strong>.xlsx, .csv, .pdf</strong> or <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Browse files</span>
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {uploadStatus && (
-                  <div style={{ marginTop: '0.65rem', color: 'var(--primary)', fontWeight: 600, fontSize: '0.8rem', textAlign: 'center' }}>
-                    {uploadStatus}
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
       </div>
 
-      {/* 3. Step 3: Quality Control */}
-      <div className="card-panel" style={{ padding: '1.35rem 1.6rem' }}>
-        <h3 style={{ marginBottom: '0.85rem', color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-          <ShieldCheck size={18} color="var(--primary)" /> 3. Quality Control
-        </h3>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-          <div>
-            <label className="label" style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-              <span>Random Quality Control Audit Sampling Rate</span>
-              <span style={{ color: auditPercentage > 0 ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 700 }}>
-                {auditPercentage > 0 ? `${auditPercentage}%` : '0% (OFF)'}
-              </span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="20"
-              step="5"
-              value={auditPercentage}
-              onChange={(e) => setAuditPercentage(parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
-              Randomly flags {auditPercentage}% of papers for lecturer audit.
-            </span>
-          </div>
-
-          <div>
-            <label className="label" style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-              <span>Low Confidence Audit Flag Threshold</span>
-              <span style={{ color: confidenceThreshold > 0 ? 'var(--warning)' : 'var(--text-muted)', fontWeight: 700 }}>
-                {confidenceThreshold > 0 ? `< ${confidenceThreshold}%` : 'OFF'}
-              </span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="90"
-              step="5"
-              value={confidenceThreshold}
-              onChange={(e) => setConfidenceThreshold(parseInt(e.target.value))}
-              style={{ width: '100%', accentColor: 'var(--warning)', cursor: 'pointer' }}
-            />
-            <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
-              Flags any paper with AI grading confidence below {confidenceThreshold}%.
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 4. Selected Staged Files List */}
+      {/* Staged Submissions List */}
       {selectedFiles.length > 0 && (
         <div className="card-panel" style={{ padding: '1.35rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
@@ -1051,133 +629,251 @@ const BulkUpload = () => {
         </div>
       )}
 
+      {/* 4. Acceptable Mark Difference (Tolerance Setting) */}
+      <div className="card-panel" style={{ padding: '1.35rem 1.6rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <Sliders size={18} color="var(--primary)" /> Acceptable Mark Difference (Tolerance)
+          </h3>
+          <span style={{
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            color: 'var(--primary)',
+            backgroundColor: 'var(--primary-light)',
+            padding: '0.2rem 0.65rem',
+            borderRadius: '999px',
+            border: '1px solid var(--border)'
+          }}>
+            {toleranceVal === 0 ? 'Strict (0%)' : toleranceVal <= 0.05 ? 'High Precision (5%)' : toleranceVal <= 0.10 ? 'Balanced (10% - Recommended)' : 'Relaxed (20%)'} • ±{(toleranceVal * totalMaxMarks).toFixed(1)} marks
+          </span>
+        </div>
+
+        <p style={{ margin: '0 0 1rem 0', fontSize: '0.825rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+          Tolerance is the maximum score difference allowed between two AI evaluators on <strong>each individual question</strong> before that question is flagged for your manual review.
+        </p>
+
+        <div style={{ maxWidth: '520px', marginBottom: '1.15rem' }}>
+          {(() => {
+            const curIdx = TOLERANCE_STEPS.findIndex(s => Math.abs(s.val - toleranceVal) < 0.01);
+            const activeStep = TOLERANCE_STEPS[curIdx >= 0 ? curIdx : 2];
+            return (
+              <>
+                <input
+                  type="range"
+                  min={0}
+                  max={3}
+                  step={1}
+                  value={curIdx >= 0 ? curIdx : 2}
+                  onChange={(e) => handleToleranceChange(TOLERANCE_STEPS[parseInt(e.target.value)].val)}
+                  disabled={savingTolerance || !currentAssignmentId}
+                  style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer', height: '6px' }}
+                />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem' }}>
+                  {TOLERANCE_STEPS.map((step, idx) => (
+                    <span
+                      key={idx}
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: Math.abs(step.val - toleranceVal) < 0.01 ? 700 : 500,
+                        color: Math.abs(step.val - toleranceVal) < 0.01 ? 'var(--primary)' : 'var(--text-muted)',
+                        textAlign: idx === 0 ? 'left' : idx === TOLERANCE_STEPS.length - 1 ? 'right' : 'center',
+                        flex: 1
+                      }}
+                    >
+                      {step.label}
+                    </span>
+                  ))}
+                </div>
+
+                <div style={{ marginTop: '0.75rem', padding: '0.65rem 0.85rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  <Info size={13} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--primary)' }} />
+                  <strong>Active Setting ({activeStep.label}):</strong> If the two AI evaluators differ by more than the allowed mark difference on any question below, the paper is flagged for your manual review.
+                  {savingTolerance && <span style={{ marginLeft: 8, color: 'var(--primary)', fontWeight: 600 }}>Saving…</span>}
+                </div>
+              </>
+            );
+          })()}
+        </div>
+
+        {/* Per-Question Mark Difference Table for Uploaded Questions */}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--secondary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>📋 Uploaded Questions in System ({rubricQuestions.length} questions)</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+              Columns show acceptable mark difference between two AI evaluators
+            </span>
+          </div>
+
+          <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.825rem', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '0.6rem 0.9rem', color: 'var(--secondary)', fontWeight: 700 }}>Question</th>
+                  <th style={{ padding: '0.6rem 0.9rem', color: 'var(--secondary)', fontWeight: 700 }}>Max Marks</th>
+                  <th style={{
+                    padding: '0.6rem 0.9rem',
+                    color: Math.abs(toleranceVal - 0.0) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
+                    backgroundColor: Math.abs(toleranceVal - 0.0) < 0.01 ? 'var(--primary-light)' : 'transparent',
+                    fontWeight: 700
+                  }}>
+                    Strict (0%) {Math.abs(toleranceVal - 0.0) < 0.01 && '★'}
+                  </th>
+                  <th style={{
+                    padding: '0.6rem 0.9rem',
+                    color: Math.abs(toleranceVal - 0.05) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
+                    backgroundColor: Math.abs(toleranceVal - 0.05) < 0.01 ? 'var(--primary-light)' : 'transparent',
+                    fontWeight: 700
+                  }}>
+                    High Precision (5%) {Math.abs(toleranceVal - 0.05) < 0.01 && '★'}
+                  </th>
+                  <th style={{
+                    padding: '0.6rem 0.9rem',
+                    color: Math.abs(toleranceVal - 0.10) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
+                    backgroundColor: Math.abs(toleranceVal - 0.10) < 0.01 ? 'var(--primary-light)' : 'transparent',
+                    fontWeight: 700
+                  }}>
+                    Balanced (10%) {Math.abs(toleranceVal - 0.10) < 0.01 && '★ (Default)'}
+                  </th>
+                  <th style={{
+                    padding: '0.6rem 0.9rem',
+                    color: Math.abs(toleranceVal - 0.20) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
+                    backgroundColor: Math.abs(toleranceVal - 0.20) < 0.01 ? 'var(--primary-light)' : 'transparent',
+                    fontWeight: 700
+                  }}>
+                    Relaxed (20%) {Math.abs(toleranceVal - 0.20) < 0.01 && '★'}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rubricQuestions.length > 0 ? (
+                  rubricQuestions.map((q, idx) => {
+                    const qNum = q.question_number || (q.number ? `Q${q.number}` : `Q${idx + 1}`);
+                    const maxScore = parseFloat(q.max_score || q.maxMark || 10.0);
+                    const prompt = q.prompt || q.text || '';
+
+                    return (
+                      <tr key={idx} style={{ borderBottom: idx < rubricQuestions.length - 1 ? '1px solid var(--border)' : 'none', backgroundColor: idx % 2 === 0 ? '#fff' : 'var(--bg-main)' }}>
+                        <td style={{ padding: '0.65rem 0.9rem', fontWeight: 700, color: 'var(--primary)' }}>
+                          <div>{qNum}</div>
+                          {prompt && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {prompt}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.65rem 0.9rem', fontWeight: 600 }}>
+                          {maxScore} pts
+                        </td>
+                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.0) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.0) < 0.01 ? 700 : 500 }}>
+                          ±0.0 pts
+                        </td>
+                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.05) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.05) < 0.01 ? 700 : 500 }}>
+                          ±{(0.05 * maxScore).toFixed(1)} pts
+                        </td>
+                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.10) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.10) < 0.01 ? 700 : 500 }}>
+                          ±{(0.10 * maxScore).toFixed(1)} pts
+                        </td>
+                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.20) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.20) < 0.01 ? 700 : 500 }}>
+                          ±{(0.20 * maxScore).toFixed(1)} pts
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No rubric questions uploaded yet for this assignment.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Quick Reference for Standard Question Max Marks */}
+        <div style={{ padding: '0.75rem 1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '6px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--secondary)', marginBottom: '0.35rem' }}>
+            💡 Quick Formula: Allowed Mark Difference = Tolerance % × Question Maximum Marks
+          </div>
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <span>• <strong>5-mark question</strong>: ±0.25 pts (5%) | <strong>±0.5 pts (10%)</strong> | ±1.0 pt (20%)</span>
+            <span>• <strong>10-mark question</strong>: ±0.5 pts (5%) | <strong>±1.0 pt (10%)</strong> | ±2.0 pts (20%)</span>
+            <span>• <strong>15-mark question</strong>: ±0.75 pts (5%) | <strong>±1.5 pts (10%)</strong> | ±3.0 pts (20%)</span>
+            <span>• <strong>20-mark question</strong>: ±1.0 pt (5%) | <strong>±2.0 pts (10%)</strong> | ±4.0 pts (20%)</span>
+          </div>
+        </div>
+      </div>
+
       {/* 5. Bottom Submission Bar */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.5rem', alignItems: 'center' }}>
-        {activeUploadTab === 'graded' ? (
-          <>
-            {importGradedResult ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => navigate('/submissions?filter=calibration')}
-                style={{
-                  padding: '0.5rem 1.35rem',
-                  fontSize: '0.875rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  backgroundColor: '#059669',
-                  border: 'none',
-                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.3)'
-                }}
-              >
-                <Target size={15} /> View Calibration Samples in Submissions List →
-              </button>
-            ) : gradedFile ? (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => { setGradedFile(null); setImportGradedResult(null); setImportGradedError(null); }}
-                  style={{ fontSize: '0.85rem' }}
-                >
-                  Clear File
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleImportGraded}
-                  disabled={isImportingGraded || !currentAssignmentId}
-                  style={{
-                    padding: '0.5rem 1.35rem',
-                    fontSize: '0.875rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                    border: 'none',
-                    boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)'
-                  }}
-                >
-                  {isImportingGraded ? (
-                    <><Loader2 size={15} className="spin" /> Importing...</>
-                  ) : (
-                    <><Sparkles size={15} /> Import as Calibration Exemplars</>
-                  )}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => navigate('/submissions?filter=calibration')}
-                style={{
-                  padding: '0.5rem 1.35rem',
-                  fontSize: '0.875rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                  border: 'none'
-                }}
-              >
-                <Target size={15} /> View Calibration Studio →
-              </button>
-            )}
-          </>
-        ) : (
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={handleConfirmUploadOnly}
+          disabled={isProcessing || selectedFiles.length === 0}
+          style={{ fontSize: '0.85rem' }}
+        >
+          {isProcessing ? 'Processing...' : 'Upload Files Only'}
+        </button>
+
+        {currentAssignment?.calibration_enabled ? (
           <>
             <button
               type="button"
               className="btn btn-outline"
-              onClick={handleConfirmUploadOnly}
-              disabled={isProcessing || selectedFiles.length === 0}
+              onClick={handleProceedToSubmissions}
+              disabled={isProcessing || !currentAssignmentId}
               style={{ fontSize: '0.85rem' }}
             >
-              {isProcessing ? 'Processing...' : 'Upload Files Only'}
+              Skip to Submissions List →
             </button>
-            {isCalibrationEnabled ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleProceedToCalibration}
-                disabled={isProcessing || !currentAssignmentId}
-                style={{
-                  padding: '0.5rem 1.35rem',
-                  fontSize: '0.875rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                  border: 'none',
-                  boxShadow: '0 2px 6px rgba(79, 70, 229, 0.3)'
-                }}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 size={15} className="spin" /> Processing...
-                  </>
-                ) : (
-                  <>
-                    <Target size={15} />
-                    {unuploadedCount > 0 || selectedFiles.length === 0
-                      ? 'Upload & Proceed to Calibration'
-                      : 'Proceed to Calibration Samples →'}
-                  </>
-                )}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleUploadAndGrade}
-                disabled={isProcessing || !currentAssignmentId}
-                style={{ padding: '0.5rem 1.35rem', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
-              >
-                {isProcessing ? 'Grading...' : <><Play size={15} /> Launch AI Grading Batch</>}
-              </button>
-            )}
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleProceedToCalibration}
+              disabled={isProcessing || !currentAssignmentId}
+              style={{
+                padding: '0.55rem 1.4rem',
+                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                backgroundColor: 'var(--primary)',
+                boxShadow: '0 2px 6px rgba(59, 130, 196, 0.3)'
+              }}
+            >
+              {isProcessing ? (
+                <><Loader2 size={15} className="spin" /> Uploading...</>
+              ) : (
+                <>Next: Calibration (Step 3) <ArrowRight size={15} /></>
+              )}
+            </button>
           </>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleProceedToSubmissions}
+            disabled={isProcessing || !currentAssignmentId}
+            style={{
+              padding: '0.55rem 1.4rem',
+              fontSize: '0.875rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              backgroundColor: 'var(--primary)',
+              boxShadow: '0 2px 6px rgba(59, 130, 196, 0.3)'
+            }}
+          >
+            {isProcessing ? (
+              <><Loader2 size={15} className="spin" /> Uploading...</>
+            ) : (
+              <>Next: Submissions List (Step 3) <ArrowRight size={15} /></>
+            )}
+          </button>
         )}
       </div>
 

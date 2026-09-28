@@ -89,6 +89,14 @@ const Dashboard = () => {
   const totalScoreSum = gradedSubs.reduce((acc, curr) => acc + curr.score, 0);
   const averageScore = gradedSubs.length > 0 ? (totalScoreSum / gradedSubs.length).toFixed(1) : '0.0';
 
+  // Estimated review time: ~3 mins per flagged paper
+  const estimatedReviewMins = flaggedCount * 3;
+  const estimatedReviewLabel = estimatedReviewMins === 0
+    ? 'Nothing to review'
+    : estimatedReviewMins < 60
+      ? `~${estimatedReviewMins} min review`
+      : `~${Math.round(estimatedReviewMins / 60 * 10) / 10}h review`;
+
   // Extract Whole Question Breakdown Analytics
   const getParentQuestionKey = (qNum) => {
     if (!qNum) return 'Q1';
@@ -210,6 +218,7 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Header action buttons */}
         <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
           <button
             className="btn btn-outline"
@@ -217,7 +226,7 @@ const Dashboard = () => {
             disabled={totalSubmissions === 0}
             style={{ fontSize: '0.825rem' }}
           >
-            <Download size={14} color="var(--primary)" /> Export CSV
+            <Download size={14} color="var(--primary)" /> Export Grades
           </button>
           <button
             className="btn btn-primary"
@@ -225,7 +234,7 @@ const Dashboard = () => {
             disabled={loading || totalSubmissions === 0 || unassessedSubs.length === 0}
             style={{ fontSize: '0.825rem' }}
           >
-            <Play size={14} /> Grade All Pending ({unassessedSubs.length})
+            <Play size={14} /> Grade All Papers ({unassessedSubs.length} pending)
           </button>
         </div>
       </div>
@@ -233,7 +242,7 @@ const Dashboard = () => {
       {/* 2. Soft Blue Minimalist Metric Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.15rem' }}>
 
-        {/* Card 1: Total Submissions (Crisp Sky Blue - distinct from panel) */}
+        {/* Card 1: Total Submissions */}
         <div
           onClick={() => navigate('/submissions', { state: { filter: 'all' } })}
           className="card-panel"
@@ -250,7 +259,7 @@ const Dashboard = () => {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#0369A1' }}>
-              Total Submissions
+              Student Papers
             </span>
             <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Users size={15} color="#0284C7" />
@@ -262,11 +271,11 @@ const Dashboard = () => {
             </div>
           </div>
           <span style={{ fontSize: '0.775rem', color: '#0284C7', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-            Browse All Papers <ArrowRight size={12} color="#0284C7" />
+            View all submissions <ArrowRight size={12} color="#0284C7" />
           </span>
         </div>
 
-        {/* Card 2: Graded & Approved (Soft Mint Emerald) */}
+        {/* Card 2: Graded & Approved */}
         <div
           onClick={() => navigate('/submissions', { state: { filter: 'graded' } })}
           className="card-panel"
@@ -283,7 +292,7 @@ const Dashboard = () => {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#16A34A' }}>
-              Graded & Approved
+              Ready to Finalise
             </span>
             <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Award size={15} color="#16A34A" />
@@ -295,11 +304,11 @@ const Dashboard = () => {
             </div>
           </div>
           <span style={{ fontSize: '0.775rem', color: '#16A34A', fontWeight: 600 }}>
-            {totalSubmissions > 0 ? `${Math.round((gradedApproved / totalSubmissions) * 100)}% evaluated` : '0%'}
+            {totalSubmissions > 0 ? `${Math.round((gradedApproved / totalSubmissions) * 100)}% of class graded` : '0% graded'}
           </span>
         </div>
 
-        {/* Card 3: Flagged for Review (Soft Warm Amber) */}
+        {/* Card 3: Flagged for Review — now with estimated review time */}
         <div
           onClick={() => navigate('/submissions', { state: { filter: 'flagged' } })}
           className="card-panel"
@@ -316,7 +325,7 @@ const Dashboard = () => {
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#D97706' }}>
-              Flagged for Audit
+              Needs Your Attention
             </span>
             <div style={{ width: '30px', height: '30px', borderRadius: '6px', backgroundColor: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShieldAlert size={15} color="#D97706" />
@@ -328,11 +337,11 @@ const Dashboard = () => {
             </div>
           </div>
           <span style={{ fontSize: '0.775rem', color: '#D97706', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-            {flaggedCount > 0 ? <>Review Flagged Papers <ArrowRight size={12} /></> : 'All papers clear'}
+            {flaggedCount > 0 ? <>{estimatedReviewLabel} <ArrowRight size={12} /></> : '✓ All papers look good'}
           </span>
         </div>
 
-        {/* Card 4: Class Average (Light Blush Pink) */}
+        {/* Card 4: Class Average */}
         <div
           className="card-panel"
           style={{
@@ -360,7 +369,7 @@ const Dashboard = () => {
             </div>
           </div>
           <span style={{ fontSize: '0.775rem', color: '#91215B', fontWeight: 600 }}>
-            From {gradedSubs.length} graded paper(s)
+            Based on {gradedSubs.length} graded paper{gradedSubs.length !== 1 ? 's' : ''}
           </span>
         </div>
 
@@ -438,7 +447,7 @@ const Dashboard = () => {
 
           {unassessedSubs.length > 0 && (
             <div style={{ marginTop: '1rem', padding: '0.55rem 0.85rem', backgroundColor: 'var(--primary-light)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--primary-dark)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <AlertTriangle size={14} color="var(--primary)" /> {unassessedSubs.length} submission(s) are awaiting AI grading.
+              <AlertTriangle size={14} color="var(--primary)" /> {unassessedSubs.length} paper{unassessedSubs.length !== 1 ? 's' : ''} waiting to be graded — click "Grade All" above to start.
             </div>
           )}
         </div>

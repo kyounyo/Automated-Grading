@@ -1,12 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, Plus, Trash2, CheckCircle2, FileText, Sparkles, ArrowRight, Loader2, FileCheck, AlertTriangle, Download } from 'lucide-react';
+import { UploadCloud, Plus, Trash2, CheckCircle2, FileText, Sparkles, ArrowRight, Loader2, FileCheck, AlertTriangle, Download, Target } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { createAssignment, parseRubricFile } from '../api/client';
 
 const AssignmentCreator = () => {
   const navigate = useNavigate();
-  const { loadAssignments, setCurrentAssignmentId } = useAssignment();
+  const { loadAssignments, setCurrentAssignmentId, setIsAssignmentCreationPending } = useAssignment();
+
+  // Track that lecturer has entered Create Assignment flow (pending until saved)
+  useEffect(() => {
+    setIsAssignmentCreationPending(true);
+  }, [setIsAssignmentCreationPending]);
 
   // Form State initialized clean/empty for user input
   const [assignmentTitle, setAssignmentTitle] = useState('');
@@ -17,7 +22,6 @@ const AssignmentCreator = () => {
   const [isParsing, setIsParsing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [calibrationEnabled, setCalibrationEnabled] = useState(false);
-  const [calibrationSampleSize, setCalibrationSampleSize] = useState(3);
 
   // Question List State starting with a blank question
   const [questions, setQuestions] = useState([
@@ -156,13 +160,14 @@ const AssignmentCreator = () => {
         rubric_data: rubricData,
         model_answer: "",
         calibration_enabled: calibrationEnabled,
-        calibration_sample_size: parseInt(calibrationSampleSize, 10) || 3
+        calibration_sample_size: 3
       };
 
       const created = await createAssignment(payload);
 
       await loadAssignments();
       setCurrentAssignmentId(created.id);
+      setIsAssignmentCreationPending(false);
 
       alert(`Assignment '${created.title}' created in PostgreSQL and indexed into ChromaDB!`);
       navigate('/bulk-upload');
@@ -188,7 +193,15 @@ const AssignmentCreator = () => {
 
         {/* Quick Actions in Header to save bottom space */}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button type="button" className="btn btn-outline" onClick={() => navigate('/')} style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => {
+              setIsAssignmentCreationPending(false);
+              navigate('/');
+            }}
+            style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+          >
             Cancel
           </button>
           <button
@@ -241,59 +254,6 @@ const AssignmentCreator = () => {
                 />
               </div>
 
-              {/* Examiner Calibration Settings Box */}
-              <div style={{
-                marginTop: '0.25rem',
-                padding: '0.75rem 0.85rem',
-                background: 'rgba(99, 102, 241, 0.04)',
-                borderRadius: '8px',
-                border: '1px solid rgba(99, 102, 241, 0.2)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.35rem'
-              }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.825rem',
-                  fontWeight: 600,
-                  color: 'var(--secondary)',
-                  cursor: 'pointer'
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={calibrationEnabled}
-                    onChange={(e) => setCalibrationEnabled(e.target.checked)}
-                    style={{ width: '15px', height: '15px', accentColor: 'var(--primary)', cursor: 'pointer' }}
-                  />
-                  Enable Examiner Calibration for New Questions
-                </label>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '1.4rem' }}>
-                  Recommended for new or subjective questions to align AI grading with examiner standards.
-                </div>
-                {calibrationEnabled && (
-                  <div style={{ marginTop: '0.35rem', marginLeft: '1.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.775rem', color: 'var(--secondary)' }}>Baseline sample size:</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      value={calibrationSampleSize}
-                      onChange={(e) => setCalibrationSampleSize(Math.max(1, Math.min(5, parseInt(e.target.value) || 3)))}
-                      style={{
-                        width: '50px',
-                        padding: '0.2rem 0.35rem',
-                        fontSize: '0.8rem',
-                        borderRadius: '4px',
-                        border: '1px solid var(--border-color)',
-                        textAlign: 'center'
-                      }}
-                    />
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>submissions per cohort</span>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
@@ -432,6 +392,90 @@ const AssignmentCreator = () => {
             )}
           </div>
 
+        </div>
+
+        {/* Examiner Calibration Preference */}
+        <div className="card-panel" style={{ padding: '1.25rem 1.6rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <Target size={18} color="var(--primary)" /> Examiner Calibration Option
+            </h3>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: calibrationEnabled ? '#4338ca' : '#475569',
+              backgroundColor: calibrationEnabled ? '#e0e7ff' : '#f1f5f9',
+              padding: '0.2rem 0.65rem',
+              borderRadius: '999px',
+              border: `1px solid ${calibrationEnabled ? '#c7d2fe' : '#cbd5e1'}`
+            }}>
+              {calibrationEnabled ? '🎯 Calibration Step Enabled' : '⚡ Calibration Step Skipped'}
+            </span>
+          </div>
+
+          <p style={{ margin: '0 0 1rem 0', fontSize: '0.825rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Do you want to include an Examiner Calibration step where you can grade a few sample student papers so the AI adapts to your marking style?
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            {/* Option A: Skip Calibration */}
+            <div
+              onClick={() => setCalibrationEnabled(false)}
+              style={{
+                border: `2px solid ${!calibrationEnabled ? 'var(--primary)' : 'var(--border)'}`,
+                backgroundColor: !calibrationEnabled ? 'var(--primary-light)' : '#fff',
+                borderRadius: '8px',
+                padding: '1rem 1.15rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: !calibrationEnabled ? 'var(--primary-dark)' : 'var(--secondary)' }}>
+                  ⚡ No, skip calibration (Direct Grading)
+                </span>
+                <input
+                  type="radio"
+                  name="calibrationPref"
+                  checked={!calibrationEnabled}
+                  onChange={() => setCalibrationEnabled(false)}
+                  style={{ accentColor: 'var(--primary)' }}
+                />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                Submissions will go straight to AI batch evaluation. Step 3 (Calibration) will not be shown in your workflow.
+              </p>
+            </div>
+
+            {/* Option B: Enable Calibration */}
+            <div
+              onClick={() => setCalibrationEnabled(true)}
+              style={{
+                border: `2px solid ${calibrationEnabled ? 'var(--primary)' : 'var(--border)'}`,
+                backgroundColor: calibrationEnabled ? 'var(--primary-light)' : '#fff',
+                borderRadius: '8px',
+                padding: '1rem 1.15rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: calibrationEnabled ? 'var(--primary-dark)' : 'var(--secondary)' }}>
+                  🎯 Yes, include calibration (Step 3)
+                </span>
+                <input
+                  type="radio"
+                  name="calibrationPref"
+                  checked={calibrationEnabled}
+                  onChange={() => setCalibrationEnabled(true)}
+                  style={{ accentColor: 'var(--primary)' }}
+                />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                Enables Step 3 (Calibration) to let you upload or mark baseline samples so the AI aligns with your exact strictness.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 3. Section 3: Question Builder (Side-by-Side Question Prompt & Model Answer Columns) */}

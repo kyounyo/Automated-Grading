@@ -11,10 +11,39 @@ def normalize_question_number(q_num: str) -> str:
     return re.sub(r"\s+", "", str(q_num)).lower()
 
 
+def evaluate_discrepancy(
+    primary_score: float,
+    auditor_score: float,
+    max_score: float,
+    tolerance_rate: float,
+    absolute_cap: float = 2.0
+) -> Dict[str, Any]:
+    """
+    Evaluates multi-agent discrepancy against dynamic tolerance and absolute cap.
+
+    Decision Rule:
+        D_i = min(tolerance_rate * max_score, absolute_cap)
+        Conflict if |primary_score - auditor_score| > D_i + 1e-5
+    """
+    diff = round(abs(float(primary_score) - float(auditor_score)), 4)
+    raw_allowed = float(tolerance_rate) * float(max_score)
+    allowed_diff = round(min(raw_allowed, float(absolute_cap)), 4)
+    is_conflict = diff > (allowed_diff + 1e-5)
+
+    return {
+        "difference": diff,
+        "allowed_difference": allowed_diff,
+        "is_conflict": is_conflict,
+        "tolerance_rate": tolerance_rate,
+        "absolute_cap_applied": raw_allowed > float(absolute_cap)
+    }
+
+
 def evaluate_confidence_and_status(
     llm_result: Dict[str, Any],
     raw_text: str,
-    total_max_score: float = 20.0
+    total_max_score: float = 20.0,
+    tolerance_rate: float = 0.10
 ) -> Dict[str, Any]:
     """
     Deterministic Confidence & Decision Engine (AutoGrade+ Architecture):
@@ -73,15 +102,17 @@ def evaluate_confidence_and_status(
 
                 if norm_key in auditor_map:
                     a_q_score = auditor_map[norm_key]
-                    diff = abs(p_q_score - a_q_score)
+                    disc = evaluate_discrepancy(
+                        primary_score=p_q_score,
+                        auditor_score=a_q_score,
+                        max_score=q_max,
+                        tolerance_rate=tolerance_rate,
+                        absolute_cap=2.0
+                    )
+                    diff = disc["difference"]
                     q_agreed = max(0.0, 1.0 - (diff / q_max))
-                    
-                    # Discrete Tolerance for Reconciliation:
-                    # Difference of <= 1.0 mark is considered acceptable grading variance (resolved by Auditor without human escalation).
-                    # A difference of >= 2.0 marks is a major disagreement that triggers a flag for human review.
-                    is_material_conflict = (diff >= 2.0 - 1e-5)
-                    if is_material_conflict:
-                        material_conflicting_qs.append(f"{q_num} (Δ{diff:.1f} pts)")
+                    if disc["is_conflict"]:
+                        material_conflicting_qs.append(f"{q_num} (Δ{diff:.1f} pts > {disc['allowed_difference']:.1f} limit)")
                 else:
                     if norm_key in [normalize_question_number(q) for q in raw_conflicting_qs]:
                         q_agreed = 0.5
@@ -133,12 +164,23 @@ def evaluate_confidence_and_status(
 
     q_str = f" on {', '.join(material_conflicting_qs)}" if material_conflicting_qs else ""
 
-    # Flag as Multi-Agent Conflict if subquestion conflict >= 2 marks OR total discrepancy >= 2 marks
-    is_total_conflict = (score_discrepancy >= 2.0 - 1e-5)
+    # Total assignment discrepancy check
+    num_qs = max(1, len(primary_breakdown) if primary_breakdown else 1)
+    total_disc = evaluate_discrepancy(
+        primary_score=primary_score,
+        auditor_score=auditor_score,
+        max_score=max_sc,
+        tolerance_rate=tolerance_rate,
+        absolute_cap=2.0 * num_qs
+    )
+    is_total_conflict = total_disc["is_conflict"]
+
+    # Flag as Multi-Agent Discrepancy if subquestion or total discrepancy exceeds tolerance
+    tol_pct_label = f"{int(round(tolerance_rate * 100))}%"
     if len(material_conflicting_qs) > 0:
-        flag_reasons.append(f"🤖 Multi-Agent Conflict{q_str}: Major score disagreement (≥ 2 marks)")
+        flag_reasons.append(f"🤖 Multi-Agent Discrepancy{q_str}: Exceeds {tol_pct_label} quality-control tolerance")
     elif is_total_conflict:
-        flag_reasons.append(f"🤖 Multi-Agent Conflict: Major score discrepancy of {score_discrepancy:.1f} pts (≥ 2 marks)")
+        flag_reasons.append(f"🤖 Multi-Agent Discrepancy: Overall score delta of {score_discrepancy:.1f} pts exceeds {tol_pct_label} tolerance ({total_disc['allowed_difference']:.1f} pts limit)")
 
     # Flag low confidence when below configured threshold (e.g. 75%, 80%)
     import os
@@ -152,6 +194,18 @@ def evaluate_confidence_and_status(
 
     status = "flagged" if len(flag_reasons) > 0 else "graded"
 
+    # Audit Trail for Discrepancy-Based Quality Control
+    discrepancy_audit = {
+        "primary_score": round(primary_score, 2),
+        "auditor_score": round(auditor_score, 2),
+        "reconciled_score": round(auditor_score if status == "graded" else primary_score, 2),
+        "discrepancy": round(score_discrepancy, 2),
+        "allowed_discrepancy": round(total_disc["allowed_difference"], 2),
+        "tolerance_rate": tolerance_rate,
+        "resolution_status": "reconciled_auto_approved" if status == "graded" else "escalated_lecturer_review",
+        "conflicting_questions": material_conflicting_qs
+    }
+
     return {
         "confidence_score": calibrated_confidence,
         "status": status,
@@ -163,6 +217,7 @@ def evaluate_confidence_and_status(
             "question_agreement": round(question_agreement, 2),
             "audit_factor": audit_factor,
             "evidence_factor": round(evidence_factor, 2)
-        }
+        },
+        "discrepancy_audit": discrepancy_audit
     }
 

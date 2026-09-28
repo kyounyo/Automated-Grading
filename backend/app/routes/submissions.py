@@ -1,4 +1,5 @@
 import os
+import datetime
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
@@ -10,10 +11,36 @@ from ..services.grading import run_grading_pipeline
 
 router = APIRouter(tags=["Submissions"])
 
+ACTIVE_GRADING_ASSIGNMENTS = set()
+
+IN_PROGRESS_STATUSES = ["processing", "extracting_answers", "retrieving_rubric", "grading"]
+
+
+def heal_orphaned_submissions(db: Session, assignment_id: str):
+    """
+    Self-healing sync: If the assignment is not actively being graded by a background task,
+    any submission left in an in-progress status is restored to its true state so frontend
+    and backend stay 100% synchronized at all times.
+    """
+    if assignment_id in ACTIVE_GRADING_ASSIGNMENTS:
+        return
+    orphaned = db.query(Submission).filter(
+        Submission.assignment_id == assignment_id,
+        Submission.status.in_(IN_PROGRESS_STATUSES)
+    ).all()
+    if orphaned:
+        for s in orphaned:
+            if s.score is not None and s.feedback and isinstance(s.feedback, dict) and s.feedback.get("breakdown"):
+                s.status = "flagged" if s.feedback.get("flag_reasons") else "graded"
+            else:
+                s.status = "pending"
+        db.commit()
+
 
 @router.get("/api/assignments/{assignment_id}/submissions", response_model=List[SubmissionResponse])
 def list_submissions_for_assignment(assignment_id: str, db: Session = Depends(get_db)):
-    """List all student submissions for a specific assignment."""
+    """List all student submissions for a specific assignment with self-healing sync."""
+    heal_orphaned_submissions(db, assignment_id)
     submissions = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
     return submissions
 
@@ -28,63 +55,26 @@ def get_submission_detail(submission_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/api/submissions/{submission_id}")
-def delete_single_submission(submission_id: str, db: Session = Depends(get_db)):
-    """Deletes a single student submission from database and deletes its file from local storage."""
+def delete_submission(submission_id: str, db: Session = Depends(get_db)):
+    """Delete a student submission and recalculate assignment stats."""
     sub = db.query(Submission).filter(Submission.id == submission_id).first()
     if not sub:
         raise HTTPException(status_code=404, detail="Submission not found")
-
-    assign_id = sub.assignment_id
-
-    # Delete local file from disk if present
-    if sub.file_path and os.path.exists(sub.file_path):
-        try:
-            os.remove(sub.file_path)
-        except Exception as e:
-            print(f"[File Delete Warning] Could not remove file {sub.file_path}: {e}")
-
-    # Delete submission database record
+    
+    assignment_id = sub.assignment_id
     db.delete(sub)
+    db.commit()
 
-    # Recalculate assignment total submissions and average score
-    assign = db.query(Assignment).filter(Assignment.id == assign_id).first()
-    if assign:
-        remaining_subs = db.query(Submission).filter(Submission.assignment_id == assign_id).all()
-        assign.total_submissions = len(remaining_subs)
+    # Recalculate Assignment stats
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if assignment:
+        remaining_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
+        assignment.total_submissions = len(remaining_subs)
         scores = [s.score for s in remaining_subs if s.score is not None]
-        assign.average_score = round(sum(scores) / len(scores), 1) if scores else 0.0
+        assignment.average_score = round(sum(scores) / len(scores), 1) if scores else 0.0
+        db.commit()
 
-    db.commit()
-    return {"message": f"Submission {submission_id} deleted successfully.", "submission_id": submission_id}
-
-
-@router.delete("/api/assignments/{assignment_id}/submissions")
-def delete_all_submissions_for_assignment(assignment_id: str, db: Session = Depends(get_db)):
-    """Deletes all student submissions for an assignment from database and local storage."""
-    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
-    if not assign:
-        raise HTTPException(status_code=404, detail="Assignment not found")
-
-    subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
-    deleted_count = len(subs)
-
-    for sub in subs:
-        if sub.file_path and os.path.exists(sub.file_path):
-            try:
-                os.remove(sub.file_path)
-            except Exception as e:
-                print(f"[File Delete Warning] Could not remove file {sub.file_path}: {e}")
-        db.delete(sub)
-
-    assign.total_submissions = 0
-    assign.average_score = 0.0
-    db.commit()
-
-    return {
-        "message": f"Successfully deleted all {deleted_count} student submission(s) for assignment {assignment_id}.",
-        "assignment_id": assignment_id,
-        "deleted_count": deleted_count
-    }
+    return {"message": "Submission deleted successfully", "id": submission_id}
 
 
 @router.post("/api/submissions/{submission_id}/grade", response_model=SubmissionResponse)
@@ -94,34 +84,91 @@ def grade_single_submission(submission_id: str, db: Session = Depends(get_db)):
     if not sub:
         raise HTTPException(status_code=404, detail="Submission not found")
     
-    updated_sub = run_grading_pipeline(db, submission_id)
-    return updated_sub
+    assignment_id = sub.assignment_id
+    ACTIVE_GRADING_ASSIGNMENTS.add(assignment_id)
+    try:
+        updated_sub = run_grading_pipeline(db, submission_id)
+        return updated_sub
+    finally:
+        ACTIVE_GRADING_ASSIGNMENTS.discard(assignment_id)
 
 
 def _batch_grade_task(assignment_id: str):
     """Background task runner for batch grading all pending submissions of an assignment."""
     from ..database import SessionLocal
+    ACTIVE_GRADING_ASSIGNMENTS.add(assignment_id)
     db = SessionLocal()
     try:
         pending_subs = db.query(Submission).filter(
             Submission.assignment_id == assignment_id,
-            Submission.status.in_(["pending", "uploaded", "extracting_answers", "retrieving_rubric", "flagged"])
+            Submission.status.in_(["pending", "uploaded", "processing", "extracting_answers", "retrieving_rubric", "grading"])
         ).all()
-        print(f"\n=================================================================")
-        print(f" [Batch AI Grading] Started processing {len(pending_subs)} submission(s)")
-        print(f"=================================================================")
+        total_batch = len(pending_subs)
+        if total_batch == 0:
+            return
+
+        print(f"\n{'='*75}", flush=True)
+        print(f" [AI BATCH GRADING INITIATED] Assignment ID: {assignment_id}", flush=True)
+        print(f" [Queue] {total_batch} submission(s) queued for evaluation", flush=True)
+        print(f"{'='*75}\n", flush=True)
+
         for idx, sub in enumerate(pending_subs):
             try:
-                print(f"\n>>> Progress: [{idx+1}/{len(pending_subs)}] ({(idx)/len(pending_subs)*100:.0f}% Completed)")
+                # Mark ONLY the currently active submission as processing
+                sub.status = "processing"
+                db.commit()
+
+                print(f"\n┌{'─'*73}┐", flush=True)
+                print(f"│ [QUEUE PROGRESS] Paper {idx+1}/{total_batch} ({(idx)/total_batch*100:.0f}% Completed)", flush=True)
+                print(f"│ Student: {sub.student_name} (ID: {sub.student_id})", flush=True)
+                print(f"│ File: {sub.file_name or 'N/A'}", flush=True)
+                print(f"└{'─'*73}┘", flush=True)
+
                 run_grading_pipeline(db, sub.id)
             except Exception as e:
-                print(f"[Batch Grading Error] Failed for submission {sub.id}: {e}")
-        print(f"\n=================================================================")
-        print(f" [Batch AI Grading] Finished all {len(pending_subs)} submission(s)!")
-        print(f"=================================================================\n")
+                print(f" [Batch Grading Error] Failed for submission {sub.id}: {e}", flush=True)
+                import traceback
+                traceback.print_exc()
+                sub.status = "pending"
+                db.commit()
+
+        # Update assignment stats upon completion
+        assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+        if assign:
+            all_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
+            scored = [s.score for s in all_subs if s.score is not None]
+            if scored:
+                assign.average_score = round(sum(scored) / len(scored), 2)
+                assign.total_submissions = len(all_subs)
+                db.commit()
+
+        print(f"\n{'='*75}", flush=True)
+        print(f" [AI BATCH GRADING COMPLETE] Finished all {total_batch} submission(s)!", flush=True)
+        print(f"{'='*75}\n", flush=True)
     finally:
+        ACTIVE_GRADING_ASSIGNMENTS.discard(assignment_id)
         db.close()
 
+
+@router.get("/api/assignments/{assignment_id}/grading-status")
+def get_grading_status(assignment_id: str, db: Session = Depends(get_db)):
+    """Returns real-time background grading status for the given assignment with self-healing."""
+    heal_orphaned_submissions(db, assignment_id)
+    is_active = assignment_id in ACTIVE_GRADING_ASSIGNMENTS
+
+    completed_count = db.query(Submission).filter(
+        Submission.assignment_id == assignment_id,
+        Submission.status.in_(["graded", "flagged", "approved"])
+    ).count()
+    total_count = db.query(Submission).filter(Submission.assignment_id == assignment_id).count()
+
+    return {
+        "assignment_id": assignment_id,
+        "is_grading": is_active,
+        "active_count": 1 if is_active else 0,
+        "completed_count": completed_count,
+        "total_count": total_count
+    }
 
 
 @router.post("/api/assignments/{assignment_id}/grade-all", status_code=status.HTTP_202_ACCEPTED)
@@ -131,11 +178,23 @@ def grade_all_submissions(assignment_id: str, background_tasks: BackgroundTasks,
     if not assign:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
+    if not assign.grading_started_at:
+        assign.grading_started_at = datetime.datetime.utcnow()
+        db.commit()
+
     pending_count = db.query(Submission).filter(
         Submission.assignment_id == assignment_id,
-        Submission.status.in_(["pending", "flagged"])
+        Submission.status.in_(["pending", "uploaded", "processing", "extracting_answers", "retrieving_rubric", "grading"])
     ).count()
 
+    if pending_count == 0:
+        return {
+            "message": "No pending submissions to grade for this assignment.",
+            "assignment_id": assignment_id,
+            "status": "idle"
+        }
+
+    ACTIVE_GRADING_ASSIGNMENTS.add(assignment_id)
     background_tasks.add_task(_batch_grade_task, assignment_id)
 
     return {
@@ -155,16 +214,15 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
     old_score = sub.score
     final_score = float(payload.new_score) if payload.new_score is not None else 0.0
 
-    # Update feedback breakdown if provided
     fb_dict = dict(sub.feedback) if isinstance(sub.feedback, dict) else {}
     if payload.updated_breakdown is not None:
         fb_dict["breakdown"] = payload.updated_breakdown
-    fb_dict["flag_reasons"] = []  # Cleared because lecturer manually reviewed and resolved conflicts
+    fb_dict["flag_reasons"] = []
     sub.feedback = fb_dict
     flag_modified(sub, "feedback")
 
     sub.score = round(final_score, 1)
-    sub.status = "graded"  # Mark as finalized by lecturer override
+    sub.status = "graded"
 
     # Create Audit Log entry
     audit = AuditLog(

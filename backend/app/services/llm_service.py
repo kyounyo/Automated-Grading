@@ -2,9 +2,16 @@ import os
 import re
 import json
 import time
-import urllib.request
+from pathlib import Path
 from typing import Dict, Any, Optional
+import requests
+from dotenv import load_dotenv
 from .confidence import evaluate_confidence_and_status
+
+# Ensure backend .env is loaded regardless of execution working directory
+_env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=_env_path)
+load_dotenv()
 
 def get_openrouter_api_key() -> str:
     return os.getenv("OPENROUTER_API_KEY", "").strip()
@@ -95,12 +102,13 @@ def _clean_json_response(content: str) -> Dict[str, Any]:
         raise ValueError(f"Failed to parse LLM JSON: {parse_err}")
 
 
-def _call_openrouter_api(messages: list, model: str, temperature: float = 0.1, max_retries: int = 3) -> Optional[Dict[str, Any]]:
+def _call_openrouter_api(messages: list, model: str, temperature: float = 0.1, max_retries: int = 2) -> Optional[Dict[str, Any]]:
     """
-    Executes HTTP POST request to OpenRouter API endpoint with automatic retries and reasoning token fallbacks.
+    Executes HTTP POST request to OpenRouter API endpoint with automatic retries, strict timeouts, and reasoning token fallbacks.
     """
     api_key = get_openrouter_api_key()
     if not api_key:
+        print(" [OpenRouter API] Key is missing or empty. Skipping remote API call.", flush=True)
         return None
 
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -120,31 +128,42 @@ def _call_openrouter_api(messages: list, model: str, temperature: float = 0.1, m
     last_error = None
     for attempt in range(1, max_retries + 1):
         try:
-            req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
-            with urllib.request.urlopen(req, timeout=75) as resp:
-                body = json.loads(resp.read().decode("utf-8"))
-                choice = body.get("choices", [{}])[0]
-                msg = choice.get("message", {})
-                content = msg.get("content") or ""
+            resp = requests.post(url, json=data, headers=headers, timeout=(10, 75))
+            if resp.status_code != 200:
+                print(f" [OpenRouter Warning] HTTP {resp.status_code} for {model}: {resp.text[:150]}", flush=True)
+                if resp.status_code in [429, 500, 502, 503, 504]:
+                    time.sleep(1.5 * attempt)
+                    continue
+                return None
 
-                # Fallback for reasoning models (e.g. Nemotron / R1) that place output in reasoning tokens
-                if not content.strip():
-                    content = msg.get("reasoning") or msg.get("reasoning_content") or ""
+            body = resp.json()
+            choice = body.get("choices", [{}])[0]
+            msg = choice.get("message", {})
+            content = msg.get("content") or ""
 
-                if not content.strip():
-                    raise ValueError("Empty response string received from LLM.")
+            # Fallback for reasoning models (e.g. Nemotron / R1) that place output in reasoning tokens
+            if not content.strip():
+                content = msg.get("reasoning") or msg.get("reasoning_content") or ""
 
-                parsed = _clean_json_response(content)
-                if isinstance(parsed, dict):
-                    parsed["_usage"] = body.get("usage", {})
-                return parsed
+            if not content.strip():
+                raise ValueError("Empty response string received from LLM.")
+
+            parsed = _clean_json_response(content)
+            if isinstance(parsed, dict):
+                parsed["_usage"] = body.get("usage", {})
+            return parsed
+        except requests.exceptions.Timeout as te:
+            print(f" [OpenRouter Timeout] Model {model} timed out after 75s (Attempt {attempt}/{max_retries})", flush=True)
+            last_error = te
+            if attempt < max_retries:
+                time.sleep(1.5 * attempt)
         except Exception as e:
             last_error = e
+            print(f" [OpenRouter API Error] Attempt {attempt}/{max_retries} for model {model}: {e}", flush=True)
             if attempt < max_retries:
-                time.sleep(2 * attempt)
-            else:
-                print(f"[OpenRouter API Warning] Call failed for model {model} after {max_retries} attempts: {e}")
-                
+                time.sleep(1.5 * attempt)
+
+    print(f" [OpenRouter API Warning] Call failed for model {model} after {max_retries} attempts: {last_error}", flush=True)
     return None
 
 
@@ -396,7 +415,8 @@ def call_llm_for_grading(
     model_answer: str, 
     rag_context: str, 
     total_max_score: float = 10.0,
-    question_few_shots: Optional[Dict[str, List[Dict]]] = None
+    question_few_shots: Optional[Dict[str, List[Dict]]] = None,
+    tolerance_rate: float = 0.10
 ) -> Dict[str, Any]:
     """
     Orchestrates Multi-Agent Grading Pipeline using google/gemini-3.1-flash-lite across 3 agents:
@@ -406,22 +426,22 @@ def call_llm_for_grading(
     - Step 4: Deterministic Confidence & Audit Engine
     """
     if not get_openrouter_api_key():
-        print("[LLM Service] OPENROUTER_API_KEY not set. Running fallback structured scoring engine.")
-        return _mock_heuristic_evaluation(student_text, rubric_json)
+        print("[LLM Service] OPENROUTER_API_KEY not set. Running fallback structured scoring engine.", flush=True)
+        return _mock_heuristic_evaluation(student_text, rubric_json, total_max_score)
 
     primary_model_name = get_llm_model()
     auditor_model_name = get_auditor_model()
 
     # Step 1: Agent 1 - Rubric & Context Parser Agent
-    print(f" │   ├─ [Agent 1: Rubric Parser] Structuring rubric rules & RAG context...")
+    print(f" │   ├─ [Agent 1: Rubric Parser] Structuring rubric rules & RAG context...", flush=True)
     parser_res = call_rubric_context_parser_agent(rubric_json, model_answer, rag_context)
     structured_rubric = parser_res if parser_res else {"structured_rules": rubric_json}
     rule_count = len(rubric_json) if isinstance(rubric_json, list) else 1
-    print(f" │   │  └─ Loaded {rule_count} rubric rule(s) & reference guidelines.")
+    print(f" │   │  └─ Loaded {rule_count} rubric rule(s) & reference guidelines.", flush=True)
 
     # Step 2: Agent 2 - Primary CoT Grader Agent
     mode_tag = f"Few-Shot ({sum(len(v) for v in question_few_shots.values())} exemplars)" if question_few_shots else "Zero-Shot"
-    print(f" │   ├─ [Agent 2: Primary Grader ({primary_model_name})] Evaluating submission in {mode_tag} mode...")
+    print(f" │   ├─ [Agent 2: Primary Grader ({primary_model_name})] Evaluating submission in {mode_tag} mode...", flush=True)
     primary_res = call_primary_grading_agent(
         student_text=student_text,
         structured_rubric=structured_rubric,
@@ -432,8 +452,8 @@ def call_llm_for_grading(
         question_few_shots=question_few_shots
     )
     if not primary_res:
-        print(" │   │  └─ [Warning] Primary Agent call failed. Using heuristic fallback.")
-        return _mock_heuristic_evaluation(student_text, rubric_json)
+        print(" │   │  └─ [Warning] Primary Agent call failed. Using heuristic fallback.", flush=True)
+        return _mock_heuristic_evaluation(student_text, rubric_json, total_max_score)
 
     # Ensure feedback dictionary and breakdown list exist
     feedback = primary_res.get("feedback", {})
@@ -465,13 +485,13 @@ def call_llm_for_grading(
         primary_res["overall_score"] = round(exact_breakdown_sum, 1)
 
     primary_score = float(primary_res.get("overall_score", 0.0))
-    print(f" │   │  └─ Primary Score Awarded: {primary_score}/{total_max_score}")
+    print(f" │   │  └─ Primary Score Awarded: {primary_score}/{total_max_score}", flush=True)
 
     # Enrich highlights with question number and position in raw text
     _enrich_highlights_with_question_info(primary_res, student_text)
 
     # Step 3: Agent 3 - Auditor Verification Agent
-    print(f" │   ├─ [Agent 3: Quality Auditor ({auditor_model_name})] Performing independent verification...")
+    print(f" │   ├─ [Agent 3: Quality Auditor ({auditor_model_name})] Performing independent verification...", flush=True)
     auditor_res = call_auditor_verification_agent(student_text, rubric_json, primary_res)
 
     if auditor_res:
@@ -494,8 +514,8 @@ def call_llm_for_grading(
         reconciliation_reason = auditor_res.get("reconciliation_reason", auditor_res.get("discrepancy_note", ""))
         severity = auditor_res.get("disagreement_severity", "NONE" if score_diff == 0 else ("MINOR" if score_diff <= 1.0 else "MAJOR"))
 
-        print(f" │   │  ├─ Auditor Score: {auditor_score}/{total_max_score} | Discrepancy: {score_diff:.1f} pts ({severity})")
-        print(f" │   │  └─ Auditor Action: {recommendation} (Audit Passed: {audit_passed})")
+        print(f" │   │  ├─ Auditor Score: {auditor_score}/{total_max_score} | Discrepancy: {score_diff:.1f} pts ({severity})", flush=True)
+        print(f" │   │  └─ Auditor Action: {recommendation} (Audit Passed: {audit_passed})", flush=True)
 
         primary_res["multi_agent_audit"] = {
             "auditor_passed": audit_passed,
@@ -513,11 +533,12 @@ def call_llm_for_grading(
         }
 
     # Step 4: Deterministic Confidence & Decision Engine
-    print(f" │   ├─ [Engine: Confidence & Reconciliation] Computing calibrated confidence...")
+    print(f" │   ├─ [Engine: Confidence & Reconciliation] Computing calibrated confidence (Tolerance: {int(round(tolerance_rate * 100))}%)...", flush=True)
     confidence_result = evaluate_confidence_and_status(
         primary_res,
         student_text,
-        total_max_score
+        total_max_score,
+        tolerance_rate=tolerance_rate
     )
 
     primary_res["confidence_score"] = confidence_result["confidence_score"]
@@ -526,6 +547,10 @@ def call_llm_for_grading(
     primary_res["is_borderline"] = confidence_result["is_borderline"]
     primary_res["is_audit_flagged"] = confidence_result["is_audit_flagged"]
     primary_res["confidence_components"] = confidence_result["confidence_components"]
+    primary_res["discrepancy_audit"] = confidence_result.get("discrepancy_audit", {})
+    if isinstance(feedback, dict):
+        feedback["discrepancy_audit"] = confidence_result.get("discrepancy_audit", {})
+        feedback["flag_reasons"] = confidence_result.get("flag_reasons", [])
 
     # Auditor-Based Reconciliation:
     # If the disagreement is resolved (diff <= 1.0 mark or confirmed) and auto-approved ("graded"),
@@ -546,40 +571,56 @@ def call_llm_for_grading(
                     if a_sc is not None:
                         p_item["score_awarded"] = float(a_sc)
 
-    print(f" │   └─ [Reconciliation Complete] Final Status: {primary_res['status'].upper()} | Final Score: {primary_res['overall_score']}/{total_max_score} | Confidence: {primary_res['confidence_score']*100:.1f}%")
+    print(f" │   └─ [Reconciliation Complete] Final Status: {primary_res['status'].upper()} | Final Score: {primary_res['overall_score']}/{total_max_score} | Confidence: {primary_res['confidence_score']*100:.1f}%", flush=True)
 
     return primary_res
 
 
 
 
-def _mock_heuristic_evaluation(student_text: str, rubric_json: list) -> Dict[str, Any]:
+def _mock_heuristic_evaluation(student_text: str, rubric_json: list, total_max_score: float = 10.0) -> Dict[str, Any]:
     text_len = len(student_text.strip())
-    base_score = min(88.0, 65.0 + (text_len / 50.0))
+    score_ratio = min(0.90, 0.65 + (text_len / 500.0))
+    base_score = round(total_max_score * score_ratio, 1)
     confidence = 0.88 if text_len > 150 else 0.65
     status = "graded" if confidence >= 0.75 else "flagged"
 
+    breakdown = []
+    if rubric_json and isinstance(rubric_json, list) and len(rubric_json) > 0:
+        for idx, item in enumerate(rubric_json):
+            q_num = item.get("question_number") or f"Q{idx + 1}"
+            max_sc = float(item.get("max_score", item.get("maxMark", round(total_max_score / len(rubric_json), 1))))
+            breakdown.append({
+                "question_number": q_num,
+                "score_awarded": round(max_sc * score_ratio, 1),
+                "max_score": max_sc,
+                "reasoning": f"Heuristic evaluation against {q_num} rubric criteria."
+            })
+    else:
+        half_max = round(total_max_score / 2.0, 1)
+        breakdown = [
+            {
+                "question_number": "Q1",
+                "score_awarded": round(half_max * score_ratio, 1),
+                "max_score": half_max,
+                "reasoning": "Demonstrated sound understanding of core principles."
+            },
+            {
+                "question_number": "Q2",
+                "score_awarded": round(half_max * score_ratio, 1),
+                "max_score": half_max,
+                "reasoning": "Provided clear logical steps in explanation."
+            }
+        ]
+
     return {
-        "overall_score": round(base_score, 1),
+        "overall_score": base_score,
         "confidence_score": confidence,
         "status": status,
         "reasoning": "Heuristic CoT evaluation performed based on response completeness and keyword density.",
         "feedback": {
             "summary": "Automated AI evaluation completed based on rubric criteria.",
-            "breakdown": [
-                {
-                    "question_number": "Q1",
-                    "score_awarded": round(base_score * 0.5, 1),
-                    "max_score": 50,
-                    "reasoning": "Demonstrated sound understanding of core principles."
-                },
-                {
-                    "question_number": "Q2",
-                    "score_awarded": round(base_score * 0.5, 1),
-                    "max_score": 50,
-                    "reasoning": "Provided clear logical steps in explanation."
-                }
-            ]
+            "breakdown": breakdown
         },
         "highlights": [
             {
@@ -590,7 +631,7 @@ def _mock_heuristic_evaluation(student_text: str, rubric_json: list) -> Dict[str
         ],
         "multi_agent_audit": {
             "auditor_passed": True,
-            "auditor_score": round(base_score, 1),
+            "auditor_score": base_score,
             "score_discrepancy": 0.0,
             "audit_note": "Fallback heuristic evaluation audit passed."
         }

@@ -69,7 +69,8 @@ SUBMISSION_ALIASES = {
     "question_number": {
         "high": [
             "question no", "question_no", "question_n", "q_no", "q_num",
-            "question number", "question label", "q num", "q no", "question_id"
+            "question number", "question label", "q num", "q no", "question_id",
+            "question id", "question#", "q#", "qid", "question no.", "q num."
         ],
         "ambiguous": ["question", "item", "task", "q"]
     },
@@ -77,9 +78,10 @@ SUBMISSION_ALIASES = {
         "high": [
             "student response", "student_response", "student answer", "student_answer",
             "student work", "submission text", "student submission", "response text",
-            "response", "answer"
+            "response", "answer", "student text", "student_text", "student essay",
+            "submission content", "answer text", "solution text"
         ],
-        "ambiguous": ["submission", "text", "body", "work"]
+        "ambiguous": ["submission", "text", "body", "work", "content", "essay"]
     }
 }
 
@@ -94,23 +96,25 @@ CALIBRATION_ALIASES = {
             "score", "human score", "human_score", "human mark", "human grade",
             "human score dataset", "lecturer score", "lecturer_score",
             "examiner score", "examiner_score", "marks", "mark", "awarded score",
-            "points", "grade"
+            "score awarded", "points", "grade", "awarded", "pts", "mark awarded",
+            "marks awarded"
         ],
-        "ambiguous": ["result", "val", "value", "sc"]
+        "ambiguous": ["result", "val", "value", "sc", "pt"]
     },
     "max_score": {
         "high": [
             "max score", "max_score", "max mark", "max_mark", "total marks",
-            "max points", "out of", "maximum mark"
+            "max points", "out of", "maximum mark", "max pts", "total pts", "total mark"
         ],
         "ambiguous": ["max", "total"]
     },
     "examiner_feedback": {
         "high": [
             "feedback", "examiner feedback", "examiner_feedback", "comment", "comments",
-            "justification", "reasoning", "marker notes", "notes", "rubric rationale"
+            "justification", "reasoning", "marker notes", "notes", "rubric rationale",
+            "remarks", "remark", "examiner notes", "marker feedback", "evaluator comments"
         ],
-        "ambiguous": ["remark", "remarks", "rationale", "note"]
+        "ambiguous": ["rationale", "note", "critique"]
     },
     "anchor_type": {
         "high": [
@@ -836,12 +840,11 @@ def parse_flexible_calibration(file_path: str) -> List[Dict[str, Any]]:
             else:
                 max_sc_val = 10.0
 
-            # 8. Feedback
-            raw_fb = str(row.get(fb_col)).strip() if fb_col and pd.notna(row.get(fb_col)) else ""
-            if raw_fb.lower() == "nan":
-                raw_fb = ""
-            if not raw_fb:
-                raw_fb = f"Examiner baseline standard for {clean_q}. Awarded {score_val}/{max_sc_val} marks."
+            # 8. Feedback (Optional)
+            raw_user_fb = str(row.get(fb_col)).strip() if fb_col and pd.notna(row.get(fb_col)) else ""
+            if raw_user_fb.lower() == "nan":
+                raw_user_fb = ""
+            clean_fb = raw_user_fb if raw_user_fb else f"Examiner baseline standard for {clean_q}. Awarded {score_val}/{max_sc_val} marks."
 
             # 9. Anchor Type
             explicit_anchor = str(row.get(anchor_col)).strip() if anchor_col and pd.notna(row.get(anchor_col)) else None
@@ -855,7 +858,8 @@ def parse_flexible_calibration(file_path: str) -> List[Dict[str, Any]]:
                 "student_text": stu_text,
                 "examiner_score": score_val,
                 "max_score": max_sc_val,
-                "examiner_feedback": raw_fb,
+                "examiner_feedback": clean_fb,
+                "examiner_feedback_raw": raw_user_fb,
                 "anchor_type": anchor_val
             })
 

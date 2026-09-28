@@ -25,7 +25,6 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
-import { saveCalibrationExample, fetchCalibrationStatus } from '../api/client';
 
 const GradingReview = () => {
   const navigate = useNavigate();
@@ -53,33 +52,32 @@ const GradingReview = () => {
   const [overrideComment, setOverrideComment] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Calibration status & cards state
-  const [calStatus, setCalStatus] = useState(null);
-  const [loadingCalStatus, setLoadingCalStatus] = useState(false);
-  const [calCardState, setCalCardState] = useState({});
   const [expandedAnswers, setExpandedAnswers] = useState({});
   const [activeScrollQ, setActiveScrollQ] = useState(null);
-  const [savingAllCal, setSavingAllCal] = useState(false);
-  const [launchingBatch, setLaunchingBatch] = useState(false);
+
+  // Only review AI-graded student submissions (calibration sample papers belong exclusively in the Calibration page)
+  const aiSubmissions = useMemo(() => {
+    const nonCal = submissions.filter(s => !s.is_calibration_sample);
+    return nonCal.length > 0 ? nonCal : submissions;
+  }, [submissions]);
 
   // Sync location.state submission into context and ensure activeSubmission is populated
   useEffect(() => {
-    if (location.state?.submission) {
+    if (location.state?.submission && !location.state?.submission?.is_calibration_sample) {
       setActiveSubmission(location.state.submission);
     } else if (location.state?.submissionId) {
-      const match = submissions.find(s => s.id === location.state.submissionId);
+      const match = aiSubmissions.find(s => s.id === location.state.submissionId);
       if (match) setActiveSubmission(match);
-    } else if (!activeSubmission && submissions.length > 0) {
-      setActiveSubmission(submissions[0]);
+    } else if (!activeSubmission && aiSubmissions.length > 0) {
+      setActiveSubmission(aiSubmissions[0]);
     }
-  }, [location.state, submissions]);
+  }, [location.state, aiSubmissions]);
 
   const targetSubId = activeSubmission?.id || location.state?.submission?.id || location.state?.submissionId;
-  const liveSub = submissions.find(s => s.id === targetSubId);
+  const liveSub = aiSubmissions.find(s => s.id === targetSubId);
   const currentSub = liveSub
-    || activeSubmission
-    || location.state?.submission
-    || (submissions.length > 0 ? submissions[0] : null);
+    || (activeSubmission && !activeSubmission.is_calibration_sample ? activeSubmission : null)
+    || (aiSubmissions.length > 0 ? aiSubmissions[0] : null);
 
   const activeSubmissionObj = currentSub;
   const feedback = activeSubmissionObj?.feedback || {};
@@ -88,39 +86,15 @@ const GradingReview = () => {
   // Active assignment object
   const activeAssignment = assignments?.find(a => String(a.id) === String(currentAssignmentId)) || currentAssignment;
 
-  // View mode for calibration samples: 'normal' (standard submission review) vs 'studio' (calibration anchor editor)
-  const isActuallyCalSample = Boolean(activeSubmissionObj?.is_calibration_sample);
-  const [viewMode, setViewMode] = useState(() => {
-    if (location.state?.isCalibration === true) return 'studio';
-    if (isActuallyCalSample && activeSubmissionObj?.status !== 'graded') return 'studio';
-    return 'normal';
-  });
-
-  useEffect(() => {
-    if (location.state?.isCalibration !== undefined) {
-      setViewMode(location.state.isCalibration ? 'studio' : 'normal');
-    } else if (isActuallyCalSample && activeSubmissionObj?.status !== 'graded') {
-      setViewMode('studio');
-    }
-  }, [location.state?.isCalibration, activeSubmissionObj?.id, activeSubmissionObj?.status, isActuallyCalSample]);
-
-  const isCalibrationSample = isActuallyCalSample && viewMode === 'studio';
-
   // Submissions list navigation
-  const currentIndex = submissions.findIndex(s => s.id === currentSub?.id);
-  const prevSubmission = currentIndex > 0 ? submissions[currentIndex - 1] : null;
-  const nextSubmission = currentIndex < submissions.length - 1 ? submissions[currentIndex + 1] : null;
+  const currentIndex = aiSubmissions.findIndex(s => s.id === currentSub?.id);
+  const prevSubmission = currentIndex > 0 ? aiSubmissions[currentIndex - 1] : null;
+  const nextSubmission = currentIndex < aiSubmissions.length - 1 ? aiSubmissions[currentIndex + 1] : null;
 
-  // Calibration-specific sample navigation
-  const calibrationSamples = submissions.filter(s => s.is_calibration_sample);
-  const currentCalIndex = calibrationSamples.findIndex(s => s.id === currentSub?.id);
-  const prevCalSample = currentCalIndex > 0 ? calibrationSamples[currentCalIndex - 1] : null;
-  const nextCalSample = currentCalIndex >= 0 && currentCalIndex < calibrationSamples.length - 1 ? calibrationSamples[currentCalIndex + 1] : null;
-
-  const navigateToSubmission = (sub, isCal = (viewMode === 'studio')) => {
+  const navigateToSubmission = (sub) => {
     if (!sub) return;
     setActiveSubmission(sub);
-    navigate('/review', { state: { submission: sub, isCalibration: isCal } });
+    navigate('/review', { state: { submission: sub } });
   };
 
   const formatStudentName = (name, id, email) => {
@@ -135,26 +109,6 @@ const GradingReview = () => {
     }
     return name && name !== 'N/A' ? name : `Student ${id || ''}`.trim();
   };
-
-  // Load Calibration Status for Assignment
-  const loadCalStatus = useCallback(async () => {
-    if (!currentAssignmentId) return;
-    try {
-      setLoadingCalStatus(true);
-      const data = await fetchCalibrationStatus(currentAssignmentId);
-      setCalStatus(data);
-    } catch (e) {
-      console.warn("Could not fetch calibration status in review:", e);
-    } finally {
-      setLoadingCalStatus(false);
-    }
-  }, [currentAssignmentId]);
-
-  useEffect(() => {
-    if (isCalibrationSample) {
-      loadCalStatus();
-    }
-  }, [isCalibrationSample, loadCalStatus]);
 
   // Extract Question List reliably from rubric_data or breakdown
   const rubricQuestions = activeAssignment?.rubric_data || [];
@@ -235,38 +189,26 @@ const GradingReview = () => {
       setActiveHighlightPop(null);
 
       const initialScores = {};
-      const initialCardState = {};
-      const rawText = currentSub.raw_text || currentSub.extracted_text || '';
-
       effectiveQuestions.forEach((q, idx) => {
         const qKey = q.question_number || `Q${idx + 1}`;
-        const initialSc = q.score_awarded != null ? q.score_awarded : (currentSub.score != null ? 0 : q.max_score);
-        initialScores[qKey] = initialSc;
-
-        const extractedAns = extractStudentAnswer(rawText, qKey);
-        initialCardState[qKey] = {
-          score: initialSc,
-          maxScore: q.max_score,
-          anchorType: initialSc >= q.max_score * 0.8 ? 'high' : initialSc <= q.max_score * 0.4 ? 'low' : 'borderline',
-          studentText: extractedAns || rawText.slice(0, 400),
-          feedback: q.reasoning || `Examiner baseline exemplar for ${qKey}. Marks awarded strictly under rubric criteria.`,
-          saving: false,
-          saveSuccess: false
-        };
+        initialScores[qKey] = q.score_awarded != null ? q.score_awarded : 0;
       });
-
       setQuestionScores(initialScores);
-      setCalCardState(initialCardState);
     }
   }, [currentSub?.id, currentSub?.status, currentSub?.score, effectiveQuestions.length]);
 
   // Total Max Score
   const totalMaxScore = useMemo(() => {
-    if (effectiveQuestions.length > 0) {
-      return effectiveQuestions.reduce((sum, q) => sum + (parseFloat(q.max_score) || 0), 0);
+    if (activeAssignment?.rubric_data && activeAssignment.rubric_data.length > 0) {
+      const sum = activeAssignment.rubric_data.reduce((acc, item) => acc + (parseFloat(item.max_score || item.maxMark) || 0), 0);
+      if (sum > 0) return sum;
     }
-    return 100;
-  }, [effectiveQuestions]);
+    if (effectiveQuestions.length > 0) {
+      const sum = effectiveQuestions.reduce((sum, q) => sum + (parseFloat(q.max_score) || 0), 0);
+      if (sum > 0) return sum;
+    }
+    return 12;
+  }, [activeAssignment, effectiveQuestions]);
 
   // Per-question score change handler
   const handlePerQuestionScoreChange = (qKey, maxScore, rawVal) => {
@@ -274,18 +216,6 @@ const GradingReview = () => {
     const validVal = isNaN(parsed) ? 0 : Math.max(0, Math.min(maxScore, parsed));
     const nextScores = { ...questionScores, [qKey]: validVal };
     setQuestionScores(nextScores);
-
-    if (calCardState[qKey]) {
-      setCalCardState(prev => ({
-        ...prev,
-        [qKey]: {
-          ...prev[qKey],
-          score: validVal,
-          anchorType: validVal >= maxScore * 0.8 ? 'high' : validVal <= maxScore * 0.4 ? 'low' : 'borderline'
-        }
-      }));
-    }
-
     const newSum = Object.values(nextScores).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
     setOverrideScore(Math.round(newSum * 10) / 10);
   };
@@ -297,112 +227,8 @@ const GradingReview = () => {
     handlePerQuestionScoreChange(qKey, maxScore, clamped);
   };
 
-  const updateCalCard = (qKey, updates) => {
-    setCalCardState(prev => {
-      const current = prev[qKey] || {};
-      const next = { ...current, ...updates };
-      if (updates.score !== undefined) {
-        setQuestionScores(qs => {
-          const nq = { ...qs, [qKey]: updates.score };
-          const newSum = Object.values(nq).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
-          setOverrideScore(Math.round(newSum * 10) / 10);
-          return nq;
-        });
-      }
-      return { ...prev, [qKey]: next };
-    });
-  };
-
   const toggleExpandAnswer = (qKey) => {
     setExpandedAnswers(prev => ({ ...prev, [qKey]: !prev[qKey] }));
-  };
-
-  // 1-Click Save Calibration Exemplar for a Question
-  const handleSaveCardExemplar = async (qKey, qObj) => {
-    if (!currentAssignmentId) return;
-    const card = calCardState[qKey] || {};
-    const scoreVal = card.score != null ? parseFloat(card.score) : 0;
-    const maxVal = parseFloat(qObj.max_score || card.maxScore || 10);
-    const studentText = (card.studentText || '').trim() || (activeSubmissionObj?.raw_text || '').slice(0, 400);
-
-    try {
-      updateCalCard(qKey, { saving: true, saveSuccess: false });
-      await saveCalibrationExample(currentAssignmentId, {
-        question_number: qKey,
-        student_text: studentText,
-        examiner_score: scoreVal,
-        max_score: maxVal,
-        examiner_feedback: card.feedback || `Examiner exemplar for ${qKey}`,
-        anchor_type: card.anchorType || 'borderline',
-        submission_id: activeSubmissionObj?.id
-      });
-
-      updateCalCard(qKey, { saving: false, saveSuccess: true });
-      await loadCalStatus();
-
-      setTimeout(() => {
-        updateCalCard(qKey, { saveSuccess: false });
-      }, 2500);
-    } catch (err) {
-      alert(`Could not save exemplar for ${qKey}: ${err.message}`);
-      updateCalCard(qKey, { saving: false });
-    }
-  };
-
-  // Save All Marks for Current Submission (Overrides score and marks as graded)
-  const handleSaveAllCalibrationMarks = async () => {
-    if (!activeSubmissionObj) return;
-    try {
-      setSavingAllCal(true);
-      const calculatedSum = Object.values(questionScores).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
-      const roundedTotal = Math.round(calculatedSum * 10) / 10;
-
-      const updatedBreakdown = effectiveQuestions.map((q, idx) => {
-        const qKey = q.question_number || `Q${idx + 1}`;
-        const score = questionScores[qKey] != null ? questionScores[qKey] : (q.score_awarded ?? 0);
-        return {
-          question_number: qKey,
-          prompt: q.prompt,
-          max_score: q.max_score,
-          score_awarded: score,
-          score: score,
-          reasoning: calCardState[qKey]?.feedback || q.reasoning || `Examiner calibration score: ${score}/${q.max_score}`
-        };
-      });
-
-      const updated = await handleScoreOverride(
-        activeSubmissionObj.id,
-        roundedTotal,
-        "Examiner baseline calibration marked and saved",
-        updatedBreakdown
-      );
-
-      if (updated) {
-        setActiveSubmission(updated);
-        setOverrideScore(roundedTotal.toString());
-      }
-
-      alert(`✅ Calibration marks saved! Submission score recorded as ${roundedTotal} / ${totalMaxScore}.`);
-    } catch (err) {
-      alert(`Failed to save calibration marks: ${err.message}`);
-    } finally {
-      setSavingAllCal(false);
-    }
-  };
-
-  // Launch Batch Grading with Few-Shot Calibration
-  const handleLaunchFewShotGrading = async () => {
-    if (!currentAssignmentId) return;
-    try {
-      setLaunchingBatch(true);
-      await triggerGradeAll(currentAssignmentId);
-      alert('🚀 Batch Few-Shot AI grading job launched! Moving to Submissions List...');
-      navigate('/submissions');
-    } catch (err) {
-      alert(`Failed to launch batch grading: ${err.message}`);
-    } finally {
-      setLaunchingBatch(false);
-    }
   };
 
   // Scroll to question in left panel
@@ -412,6 +238,27 @@ const GradingReview = () => {
     if (elem) {
       elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  };
+
+  // Translate technical flag reasons into plain English for lecturers
+  const humaniseFlagReason = (reason) => {
+    if (!reason) return reason;
+    const r = reason.toLowerCase();
+    if (r.includes('multi-agent discrepancy') || r.includes('quality-control tolerance')) {
+      return '🤖 Two AI graders disagreed on the score — please check and confirm the final mark.';
+    }
+    if (r.includes('low system confidence')) {
+      const pctMatch = reason.match(/(\d+)%/);
+      const pct = pctMatch ? pctMatch[1] : null;
+      return `📉 The AI wasn\'t very confident about this grade${pct ? ` (${pct}% confidence)` : ''} — a quick review is recommended.`;
+    }
+    if (r.includes('terse answer') || r.includes('short answer')) {
+      return '⚠️ This student\'s answer was very short — please verify there\'s enough detail to justify the score.';
+    }
+    if (r.includes('random quality control') || r.includes('qc audit')) {
+      return '🎲 This paper was randomly selected for a spot-check to ensure grading quality.';
+    }
+    return reason; // fallback to original if no match
   };
 
   // Highlights synthesis
@@ -492,7 +339,7 @@ const GradingReview = () => {
       if (updated) {
         setOverrideScore(updated.score != null ? updated.score.toString() : newScore.toString());
       }
-      alert(`Grade updated successfully! Final score is now ${newScore} / ${totalMaxScore || 100}. Audit log recorded in database.`);
+      alert(`Grade updated successfully! Final score is now ${newScore} / ${totalMaxScore || 12}. Audit log recorded in database.`);
       setOverrideComment('');
     } catch (err) {
       alert(`Override error: ${err.message}`);
@@ -528,7 +375,6 @@ const GradingReview = () => {
     try {
       setSaving(true);
       await triggerGradeSubmission(activeSubmissionObj.id);
-      alert("AI grading pipeline completed successfully!");
     } catch (err) {
       alert(`AI grading failed: ${err.message}`);
     } finally {
@@ -654,7 +500,7 @@ const GradingReview = () => {
         <FileText size={48} color="var(--primary)" style={{ opacity: 0.6, marginBottom: '1rem' }} />
         <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--secondary)' }}>No Submission Selected</h3>
         <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-          Please choose a student submission from the Submissions List to review or calibrate.
+          Please choose a student submission from the Submissions List to review.
         </p>
         <button className="btn btn-primary" onClick={() => navigate('/submissions')}>
           <ArrowLeft size={16} /> Back to Submissions List
@@ -667,66 +513,6 @@ const GradingReview = () => {
 
   return (
     <div className="grading-review-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', gap: '0.65rem' }}>
-
-      {/* =========================================================================
-          TOP BANNER: EXAMINER CALIBRATION STUDIO HEADER
-          ========================================================================= */}
-      {isCalibrationSample ? (
-        <div style={{
-          padding: '0.75rem 1.15rem',
-          borderRadius: '8px',
-          background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.12) 0%, rgba(124, 58, 237, 0.09) 100%)',
-          border: '1.5px solid rgba(99, 102, 241, 0.35)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-          flexShrink: 0
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <span style={{ fontSize: '1.35rem' }}>🎯</span>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <strong style={{ fontSize: '0.95rem', color: '#4338ca' }}>Examiner Calibration Studio</strong>
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: '#4f46e5', color: '#fff' }}>
-                  Sample {currentCalIndex >= 0 ? `${currentCalIndex + 1} of ${calibrationSamples.length}` : 'Baseline'}
-                </span>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#6b7280' }}>
-                  • {effectiveQuestions.length} Rubric Questions
-                </span>
-              </div>
-              <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Mark student answers below and click <strong>"Save Calibration Exemplar"</strong> to establish the authoritative few-shot standards that guide the AI grading model.
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {calStatus && calStatus.total_calibrated_examples > 0 && (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleLaunchFewShotGrading}
-                disabled={launchingBatch}
-                style={{
-                  fontSize: '0.78rem',
-                  padding: '0.35rem 0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  border: 'none',
-                  boxShadow: '0 2px 5px rgba(16, 185, 129, 0.3)'
-                }}
-              >
-                {launchingBatch ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />}
-                Finish & Launch AI Grading ({calStatus.total_calibrated_examples} Ex)
-              </button>
-            )}
-          </div>
-        </div>
-      ) : null}
 
       {/* =========================================================================
           NAVIGATION & METADATA BAR
@@ -745,66 +531,34 @@ const GradingReview = () => {
 
           {/* Switcher */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--surface)', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
-            {isCalibrationSample ? (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => navigateToSubmission(prevCalSample, true)}
-                  disabled={!prevCalSample}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !prevCalSample ? 0.4 : 1 }}
-                  title={prevCalSample ? `Prev: ${formatStudentName(prevCalSample.student_name, prevCalSample.student_id, prevCalSample.student_email)}` : 'First sample'}
-                >
-                  <ChevronLeft size={15} /> Prev Sample
-                </button>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => navigateToSubmission(prevSubmission)}
+              disabled={!prevSubmission}
+              style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !prevSubmission ? 0.4 : 1 }}
+            >
+              <ChevronLeft size={15} /> Prev
+            </button>
 
-                <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#4338ca', padding: '0 0.65rem', minWidth: '130px', textAlign: 'center' }}>
-                  🎯 Sample {currentCalIndex >= 0 ? `${currentCalIndex + 1} of ${calibrationSamples.length}` : '—'}
-                </span>
+            <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--secondary)', padding: '0 0.65rem', minWidth: '110px', textAlign: 'center' }}>
+              Student {currentIndex >= 0 ? `${currentIndex + 1} of ${aiSubmissions.length}` : '—'}
+            </span>
 
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => navigateToSubmission(nextCalSample, true)}
-                  disabled={!nextCalSample}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !nextCalSample ? 0.4 : 1 }}
-                  title={nextCalSample ? `Next: ${formatStudentName(nextCalSample.student_name, nextCalSample.student_id, nextCalSample.student_email)}` : 'Last sample'}
-                >
-                  Next Sample <ChevronRight size={15} />
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => navigateToSubmission(prevSubmission, false)}
-                  disabled={!prevSubmission}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !prevSubmission ? 0.4 : 1 }}
-                >
-                  <ChevronLeft size={15} /> Prev
-                </button>
-
-                <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--secondary)', padding: '0 0.65rem', minWidth: '110px', textAlign: 'center' }}>
-                  Student {currentIndex >= 0 ? `${currentIndex + 1} of ${submissions.length}` : '—'}
-                </span>
-
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => navigateToSubmission(nextSubmission, false)}
-                  disabled={!nextSubmission}
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !nextSubmission ? 0.4 : 1 }}
-                >
-                  Next <ChevronRight size={15} />
-                </button>
-              </>
-            )}
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => navigateToSubmission(nextSubmission)}
+              disabled={!nextSubmission}
+              style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !nextSubmission ? 0.4 : 1 }}
+            >
+              Next <ChevronRight size={15} />
+            </button>
           </div>
 
           {/* Action Status */}
           <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
-            {!isCalibrationSample && activeSubmissionObj.status === 'pending' && (
+            {activeSubmissionObj.status === 'pending' && (
               <button className="btn btn-primary" onClick={handleGradeWithAI} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}>
                 {saving ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />} Run AI Grading
               </button>
@@ -834,13 +588,9 @@ const GradingReview = () => {
             <span
               className="status-badge"
               style={{
-                backgroundColor: isCalibrationSample
-                  ? 'rgba(99, 102, 241, 0.12)'
-                  : isFlagged ? 'var(--warning-bg)' : 'var(--success-bg)',
-                color: isCalibrationSample
-                  ? '#4f46e5'
-                  : isFlagged ? 'var(--warning)' : 'var(--success)',
-                border: `1px solid ${isCalibrationSample ? 'rgba(99, 102, 241, 0.3)' : isFlagged ? 'var(--warning-border)' : 'var(--success-border)'}`,
+                backgroundColor: isFlagged ? 'var(--warning-bg)' : 'var(--success-bg)',
+                color: isFlagged ? 'var(--warning)' : 'var(--success)',
+                border: `1px solid ${isFlagged ? 'var(--warning-border)' : 'var(--success-border)'}`,
                 padding: '0.35rem 0.75rem',
                 fontSize: '0.8rem',
                 fontWeight: 700,
@@ -850,7 +600,7 @@ const GradingReview = () => {
                 gap: '0.35rem'
               }}
             >
-              {isCalibrationSample ? '🎯 Calibration Sample' : isFlagged ? '⚠️ Flagged for Audit' : '✓ Graded & Approved'}
+              {isFlagged ? '⚠️ Needs your review' : '✓ Graded'}
             </span>
           </div>
         </div>
@@ -882,15 +632,80 @@ const GradingReview = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-              {isCalibrationSample ? 'Calculated Total' : 'Total Score'}
+              Total Score
             </span>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>
-              {isCalibrationSample ? calculatedTotalFromQuestions : (activeSubmissionObj.score != null ? activeSubmissionObj.score : '—')}
+              {activeSubmissionObj.score != null ? activeSubmissionObj.score : '—'}
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{totalMaxScore ? ` / ${totalMaxScore}` : ''}</span>
             </span>
           </div>
         </div>
       </div>
+
+      {/* Multi-Agent Quality Control & Discrepancy Status Banner */}
+      {(isFlagged || feedback?.discrepancy_audit) && (
+        <div
+          style={{
+            padding: '0.65rem 1.15rem',
+            borderRadius: '8px',
+            backgroundColor: isFlagged ? 'rgba(245, 158, 11, 0.08)' : 'rgba(16, 185, 129, 0.08)',
+            border: `1px solid ${isFlagged ? 'rgba(245, 158, 11, 0.3)' : 'rgba(16, 185, 129, 0.25)'}`,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.6rem',
+            flexShrink: 0
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem' }}>
+            {isFlagged ? (
+              <AlertTriangle size={16} color="var(--warning)" style={{ flexShrink: 0, marginTop: 2 }} />
+            ) : (
+              <CheckCircle2 size={16} color="var(--success)" style={{ flexShrink: 0, marginTop: 2 }} />
+            )}
+            <div style={{ fontSize: '0.8rem', color: isFlagged ? '#92400e' : '#065f46', lineHeight: 1.55 }}>
+              <strong>{isFlagged ? '⚠️ Why is this paper flagged?' : '✓ Grading verified'}</strong>
+              {isFlagged && rawFlagReasons.length > 0 ? (
+                <ul style={{ margin: '0.3rem 0 0 0', paddingLeft: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                  {rawFlagReasons.map((r, i) => (
+                    <li key={i} style={{ fontSize: '0.785rem' }}>{humaniseFlagReason(r)}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span style={{ marginLeft: '0.35rem' }}>
+                  {isFlagged
+                    ? 'This paper needs your manual review before it can be finalised.'
+                    : "Both AI graders agreed on this score — it's been automatically approved and is ready to finalise."}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {feedback?.discrepancy_audit && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <span>
+                Observed Δ: <strong style={{ color: 'var(--text-main)' }}>{feedback.discrepancy_audit.discrepancy} pts</strong>
+              </span>
+              <span>•</span>
+              <span>
+                Allowed Limit: <strong style={{ color: 'var(--text-main)' }}>{feedback.discrepancy_audit.allowed_discrepancy} pts</strong>
+              </span>
+              <span>•</span>
+              <span style={{
+                padding: '0.15rem 0.45rem',
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                border: '1px solid var(--border)',
+                fontWeight: 600,
+                color: 'var(--primary)'
+              }}>
+                Tolerance: {Math.round(feedback.discrepancy_audit.tolerance_rate * 100)}%
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* =========================================================================
           MAIN TWO-COLUMN WORKSPACE
@@ -979,7 +794,7 @@ const GradingReview = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Calibration Cards or Standard Grading Overrides */}
+        {/* RIGHT COLUMN: Standard Grading Breakdown & Lecturer Overrides */}
         <div
           style={{
             display: 'flex',
@@ -990,448 +805,7 @@ const GradingReview = () => {
             paddingRight: '4px'
           }}
         >
-          {/* =========================================================================
-              EXAMINER CALIBRATION MODE: INLINE QUESTION CARDS
-              ========================================================================= */}
-          {isCalibrationSample ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              
-              {/* Calibration Header Info Box */}
-              <div style={{
-                padding: '0.75rem 1rem',
-                backgroundColor: 'rgba(99, 102, 241, 0.05)',
-                border: '1px solid rgba(99, 102, 241, 0.25)',
-                borderRadius: '8px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '0.5rem'
-              }}>
-                <div>
-                  <strong style={{ fontSize: '0.85rem', color: '#4338ca' }}>
-                    Examiner Question Scoring & Exemplar Setup
-                  </strong>
-                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Set examiner score, select anchor classification, and click "Save Calibration Exemplar" to establish few-shot benchmarks.
-                  </p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {activeSubmissionObj?.status === 'graded' && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => setViewMode('normal')}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.65rem',
-                        backgroundColor: '#fff',
-                        borderColor: 'rgba(99, 102, 241, 0.4)',
-                        color: '#4f46e5',
-                        fontWeight: 600
-                      }}
-                    >
-                      👁️ View Normal Submission
-                    </button>
-                  )}
-                  <span style={{ fontSize: '0.775rem', fontWeight: 700, color: '#4f46e5', backgroundColor: '#fff', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-                    Total: {calculatedTotalFromQuestions} / {totalMaxScore}
-                  </span>
-                </div>
-              </div>
-
-              {/* List of Question Cards */}
-              {effectiveQuestions.map((q, idx) => {
-                const qKey = q.question_number || `Q${idx + 1}`;
-                const card = calCardState[qKey] || {};
-                const currentScoreVal = card.score != null ? card.score : (questionScores[qKey] ?? 0);
-                const maxSc = q.max_score || 10;
-                const isExpanded = Boolean(expandedAnswers[qKey]);
-
-                // Check calibration status for this question
-                const qStatusObj = calStatus?.questions?.find(qs => qs.question_number.toUpperCase() === qKey.toUpperCase());
-                const isQuestionCalibrated = (qStatusObj?.sample_count || 0) > 0;
-
-                return (
-                  <div
-                    key={qKey}
-                    className="card-panel"
-                    style={{
-                      padding: '1rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.65rem',
-                      backgroundColor: 'var(--surface)',
-                      border: card.saveSuccess ? '1.5px solid #10b981' : isQuestionCalibrated ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid var(--border)',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.03)'
-                    }}
-                  >
-                    {/* Header Row */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{
-                          backgroundColor: '#4f46e5',
-                          color: '#fff',
-                          fontSize: '0.8rem',
-                          fontWeight: 800,
-                          padding: '0.2rem 0.55rem',
-                          borderRadius: '4px'
-                        }}>
-                          {qKey}
-                        </span>
-                        <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                          Max: {maxSc} pts
-                        </span>
-                        {isQuestionCalibrated ? (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.1rem 0.45rem', borderRadius: '4px', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-                            ✓ {qStatusObj.sample_count} Exemplar{qStatusObj.sample_count === 1 ? '' : 's'} (v{qStatusObj.version})
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.1rem 0.45rem', borderRadius: '4px', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#b45309', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
-                            ⏳ Needs Exemplar
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Model Answer Toggle */}
-                      <button
-                        type="button"
-                        onClick={() => toggleExpandAnswer(qKey)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          color: '#4f46e5',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <BookOpen size={13} /> {isExpanded ? 'Hide Marking Scheme' : 'View Marking Scheme'}
-                      </button>
-                    </div>
-
-                    {/* Question Prompt */}
-                    <div style={{ fontSize: '0.825rem', color: 'var(--secondary)', fontWeight: 600, lineHeight: '1.4' }}>
-                      {q.prompt}
-                    </div>
-
-                    {/* Collapsible Model Answer */}
-                    {isExpanded && (
-                      <div style={{
-                        padding: '0.65rem 0.85rem',
-                        backgroundColor: '#faf5ff',
-                        border: '1px solid #e9d5ff',
-                        borderRadius: '6px',
-                        fontSize: '0.78rem',
-                        color: '#581c87',
-                        lineHeight: '1.45',
-                        whiteSpace: 'pre-wrap'
-                      }}>
-                        📖 <strong>Official Model Answer & Criteria:</strong>
-                        <div style={{ marginTop: '0.2rem' }}>
-                          {q.model_answer || 'No specific model answer provided in rubric.'}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Student Response Input / Preview */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                          Student Answer (for calibration few-shot example):
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => updateCalCard(qKey, { studentText: extractStudentAnswer(rawStudentText, qKey) })}
-                          style={{ background: 'none', border: 'none', fontSize: '0.7rem', color: '#4f46e5', cursor: 'pointer', textDecoration: 'underline' }}
-                        >
-                          Auto-Extract from Student Text
-                        </button>
-                      </div>
-                      <textarea
-                        rows={3}
-                        className="input-field"
-                        value={card.studentText || ''}
-                        onChange={(e) => updateCalCard(qKey, { studentText: e.target.value })}
-                        placeholder="Student response for this question..."
-                        style={{ fontSize: '0.8rem', padding: '0.45rem', resize: 'vertical' }}
-                      />
-                    </div>
-
-                    {/* Scoring Controls & Presets */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem',
-                      padding: '0.5rem 0.65rem',
-                      backgroundColor: 'var(--bg-main)',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--secondary)' }}>
-                          Examiner Score:
-                        </span>
-                        {/* Quick Presets */}
-                        <button
-                          type="button"
-                          onClick={() => updateCalCard(qKey, { score: 0 })}
-                          style={{
-                            padding: '0.2rem 0.45rem',
-                            fontSize: '0.725rem',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border)',
-                            backgroundColor: currentScoreVal === 0 ? '#fee2e2' : '#fff',
-                            color: currentScoreVal === 0 ? '#991b1b' : 'var(--text-main)',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          0 pts
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateCalCard(qKey, { score: Math.round((maxSc / 2) * 10) / 10 })}
-                          style={{
-                            padding: '0.2rem 0.45rem',
-                            fontSize: '0.725rem',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border)',
-                            backgroundColor: currentScoreVal === Math.round((maxSc / 2) * 10) / 10 ? '#fef3c7' : '#fff',
-                            color: currentScoreVal === Math.round((maxSc / 2) * 10) / 10 ? '#92400e' : 'var(--text-main)',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Half ({Math.round((maxSc / 2) * 10) / 10})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => updateCalCard(qKey, { score: maxSc })}
-                          style={{
-                            padding: '0.2rem 0.45rem',
-                            fontSize: '0.725rem',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border)',
-                            backgroundColor: currentScoreVal === maxSc ? '#dcfce7' : '#fff',
-                            color: currentScoreVal === maxSc ? '#166534' : 'var(--text-main)',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Full ({maxSc})
-                        </button>
-                      </div>
-
-                      {/* Stepper Input */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => handleStepQuestionScore(qKey, maxSc, -0.5)}
-                          style={{ padding: '0.15rem 0.4rem', minWidth: '24px', height: '26px' }}
-                        >
-                          <Minus size={11} />
-                        </button>
-                        <input
-                          type="number"
-                          step="0.5"
-                          min="0"
-                          max={maxSc}
-                          className="input-field"
-                          value={currentScoreVal}
-                          onChange={(e) => handlePerQuestionScoreChange(qKey, maxSc, e.target.value)}
-                          style={{ width: '58px', height: '26px', padding: '0.1rem', textAlign: 'center', fontWeight: 800, fontSize: '0.85rem' }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-outline"
-                          onClick={() => handleStepQuestionScore(qKey, maxSc, 0.5)}
-                          style={{ padding: '0.15rem 0.4rem', minWidth: '24px', height: '26px' }}
-                        >
-                          <Plus size={11} />
-                        </button>
-                        <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                          / {maxSc}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Anchor Classification Selector */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                        Anchor Type:
-                      </span>
-                      {[
-                        { type: 'high', label: '🟢 High Anchor (Full Credit)' },
-                        { type: 'borderline', label: '🟡 Borderline Anchor (Partial Credit)' },
-                        { type: 'low', label: '🔴 Low Anchor (Common Error)' }
-                      ].map(a => (
-                        <button
-                          key={a.type}
-                          type="button"
-                          onClick={() => updateCalCard(qKey, { anchorType: a.type })}
-                          style={{
-                            padding: '0.2rem 0.55rem',
-                            fontSize: '0.72rem',
-                            borderRadius: '12px',
-                            border: card.anchorType === a.type ? '1.5px solid #4f46e5' : '1px solid var(--border)',
-                            backgroundColor: card.anchorType === a.type ? 'rgba(99, 102, 241, 0.12)' : '#fff',
-                            color: card.anchorType === a.type ? '#4338ca' : 'var(--text-main)',
-                            fontWeight: card.anchorType === a.type ? 700 : 500,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {a.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Examiner Rationale */}
-                    <div>
-                      <textarea
-                        rows={2}
-                        className="input-field"
-                        value={card.feedback || ''}
-                        onChange={(e) => updateCalCard(qKey, { feedback: e.target.value })}
-                        placeholder="Examiner marking rationale (explains marks awarded to train the few-shot AI grader)..."
-                        style={{ fontSize: '0.775rem', padding: '0.4rem', resize: 'vertical' }}
-                      />
-                    </div>
-
-                    {/* Action Button: 1-Click Save Exemplar */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem', paddingTop: '0.2rem' }}>
-                      {card.saveSuccess && (
-                        <span style={{ fontSize: '0.775rem', color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          ✓ Saved as {qKey} Exemplar!
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleSaveCardExemplar(qKey, q)}
-                        disabled={card.saving}
-                        style={{
-                          fontSize: '0.775rem',
-                          padding: '0.38rem 0.85rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
-                          border: 'none',
-                          color: '#fff',
-                          boxShadow: '0 2px 4px rgba(79, 70, 229, 0.25)'
-                        }}
-                      >
-                        {card.saving ? (
-                          <>
-                            <Loader2 size={13} className="spin" /> Saving Exemplar...
-                          </>
-                        ) : (
-                          <>
-                            <Target size={14} /> Save as Calibration Exemplar
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Bottom Actions for Calibration Sample */}
-              <div className="card-panel" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div>
-                  <strong style={{ fontSize: '0.9rem', color: 'var(--secondary)' }}>
-                    Sample Score: {calculatedTotalFromQuestions} / {totalMaxScore}
-                  </strong>
-                  <p style={{ margin: '0.1rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    Save overall marks for this student or proceed to the next calibration sample.
-                  </p>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={handleSaveAllCalibrationMarks}
-                    disabled={savingAllCal}
-                    style={{ fontSize: '0.825rem', padding: '0.45rem 1rem' }}
-                  >
-                    {savingAllCal ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
-                    Save Marks for this Student
-                  </button>
-
-                  {nextCalSample && (
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={() => navigateToSubmission(nextCalSample, true)}
-                      style={{ fontSize: '0.825rem', padding: '0.45rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-                    >
-                      Next Sample <ChevronRight size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          ) : (
-            /* =========================================================================
-                STANDARD AI GRADING REVIEW MODE
-                ========================================================================= */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              
-              {isActuallyCalSample && (
-                <div style={{
-                  padding: '0.8rem 1.15rem',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(124, 58, 237, 0.05) 100%)',
-                  border: '1px solid rgba(99, 102, 241, 0.25)',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '0.75rem'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                    <span style={{ fontSize: '1.3rem' }}>🎯</span>
-                    <div>
-                      <strong style={{ fontSize: '0.875rem', color: '#4338ca' }}>
-                        Examiner Calibration Baseline Exemplar
-                      </strong>
-                      <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        This submission serves as an authoritative few-shot calibration example for AI grading.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setViewMode('studio')}
-                    style={{
-                      fontSize: '0.775rem',
-                      padding: '0.35rem 0.75rem',
-                      backgroundColor: '#fff',
-                      borderColor: '#818cf8',
-                      color: '#4338ca',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem'
-                    }}
-                  >
-                    <Target size={13} /> Edit in Calibration Studio →
-                  </button>
-                </div>
-              )}
-
-              {/* Card 1: Per-Question Score Overrides */}
+          {/* Card 1: Per-Question Score Overrides */}
               <div
                 className="card-panel"
                 style={{
@@ -1447,7 +821,7 @@ const GradingReview = () => {
                     <Edit3 size={16} color="var(--primary)" /> Per-Question Score Override
                   </h3>
                   <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
-                    Sum: {calculatedTotalFromQuestions} / {totalMaxScore || 100}
+                    Sum: {calculatedTotalFromQuestions} / {totalMaxScore || 12}
                   </span>
                 </div>
 
@@ -1541,13 +915,13 @@ const GradingReview = () => {
                 <form onSubmit={handleOverrideSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                   <div>
                     <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
-                      Final Score (0 - {totalMaxScore || 100})
+                      Final Score (0 - {totalMaxScore || 12})
                     </label>
                     <input
                       type="number"
                       step="0.5"
                       min="0"
-                      max={totalMaxScore || 100}
+                      max={totalMaxScore || 12}
                       className="input-field"
                       value={overrideScore}
                       onChange={(e) => setOverrideScore(e.target.value)}
@@ -1592,10 +966,6 @@ const GradingReview = () => {
                   </p>
                 </div>
               )}
-
-            </div>
-          )}
-
         </div>
       </div>
     </div>

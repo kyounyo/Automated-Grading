@@ -202,6 +202,50 @@
   border-color: var(--primary);
 }
 
+.new-assignment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  border: 1px solid #A8CEEA;
+  color: var(--primary);
+  font-size: 0.825rem;
+  font-weight: 700;
+  cursor: pointer;
+  height: 48px;
+  box-sizing: border-box;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.new-assignment-btn:hover {
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.step-badge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #E2E8F0;
+  color: var(--secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.nav-item.active .step-badge {
+  background-color: var(--primary);
+  color: #FFFFFF;
+}
+
 .edit-assignment-btn {
   display: inline-flex;
   align-items: center;

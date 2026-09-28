@@ -54,9 +54,11 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         raise ValueError(f"Assignment {submission.assignment_id} not found.")
 
     # Step 1: Extract Document Text from raw_text or file_path
-    print(f"\n[Submission {submission.student_id}] ({submission.student_name})")
-    print(f" ├─ [1/4] Extracting student submission text...")
+    print(f"\n[Submission {submission.student_id}] ({submission.student_name})", flush=True)
+    print(f" ├─ [1/4] Extracting student submission text...", flush=True)
     submission.status = "extracting_answers"
+    if not assignment.grading_started_at:
+        assignment.grading_started_at = datetime.datetime.utcnow()
     db.commit()
     extracted_text = ""
     if submission.raw_text:
@@ -74,8 +76,8 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     # Step 2: Check for Blank / Missing Student Submission
     if is_blank_submission(extracted_text):
         duration = time.time() - start_time
-        print(f" ├─ [Blank Submission] Detected empty response ('-')")
-        print(f" └─ Status: GRADED | Score: 0.0/{total_max_score} | Confidence: 100.0% (Fast-path {duration:.2f}s)")
+        print(f" ├─ [Blank Submission] Detected empty response ('-')", flush=True)
+        print(f" └─ Status: GRADED | Score: 0.0/{total_max_score} | Confidence: 100.0% (Fast-path {duration:.2f}s)", flush=True)
         submission.score = 0.0
         submission.confidence_score = 1.0
         submission.status = "graded"
@@ -126,7 +128,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         return submission
 
     # Step 3: Query ChromaDB for RAG context
-    print(f" ├─ [2/4] Retrieving ChromaDB rubric & question vector context...")
+    print(f" ├─ [2/4] Retrieving ChromaDB rubric & question vector context...", flush=True)
     submission.status = "retrieving_rubric"
     db.commit()
     rag_context = retrieve_rubric_context(assignment.id, extracted_text)
@@ -158,7 +160,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     max_cal_version = max((ex.version for ex in cal_examples), default=1) if cal_examples else None
 
     # Step 4: Execute Multi-Agent LLM Grading Prompt
-    print(f" ├─ [3/4] Running Multi-Agent LLM ({grading_mode.upper()} mode, {total_cal_count} exemplars via {LLM_MODEL})...")
+    print(f" ├─ [3/4] Running Multi-Agent LLM ({grading_mode.upper()} mode, {total_cal_count} exemplars via {LLM_MODEL})...", flush=True)
     submission.status = "grading"
     db.commit()
     llm_result = call_llm_for_grading(
@@ -167,7 +169,8 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
         model_answer=assignment.model_answer or "",
         rag_context=rag_context,
         total_max_score=total_max_score,
-        question_few_shots=question_few_shots if total_cal_count > 0 else None
+        question_few_shots=question_few_shots if total_cal_count > 0 else None,
+        tolerance_rate=getattr(assignment, "tolerance_rate", 0.10)
     )
 
     # Step 5: Save Record to PostgreSQL
@@ -178,7 +181,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     submission.confidence_score = float(llm_result.get("confidence_score", 0.85))
     submission.status = str(llm_result.get("status", "graded"))
 
-    print(f" ├─ [4/4] Confidence check ({submission.confidence_score * 100:.1f}%) & Multi-Agent Reconciliation...")
+    print(f" ├─ [4/4] Confidence check ({submission.confidence_score * 100:.1f}%) & Multi-Agent Reconciliation...", flush=True)
 
     feedback_dict = llm_result.get("feedback", {})
     if not isinstance(feedback_dict, dict):
@@ -249,7 +252,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     except Exception as e:
         print(f"[ICC Tracker Warning] Error updating ICC tracker for submission {submission.id}: {e}")
 
-    print(f" └─ Status: {submission.status.upper()} | Score: {submission.score}/{total_max_score} | Confidence: {submission.confidence_score * 100:.1f}% | Completed in {duration:.2f}s")
+    print(f" └─ Status: {submission.status.upper()} | Score: {submission.score}/{total_max_score} | Confidence: {submission.confidence_score * 100:.1f}% | Completed in {duration:.2f}s", flush=True)
 
     return submission
 

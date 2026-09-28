@@ -24,6 +24,7 @@ class AssignmentCreate(BaseModel):
     calibration_enabled: Optional[bool] = False
     calibration_sample_size: Optional[int] = 3
     calibration_settings: Optional[Dict[str, Any]] = None
+    tolerance_rate: Optional[float] = 0.10
 
 
 class AssignmentUpdate(BaseModel):
@@ -33,6 +34,7 @@ class AssignmentUpdate(BaseModel):
     calibration_enabled: Optional[bool] = None
     calibration_sample_size: Optional[int] = None
     calibration_settings: Optional[Dict[str, Any]] = None
+    tolerance_rate: Optional[float] = None
 
 
 class AssignmentResponse(BaseModel):
@@ -48,6 +50,8 @@ class AssignmentResponse(BaseModel):
     calibration_enabled: Optional[bool] = False
     calibration_sample_size: Optional[int] = 3
     calibration_settings: Optional[Dict[str, Any]] = None
+    tolerance_rate: Optional[float] = 0.10
+    grading_started_at: Optional[datetime.datetime] = None
     created_at: Optional[datetime.datetime] = None
 
     class Config:

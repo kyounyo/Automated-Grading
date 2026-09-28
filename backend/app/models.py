@@ -19,6 +19,8 @@ class Assignment(Base):
     calibration_enabled = Column(Boolean, default=False)
     calibration_sample_size = Column(Integer, default=3)
     calibration_settings = Column(JSON, nullable=True)
+    tolerance_rate = Column(Float, default=0.10, nullable=False)
+    grading_started_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     submissions = relationship("Submission", back_populates="assignment", cascade="all, delete-orphan")

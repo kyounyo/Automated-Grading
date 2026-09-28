@@ -24,9 +24,11 @@ from ..services.document_parser import (
     parse_excel_rubric,
     parse_separate_question_and_rubric_docs
 )
-from ..services.calibration_importer import import_graded_calibration_data
+from ..services.calibration_importer import import_graded_calibration_data, preview_graded_file
 
 router = APIRouter(prefix="/api/assignments", tags=["Assignments"])
+
+ALLOWED_TOLERANCES = {0.0, 0.10, 0.20}
 
 TEMP_DIR = Path(__file__).resolve().parent.parent.parent / "uploads" / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -75,6 +77,10 @@ def update_assignment(assignment_id: str, payload: AssignmentUpdate, db: Session
         assign.calibration_sample_size = payload.calibration_sample_size
     if payload.calibration_settings is not None:
         assign.calibration_settings = payload.calibration_settings
+    if payload.tolerance_rate is not None:
+        if not (0.0 <= payload.tolerance_rate <= 0.20):
+            raise HTTPException(status_code=400, detail="Tolerance must be between 0% and 20% (0.0 to 0.20).")
+        assign.tolerance_rate = round(payload.tolerance_rate, 4)
 
     db.commit()
     db.refresh(assign)
@@ -218,6 +224,10 @@ def create_assignment(payload: AssignmentCreate, db: Session = Depends(get_db)):
                 
             normalized_rubric_data.append(q_data)
 
+    tolerance = payload.tolerance_rate if payload.tolerance_rate is not None else 0.10
+    if not (0.0 <= tolerance <= 0.20):
+        raise HTTPException(status_code=400, detail="Tolerance must be between 0% and 20% (0.0 to 0.20).")
+
     new_assign = Assignment(
         id=assign_id,
         title=payload.title,
@@ -230,7 +240,8 @@ def create_assignment(payload: AssignmentCreate, db: Session = Depends(get_db)):
         average_score=0.0,
         calibration_enabled=payload.calibration_enabled or False,
         calibration_sample_size=payload.calibration_sample_size or 3,
-        calibration_settings=payload.calibration_settings
+        calibration_settings=payload.calibration_settings,
+        tolerance_rate=tolerance
     )
     db.add(new_assign)
     db.commit()
@@ -332,7 +343,27 @@ def update_assignment_calibration_settings(assignment_id: str, payload: dict, db
     if "calibration_enabled" in payload:
         assign.calibration_enabled = bool(payload["calibration_enabled"])
     if "calibration_sample_size" in payload:
-        assign.calibration_sample_size = max(1, min(10, int(payload["calibration_sample_size"])))
+        new_size = max(1, min(50, int(payload["calibration_sample_size"])))
+        assign.calibration_sample_size = new_size
+
+        # Synchronize submission calibration sample flags
+        all_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).order_by(Submission.created_at.asc()).all()
+        if all_subs:
+            current_cals = [s for s in all_subs if s.is_calibration_sample]
+            if len(current_cals) < new_size:
+                needed = new_size - len(current_cals)
+                candidates = [s for s in all_subs if not s.is_calibration_sample]
+                for s in candidates[:needed]:
+                    s.is_calibration_sample = True
+            elif len(current_cals) > new_size:
+                excess = len(current_cals) - new_size
+                # Prefer unflagging un-graded calibration samples first
+                removable = [s for s in current_cals if s.status != "graded" and s.score is None]
+                if len(removable) < excess:
+                    removable = current_cals[::-1]
+                for s in removable[:excess]:
+                    s.is_calibration_sample = False
+
     if "calibration_settings" in payload:
         assign.calibration_settings = payload["calibration_settings"]
 
@@ -469,6 +500,49 @@ async def import_graded_submissions(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to import graded submissions: {str(e)}")
+    finally:
+        if temp_path.exists():
+            try: os.remove(temp_path)
+            except Exception: pass
+
+
+@router.post("/{assignment_id}/calibration/preview")
+async def preview_calibration_file_endpoint(
+    assignment_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Parses and returns a preview of the calibration Excel/CSV file with detected columns,
+    total counts, distinct questions, and extracted sample rows before saving to the database.
+    """
+    assign = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assign:
+        raise HTTPException(status_code=404, detail=f"Assignment '{assignment_id}' not found")
+
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in [".xlsx", ".xls", ".csv"]:
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload an Excel (.xlsx/.xls) or CSV (.csv) file.")
+
+    temp_filename = f"cal_preview_{uuid.uuid4().hex[:6]}_{file.filename}"
+    temp_path = TEMP_DIR / temp_filename
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+
+        preview_data = preview_graded_file(
+            file_path=str(temp_path),
+            assignment_id=assignment_id,
+            db=db
+        )
+        return preview_data
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to preview calibration file: {str(e)}")
     finally:
         if temp_path.exists():
             try: os.remove(temp_path)

@@ -60,6 +60,12 @@ export async function gradeAllSubmissions(assignmentId) {
   return await response.json();
 }
 
+export async function fetchGradingStatus(assignmentId) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/grading-status`);
+  if (!response.ok) throw new Error('Failed to fetch grading status');
+  return await response.json();
+}
+
 export async function overrideScore(submissionId, payload) {
   const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/override`, {
     method: 'PATCH',
@@ -213,6 +219,18 @@ export async function swapCalibrationSample(assignmentId, removeSubmissionId, ad
     })
   });
   if (!response.ok) throw new Error('Failed to swap calibration sample');
+  return await response.json();
+}
+
+export async function previewCalibrationFile(assignmentId, formData) {
+  const response = await fetch(`${API_BASE_URL}/assignments/${assignmentId}/calibration/preview`, {
+    method: 'POST',
+    body: formData
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || 'Failed to preview calibration file');
+  }
   return await response.json();
 }
 
