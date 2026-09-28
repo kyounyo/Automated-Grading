@@ -181,86 +181,134 @@ def parse_separate_question_and_rubric_docs(q_doc: str, r_doc: str) -> List[Dict
 
 def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
     """
-    Intelligently splits raw PDF text into distinct Question blocks (e.g. Question 6, Question 8).
+    Intelligently splits raw PDF text into distinct Question blocks
     """
     clean_text = re.sub(r'--- Page \d+ ---', '', raw_text)
     clean_text = re.sub(r'[\u2060\u200b\ufeff]', '', clean_text)
     clean_text = re.sub(r'\n{3,}', '\n\n', clean_text).strip()
 
-    # 1. Primary Strategy: LLM-Guided Exact Slicing (Handles ANY layout with 100% verbatim text & real names)
+    # Pre-process: insert newline before mid-line sub-part markers like (5 marks) (b), . (b), . (c), . 6b)
+    clean_text = re.sub(
+        r'([\.\?\!\)]|\bmarks?\b)\s+((?:\d+[\.\:\)]?\s*)?(?:\([a-z0-9]+\)|[a-z0-9]\)))',
+        r'\1\n\2',
+        clean_text,
+        flags=re.IGNORECASE
+    )
+
+    # 1. Primary Strategy: LLM-Guided Exact Slicing (Handles ANY layout with 100% verbatim text)
     llm_sliced = parse_entire_document_with_llm(clean_text)
     if llm_sliced:
         return llm_sliced
 
-    # 2. Fallback Strategy: Python Two-Section Matcher (Questions-First, Answers-Last layout)
+    # Unified Question Pattern for regex fallback:
+    # Matches "Question", "Q", "1. (a)", "1. (a) (i)", "1.", "1(a)(i)", "Question 1(a)(ii)", etc. at start of line
+    q_header_pattern = r'(?:^|\n)\s*(?<!for\s)(?<!Rubric\s)(?<!Marking\s)(?:(?:Question|Q)[\.\:]?\s*)?(\d+(?:[\s\.\)]*(?:\([a-z0-9]+\)|[a-z0-9]\.|\b(?:i{1,3}|iv|v|vi{0,3}|ix|x)\b))*)'
+
+    # 2. Fallback Strategy A: Python Two-Section Matcher (Questions-First, Answers-Last layout)
     split_match = re.search(r'(?:^|\n)\s*(?:Marking\s+(?:Scheme|Rubric)|Answer\s+Key|Model\s+Answers?|Answers|Solutions)\b', clean_text, re.IGNORECASE)
     
     if split_match:
         q_section = clean_text[:split_match.start()].strip()
         a_section = clean_text[split_match.start():].strip()
         
-        # Parse Questions from Section 1
-        q_matches = list(re.finditer(r'(?<!for\s)(?<!Rubric\s)(?<!Marking\s)\b(?:Question|Q)\s*(\d+)', q_section, re.IGNORECASE))
-        if not q_matches:
-            q_matches = list(re.finditer(r'(?:^|\n)\s*(\d+)[\.\)]', q_section))
-            
-        questions_dict = {}
-        for i in range(len(q_matches)):
-            q_num = q_matches[i].group(1)
-            start_idx = q_matches[i].start()
-            next_start = len(q_section)
-            for j in range(i + 1, len(q_matches)):
-                if q_matches[j].group(1) != q_num:
-                    next_start = q_matches[j].start()
-                    break
-            questions_dict[q_num] = q_section[start_idx:next_start].strip()
-            
-        # Parse Answers from Section 2
-        a_matches = list(re.finditer(r'\b(?:Question|Q|Answer)\s*(\d+)', a_section, re.IGNORECASE))
-        if not a_matches:
-            a_matches = list(re.finditer(r'(?:^|\n)\s*(\d+)[\.\)]', a_section))
-            
-        answers_dict = {}
-        for i in range(len(a_matches)):
-            a_num = a_matches[i].group(1)
-            start_idx = a_matches[i].start()
-            next_start = len(a_section)
-            for j in range(i + 1, len(a_matches)):
-                if a_matches[j].group(1) != a_num:
-                    next_start = a_matches[j].start()
-                    break
-            answers_dict[a_num] = a_section[start_idx:next_start].strip()
+        q_in_q_section = list(re.finditer(q_header_pattern, q_section, re.IGNORECASE))
+        q_in_a_section = list(re.finditer(q_header_pattern, a_section, re.IGNORECASE))
 
-        # Pair Questions and Answers by Question Number
-        parsed = []
-        all_q_nums = sorted(list(set(questions_dict.keys()) | set(answers_dict.keys())), key=lambda x: int(x) if x.isdigit() else x)
-        
-        for q_num in all_q_nums:
-            q_text = questions_dict.get(q_num, f"Question {q_num}")
-            a_text = answers_dict.get(q_num, f"Answer for Question {q_num}")
-            parsed.append({
-                "id": len(parsed) + 1,
-                "question_number": f"Q{q_num}",
-                "text": q_text,
-                "maxMark": calculate_question_max_mark(q_text),
-                "modelAnswer": a_text
-            })
-        if parsed:
-            return parsed
+        q_nums_in_q = {re.sub(r'[\s\.]+', '', m.group(1).strip()) for m in q_in_q_section}
 
-    # 2. Interleaved Layout (Questions + Answers together in sequence)
-    q_matches = list(re.finditer(r'(?<!for\s)(?<!Rubric\s)(?<!Marking\s)\b(?:Question|Q)\s*(\d+)', clean_text, re.IGNORECASE))
-    if not q_matches:
-        q_matches = list(re.finditer(r'(?:^|\n)\s*(\d+)[\.\)]', clean_text))
+        is_interleaved = False
+        for a_m in q_in_a_section:
+            full_str = a_m.group(0).strip()
+            num_clean = re.sub(r'[\s\.]+', '', a_m.group(1).strip())
+            num_m = re.search(r'\d+', num_clean)
+            n_val = int(num_m.group(0)) if num_m else 0
+            has_q_prefix = bool(re.search(r'(?:Question|Q)\b', full_str, re.IGNORECASE))
+            if (has_q_prefix and num_clean not in q_nums_in_q) or (n_val > 0 and num_clean not in q_nums_in_q and any(n_val > int(re.search(r'\d+', q).group(0)) for q in q_nums_in_q if re.search(r'\d+', q))):
+                is_interleaved = True
+                break
 
-    if not q_matches:
+        if not is_interleaved and q_in_q_section:
+            # Parse Questions from Section 1
+            questions_dict = {}
+            for i in range(len(q_in_q_section)):
+                raw_q = q_in_q_section[i].group(1).strip()
+                q_num = re.sub(r'[\s\.]+', '', raw_q)
+                start_idx = q_in_q_section[i].start()
+                next_start = len(q_section)
+                for j in range(i + 1, len(q_in_q_section)):
+                    raw_next = q_in_q_section[j].group(1).strip()
+                    next_num = re.sub(r'[\s\.]+', '', raw_next)
+                    if next_num != q_num:
+                        next_start = q_in_q_section[j].start()
+                        break
+                questions_dict[q_num] = q_section[start_idx:next_start].strip()
+                
+            # Parse Answers from Section 2
+            answers_dict = {}
+            for i in range(len(q_in_a_section)):
+                raw_a = q_in_a_section[i].group(1).strip()
+                a_num = re.sub(r'[\s\.]+', '', raw_a)
+                start_idx = q_in_a_section[i].start()
+                next_start = len(a_section)
+                for j in range(i + 1, len(q_in_a_section)):
+                    raw_next = q_in_a_section[j].group(1).strip()
+                    next_num = re.sub(r'[\s\.]+', '', raw_next)
+                    if next_num != a_num:
+                        next_start = q_in_a_section[j].start()
+                        break
+                answers_dict[a_num] = a_section[start_idx:next_start].strip()
+
+            # Pair Questions and Answers by Question Number
+            parsed = []
+            all_q_nums = list(set(questions_dict.keys()) | set(answers_dict.keys()))
+            all_q_nums.sort(key=lambda x: [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', x) if c])
+            
+            for q_num in all_q_nums:
+                q_text = questions_dict.get(q_num, f"Question {q_num}")
+                a_text = answers_dict.get(q_num, f"Answer for Question {q_num}")
+                q_label = f"Q{q_num}" if not q_num.lower().startswith("q") else q_num
+                parsed.append({
+                    "id": len(parsed) + 1,
+                    "question_number": q_label,
+                    "text": q_text,
+                    "maxMark": calculate_question_max_mark(q_text),
+                    "modelAnswer": a_text
+                })
+            if parsed:
+                return parsed
+
+    # 3. Fallback Strategy B: Interleaved Layout (Questions + Answers together in sequence)
+    raw_q_matches = list(re.finditer(q_header_pattern, clean_text, re.IGNORECASE))
+    if not raw_q_matches:
         return []
+
+    # Filter out false-positive bullet list numbers (e.g. 1., 2. inside answer lists)
+    q_matches = []
+    last_main_num = 0
+
+    for m in raw_q_matches:
+        full_match_str = m.group(0).strip()
+        raw_q = m.group(1).strip()
+        q_clean = re.sub(r'[\s\.]+', '', raw_q)
+
+        num_m = re.search(r'\d+', q_clean)
+        main_num = int(num_m.group(0)) if num_m else 0
+
+        has_q_prefix = bool(re.search(r'(?:Question|Q)\b', full_match_str, re.IGNORECASE))
+
+        if not has_q_prefix and main_num > 0 and last_main_num > 0 and main_num < last_main_num:
+            continue  # Skip bullet point inside answer (e.g. 1. or 2. appearing after Q6)
+
+        q_matches.append(m)
+        if main_num > 0 and (has_q_prefix or main_num >= last_main_num):
+            last_main_num = main_num
 
     parsed = []
     seen_nums = set()
 
     for i in range(len(q_matches)):
-        q_num = q_matches[i].group(1)
+        raw_q = q_matches[i].group(1).strip()
+        q_num = re.sub(r'[\s\.]+', '', raw_q)
         if q_num in seen_nums:
             continue
         seen_nums.add(q_num)
@@ -268,24 +316,34 @@ def smart_parse_rubric_text(raw_text: str) -> List[Dict[str, Any]]:
         start_idx = q_matches[i].start()
         next_start = len(clean_text)
         for j in range(i + 1, len(q_matches)):
-            if q_matches[j].group(1) != q_num:
+            raw_next = q_matches[j].group(1).strip()
+            next_num = re.sub(r'[\s\.]+', '', raw_next)
+            if next_num != q_num:
                 next_start = q_matches[j].start()
                 break
 
         block = clean_text[start_idx:next_start].strip()
 
-        rubric_match = re.search(r'(?:Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*' + q_num + r'|(?:^|\n)\s*Answers?\:?)', block, re.IGNORECASE)
-        if rubric_match:
+        rubric_match = re.search(
+            r'(?:Marking\s+(?:Rubric\s+)?for\s+(?:Question|Q)?\s*' + re.escape(q_num) +
+            r'|(?:^|\n)\s*(?:Model\s+Answer|Answer\s+Scheme|Marking\s+Scheme|Suggested\s+Answer|Answers?|Solutions?|Rubric|Criteria)\s*[\:\.\-]?\s*)',
+            block,
+            re.IGNORECASE
+        )
+
+        if rubric_match and rubric_match.start() > 10:
             prompt_text = block[:rubric_match.start()].strip()
             rubric_text = block[rubric_match.start():].strip()
         else:
             prompt_text = block
             rubric_text = block
+
         total_marks = calculate_question_max_mark(prompt_text)
+        q_label = f"Q{q_num}" if not q_num.lower().startswith("q") else q_num
 
         parsed.append({
             "id": len(parsed) + 1,
-            "question_number": f"Q{q_num}",
+            "question_number": q_label,
             "text": prompt_text.strip(),
             "maxMark": total_marks,
             "modelAnswer": rubric_text.strip()

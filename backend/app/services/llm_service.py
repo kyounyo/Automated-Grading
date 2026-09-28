@@ -1,7 +1,9 @@
 import os
 import re
 import json
+import time
 import urllib.request
+import urllib.error
 from typing import Dict, Any, List, Optional
 from .confidence import evaluate_confidence_and_status
 
@@ -27,8 +29,8 @@ LLM_MODEL = get_llm_model()
 def _clean_json_response(content: str) -> Dict[str, Any]:
     """
     Cleans raw response from OpenRouter models:
-    - Removes DeepSeek/Gemini <think>...</think> reasoning blocks
-    - Strips markdown ```json Fences
+    - Removes DeepSeek/Nemotron <think>...</think> reasoning blocks
+    - Extracts JSON from ```json ... ``` blocks if present
     - Multi-stage JSON repairer for missing commas, unescaped quotes, and trailing commas
     """
     if not content:
@@ -36,24 +38,28 @@ def _clean_json_response(content: str) -> Dict[str, Any]:
 
     clean_text = content.strip()
     
+    # Strip <think> reasoning tags
     think_match = re.search(r'<think>.*?</think>', clean_text, flags=re.DOTALL)
     if think_match:
         clean_text = clean_text.replace(think_match.group(0), "").strip()
 
-    if clean_text.startswith("```json"):
-        clean_text = clean_text[7:]
-    elif clean_text.startswith("```"):
-        clean_text = clean_text[3:]
-    
-    if clean_text.endswith("```"):
-        clean_text = clean_text[:-3]
+    # If response contains ```json ... ``` codeblock, extract it specifically
+    json_block_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', clean_text, flags=re.DOTALL)
+    if json_block_match:
+        clean_text = json_block_match.group(1).strip()
+    else:
+        if clean_text.startswith("```json"):
+            clean_text = clean_text[7:]
+        elif clean_text.startswith("```"):
+            clean_text = clean_text[3:]
+        if clean_text.endswith("```"):
+            clean_text = clean_text[:-3]
+        clean_text = clean_text.strip()
 
-    clean_text = clean_text.strip()
-    
-    start_idx = clean_text.find("{")
-    end_idx = clean_text.rfind("}")
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        clean_text = clean_text[start_idx:end_idx + 1]
+        start_idx = clean_text.find("{")
+        end_idx = clean_text.rfind("}")
+        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+            clean_text = clean_text[start_idx:end_idx + 1]
 
     try:
         return json.loads(clean_text)
@@ -93,43 +99,67 @@ def _clean_json_response(content: str) -> Dict[str, Any]:
             "highlights": []
         }
     except Exception as parse_err:
-        raise ValueError(f"Failed to parse LLM JSON: {parse_err}")
+        return {
+            "overall_score": 0.0,
+            "confidence_score": 0.5,
+            "status": "error",
+            "reasoning": f"Fallback parse after JSON error: {parse_err}",
+            "feedback": {"summary": "JSON parsing error", "breakdown": []},
+            "highlights": []
+        }
 
 
-def _call_openrouter_api(messages: list, model: str, temperature: float = 0.1) -> Optional[Dict[str, Any]]:
+def _call_openrouter_api(messages: list, model: str, temperature: float = 0.0) -> Optional[Dict[str, Any]]:
     """
-    Executes HTTP POST request to OpenRouter API endpoint.
+    Executes HTTP POST request to OpenRouter API endpoint with automatic rate limit (HTTP 429) retry backoff.
     """
     api_key = get_openrouter_api_key()
     if not api_key:
         return None
 
-    try:
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://autograde.ai",
-            "X-Title": "AutoGrade+"
-        }
-        data = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "response_format": {"type": "json_object"}
-        }
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://autograde.ai",
+        "X-Title": "AutoGrade+"
+    }
+    data = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "response_format": {"type": "json_object"}
+    }
 
-        req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
-        with urllib.request.urlopen(req, timeout=35) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-            content = body["choices"][0]["message"]["content"]
-            parsed = _clean_json_response(content)
-            if isinstance(parsed, dict):
-                parsed["_usage"] = body.get("usage", {})
-            return parsed
-    except Exception as e:
-        print(f"[OpenRouter API Warning] Call failed for model {model}: {e}")
-        return None
+    max_attempts = 4
+    for attempt in range(max_attempts):
+        try:
+            req = urllib.request.Request(url, data=json.dumps(data).encode("utf-8"), headers=headers)
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                content = body["choices"][0]["message"]["content"]
+                parsed = _clean_json_response(content)
+                if isinstance(parsed, dict):
+                    parsed["_usage"] = body.get("usage", {})
+                return parsed
+        except urllib.error.HTTPError as e:
+            if e.code in [429, 502, 503, 504] and attempt < max_attempts - 1:
+                wait_s = (attempt + 1) * 3
+                print(f"[OpenRouter API Backoff] HTTP {e.code} for {model}. Retrying in {wait_s}s (Attempt {attempt + 1}/{max_attempts})...")
+                time.sleep(wait_s)
+            else:
+                print(f"[OpenRouter API Warning] Call failed for model {model}: {e}")
+                return None
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str and attempt < max_attempts - 1:
+                wait_s = (attempt + 1) * 3
+                print(f"[OpenRouter API Backoff] Rate limit for {model}. Retrying in {wait_s}s...")
+                time.sleep(wait_s)
+            else:
+                print(f"[OpenRouter API Warning] Call failed for model {model}: {e}")
+                return None
+    return None
 
 
 def call_rubric_context_parser_agent(rubric_json: list, model_answer: str, rag_context: str, model: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -616,21 +646,65 @@ Return strictly valid JSON with no markdown wrapping, matching this format:
         return {}
 
 
+def normalize_text_for_matching(text: str) -> str:
+    if not text:
+        return ""
+    text = re.sub(r'[\u2018\u2019\u201b\u2039\u203a\xb4\`]', "'", text)
+    text = re.sub(r'[\u201c\u201d\u201e\xab\xbb]', '"', text)
+    text = re.sub(r'[\u2013\u2014\u2015]', '-', text)
+    text = re.sub(r'[\u2026]', '...', text)
+    text = re.sub(r'[\u2060\u200b\ufeff]', '', text)
+    return text
+
+
 def _find_phrase_range(raw_text: str, phrase: str, start_after: int = 0):
     if not phrase or not phrase.strip():
         return -1, -1
-    idx = raw_text.find(phrase, start_after)
+
+    search_text = raw_text[start_after:] if start_after > 0 else raw_text
+    norm_search = normalize_text_for_matching(search_text)
+    norm_phrase = normalize_text_for_matching(phrase)
+
+    # 1. Exact Substring Match
+    idx = norm_search.find(norm_phrase)
     if idx != -1:
-        return idx, idx + len(phrase)
-    
-    words = [re.escape(w) for w in phrase.strip().split()]
-    if not words:
-        return -1, -1
-    pattern = r'\s+'.join(words)
-    m = re.search(pattern, raw_text[start_after:], re.IGNORECASE)
-    if m:
-        return start_after + m.start(), start_after + m.end()
-        
+        actual_start = start_after + idx
+        return actual_start, actual_start + len(phrase)
+
+    # 2. Regex match with flexible whitespace/punctuation
+    words = norm_phrase.strip().split()
+    if words:
+        escaped_words = [re.escape(w) for w in words]
+        pattern = r'\s*[\W_]*\s*'.join(escaped_words)
+        m = re.search(pattern, norm_search, re.IGNORECASE)
+        if m:
+            return start_after + m.start(), start_after + m.end()
+
+    # 3. Fallback: Strip leading numbering prefix like "6.", "6. (a)", "6. (a) (i)", "Q6.", "(a)" from phrase
+    clean_phrase = re.sub(r'^(?:Question|Q)?\s*\d+[\.\)]?\s*(?:\([a-z0-9]+\)|[a-z0-9]+\.?)?\s*(?:\([ivx]+\)|[ivx]+\.?)?\s*', '', norm_phrase, flags=re.IGNORECASE).strip()
+    if clean_phrase and clean_phrase != norm_phrase.strip():
+        clean_words = clean_phrase.split()
+        if len(clean_words) >= 2:
+            escaped_clean = [re.escape(w) for w in clean_words]
+            clean_pattern = r'\s*[\W_]*\s*'.join(escaped_clean)
+            m = re.search(clean_pattern, norm_search, re.IGNORECASE)
+            if m:
+                match_start = start_after + m.start()
+                # Check up to 50 chars before match_start for original numbering prefix
+                prefix_window = raw_text[max(0, match_start - 50):match_start]
+                num_m = re.search(r'(?:Question|Q)?\s*\d+[\.\)]?\s*(?:\([a-z0-9]+\)|[a-z0-9]+\.?)?\s*(?:\([ivx]+\)|[ivx]+\.?)?\s*$', prefix_window, re.IGNORECASE)
+                if num_m:
+                    return max(0, match_start - 50) + num_m.start(), start_after + m.end()
+                return match_start, start_after + m.end()
+
+    # 4. Pure Alphanumeric Word Sequence Match
+    alpha_words = re.findall(r'[a-zA-Z0-9]+', phrase)
+    if len(alpha_words) >= 3:
+        alpha_pattern = r'[\s\W]+'.join(re.escape(w) for w in alpha_words[:6])
+        m = re.search(alpha_pattern, search_text, re.IGNORECASE)
+        if m:
+            return start_after + m.start(), start_after + m.end()
+
     return -1, -1
 
 
@@ -638,7 +712,7 @@ def parse_entire_document_with_llm(raw_text: str) -> List[Dict[str, Any]]:
     """
     LLM-Guided Exact Slicing Document Parser.
     Uses LLM intelligence to identify start & end anchor phrases for questions and answers across ANY document layout,
-    and then performs direct Python string slicing on raw_text to guarantee 100% exact verbatim preservation and zero name redaction.
+    and then performs direct Python string slicing on raw_text to guarantee 100% exact verbatim preservation.
     """
     api_key = get_openrouter_api_key()
     if not api_key or not LLM_API_URL:
@@ -646,28 +720,35 @@ def parse_entire_document_with_llm(raw_text: str) -> List[Dict[str, Any]]:
 
     prompt = f"""
 You are an intelligent document structure analyzer.
-Your job is to read the raw document text below and identify all Questions and Answer Schemes/Rubrics regardless of document layout.
+Your job is to identify every question/sub-question and its corresponding answer scheme/rubric in the raw document text.
 
 Raw Document Text:
 {raw_text}
 
 STRICT INSTRUCTIONS:
-1. "question_start_phrase": Exact 4-8 starting words of the question.
-2. "question_end_phrase": Exact 4-8 ending words of the question prompt.
-3. "answer_start_phrase": Exact 4-8 starting words of the corresponding answer scheme/rubric.
-4. "answer_end_phrase": Exact 4-8 ending words of the answer scheme/rubric.
-5. "max_marks": Extract maximum marks if mentioned (e.g. 6.0, 10.0). Default to 10.0 if not specified.
+1. Extract ALL sub-parts (e.g. "Q6(a)", "Q6(b)", "Q6(a)(i)", "Q6(a)(ii)") as SEPARATE, DISTINCT items in the array! If a paragraph contains sub-parts (a) and (b), output Q6(a) and Q6(b) as separate question entries, NEVER combine them into one item!
+2. Recognize ANY sub-part numbering format regardless of style, including letters (a, b, c), Roman numerals (i, ii, iii, iv, v, vi), numbers (1, 2), or formats like "6. (a)", "6(a)", "(b)", "6) (a)".
+3. Do NOT extract bullet list items or point criteria inside answers (such as -May be biodegradable, 1., 2. under Advantages or Disadvantages) as separate questions! Include them as part of the model answer scheme/rubric.
+4. If the rubric/answer scheme repeats the question prompt text before providing the answer criteria, EXCLUDE the repeated question text! "answer_start_phrase" must be the starting 4 to 8 words of the actual answer/marking criteria that follow.
+5. "question_number": Use exact question label (e.g. "Q6(a)", "Q6(b)", "Q6(a)(i)", "Q9").
+6. "question_start_phrase": Exact 4 to 8 starting words of the question prompt (e.g. "6. (a) Polymer-based injectable modified").
+7. "question_end_phrase": Exact 4 to 8 ending words of the question prompt (e.g. "means for the patient. (5 marks)").
+8. "answer_start_phrase": Exact 4 to 8 starting words that OPEN the actual answer/marking criteria (e.g. "Advantages -May be biodegradable" or "One mark for disagree"). Must start AFTER any repeated question text!
+9. "answer_end_phrase": Exact 4 to 8 ending words of the answer scheme/rubric (e.g. "Complex manufacture - expensive").
+10. "max_marks": Extract maximum marks if mentioned (e.g. 5.0, 10.0). Default to 10.0 if not specified.
 
 OUTPUT FORMAT:
+
 Return strictly valid JSON with no markdown wrapping, matching this array format:
+
 [
   {{
-    "question_number": "Q1",
-    "question_start_phrase": "Exact starting 4 to 8 words...",
-    "question_end_phrase": "Exact ending 4 to 8 words...",
-    "answer_start_phrase": "Exact starting 4 to 8 words...",
-    "answer_end_phrase": "Exact ending 4 to 8 words...",
-    "max_marks": 10.0
+    "question_number": "Q6(a)(i)",
+    "question_start_phrase": "Exact 4 to 8 words copied from the question",
+    "question_end_phrase": "Exact 4 to 8 words copied from the question",
+    "answer_start_phrase": "Exact 4 to 8 words copied from the answer",
+    "answer_end_phrase": "Exact 4 to 8 words copied from the answer",
+    "max_marks": 5.0
   }}
 ]
 """
@@ -699,43 +780,116 @@ Return strictly valid JSON with no markdown wrapping, matching this array format
                 return []
 
             results = []
+            num_guides = len(guides)
+            last_q_pos = 0
+            last_a_start_idx = 0
+
             for idx, g in enumerate(guides):
-                q_num = g.get("question_number", f"Q{idx + 1}")
+                q_num = str(g.get("question_number", f"Q{idx + 1}")).strip()
+                if not q_num.lower().startswith("q") and not re.match(r'^\d', q_num):
+                    q_num = f"Q{q_num}"
+                elif q_num.isdigit():
+                    q_num = f"Q{q_num}"
+
                 max_mark = float(g.get("max_marks", 10.0))
 
                 q_start_phrase = g.get("question_start_phrase", "")
                 q_end_phrase = g.get("question_end_phrase", "")
-
-                q_s_start, q_s_end = _find_phrase_range(raw_text, q_start_phrase, 0)
-                q_e_start, q_e_end = _find_phrase_range(raw_text, q_end_phrase, max(0, q_s_start))
-
-                if q_s_start != -1 and q_e_end != -1:
-                    prompt_verbatim = raw_text[q_s_start : q_e_end].strip()
-                elif q_s_start != -1:
-                    prompt_verbatim = raw_text[q_s_start:].strip()
-                else:
-                    prompt_verbatim = f"Question {q_num}"
-
                 a_start_phrase = g.get("answer_start_phrase", "")
                 a_end_phrase = g.get("answer_end_phrase", "")
 
-                a_s_start, a_s_end = _find_phrase_range(raw_text, a_start_phrase, 0)
-                a_e_start, a_e_end = _find_phrase_range(raw_text, a_end_phrase, max(0, a_s_start))
+                # 1. Find question start
+                q_s_start, q_s_end = _find_phrase_range(raw_text, q_start_phrase, 0)
+                
+                # 2. Find question end
+                q_e_start, q_e_end = _find_phrase_range(raw_text, q_end_phrase, max(0, q_s_start))
 
-                if a_s_start != -1 and a_e_end != -1:
-                    answer_verbatim = raw_text[a_s_start : a_e_end].strip()
-                elif a_s_start != -1:
-                    answer_verbatim = raw_text[a_s_start:].strip()
+                # 3. Find answer start (must start AFTER question prompt AND after previous sub-part answer)
+                search_after_q = q_e_end if q_e_end != -1 else (q_s_end if q_s_end != -1 else 0)
+                search_a_from = max(search_after_q, last_a_start_idx)
+                a_s_start, a_s_end = _find_phrase_range(raw_text, a_start_phrase, search_a_from)
+                
+                if a_s_start != -1:
+                    last_a_start_idx = a_s_start + 1
+
+                # 4. Find answer end
+                a_e_start, a_e_end = _find_phrase_range(raw_text, a_end_phrase, max(0, a_s_start if a_s_start != -1 else q_s_start))
+
+                # Look ahead for next question start phrase if available
+                next_q_s_start = len(raw_text)
+                if idx + 1 < num_guides:
+                    next_q_sp = guides[idx + 1].get("question_start_phrase", "")
+                    nq_s, _ = _find_phrase_range(raw_text, next_q_sp, max(0, q_s_start + 1))
+                    if nq_s != -1:
+                        next_q_s_start = nq_s
+
+                # Fallbacks for Question Prompt bounds
+                if q_s_start == -1:
+                    clean_q_label = re.sub(r'^Q', '', q_num)
+                    tokens = re.findall(r'[a-zA-Z0-9]+', clean_q_label)
+                    if tokens:
+                        label_pattern = r'(?:^|\n)\s*(?:Question|Q)?\s*' + r'[\s\.\(\)]*'.join(re.escape(t) for t in tokens)
+                        m_label = re.search(label_pattern, raw_text, re.IGNORECASE)
+                        if m_label:
+                            q_s_start = m_label.start()
+                        else:
+                            q_s_start = 0
+                    else:
+                        q_s_start = 0
+
+                if q_e_end == -1:
+                    if a_s_start != -1 and a_s_start > q_s_start:
+                        q_e_end = a_s_start
+                    elif next_q_s_start < len(raw_text) and next_q_s_start > q_s_start:
+                        block_between = raw_text[q_s_start:next_q_s_start]
+                        ans_m = re.search(r'(?:^|\n)\s*(?:Model\s+Answer|Answer|Answers|Rubric|Marking\s+Scheme|Solution|Suggested\s+Answer)\s*[\:\.\-]?\s*', block_between, re.IGNORECASE)
+                        if ans_m:
+                            q_e_end = q_s_start + ans_m.start()
+                            if a_s_start == -1:
+                                a_s_start = q_s_start + ans_m.start()
+                        else:
+                            q_e_end = next_q_s_start
+                    else:
+                        block_from_q = raw_text[q_s_start:]
+                        ans_m = re.search(r'(?:^|\n)\s*(?:Model\s+Answer|Answer|Answers|Rubric|Marking\s+Scheme|Solution|Suggested\s+Answer)\s*[\:\.\-]?\s*', block_from_q, re.IGNORECASE)
+                        if ans_m:
+                            q_e_end = q_s_start + ans_m.start()
+                            if a_s_start == -1:
+                                a_s_start = q_s_start + ans_m.start()
+                        else:
+                            q_e_end = len(raw_text)
+
+                prompt_verbatim = raw_text[q_s_start:q_e_end].strip()
+
+                # Fallbacks for Answer bounds
+                if a_s_start == -1:
+                    a_s_start = q_e_end
+
+                if a_e_end == -1 or a_e_end <= a_s_start:
+                    a_e_end = min(len(raw_text), next_q_s_start)
+
+                if a_s_start < len(raw_text) and a_e_end > a_s_start:
+                    answer_verbatim = raw_text[a_s_start:a_e_end].strip()
                 else:
                     answer_verbatim = prompt_verbatim
 
                 results.append({
                     "id": idx + 1,
-                    "question_number": q_num if str(q_num).startswith("Q") else f"Q{q_num}",
+                    "question_number": q_num,
                     "text": prompt_verbatim,
                     "maxMark": max_mark,
-                    "modelAnswer": answer_verbatim
+                    "modelAnswer": answer_verbatim,
+                    "_q_s_start": q_s_start
                 })
+
+            # Sort results by physical position in raw_text
+            results.sort(key=lambda r: r.get("_q_s_start", 0))
+
+            # Clean up internal metadata keys
+            for idx, item in enumerate(results):
+                item["id"] = idx + 1
+                if "_q_s_start" in item:
+                    del item["_q_s_start"]
 
             return results
     except Exception as e:
