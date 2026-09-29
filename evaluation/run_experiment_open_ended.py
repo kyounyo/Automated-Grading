@@ -1,15 +1,16 @@
 import os
 import re
 import sys
+import glob
 import json
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
-
 import time
+import argparse
 import pandas as pd
 import pingouin as pg
 from dotenv import load_dotenv
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 # Path setup
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,18 +20,20 @@ sys.path.append(backend_dir)
 # Load environment variables
 load_dotenv(dotenv_path=os.path.join(script_dir, ".env"))
 
-# Import exact backend agent & key helper
+# Import exact backend agent & confidence engine implementations
 from app.services.llm_service import (
     call_primary_grading_agent,
+    call_auditor_verification_agent,
     get_openrouter_api_key
 )
+from app.services.confidence import evaluate_confidence_and_status
 
 if not get_openrouter_api_key():
     print("❌ Error: No OPENROUTER_API_KEY found in evaluation/.env")
     sys.exit(1)
 
 # ---------------------------------------------------------
-# KNOWN PRESET MODELS & PRICING (Matching Experiment 2)
+# KNOWN PRESET MODELS & PRICING
 # ---------------------------------------------------------
 PRESET_MODELS = {
     "A": {
@@ -189,7 +192,7 @@ Before returning the final score, verify that:
 - the total score is calculated correctly."
 """
 
-def resolve_model(input_val: str):
+def resolve_model(input_val: str, default_role="Model"):
     """Resolves short key (A, B, C) or raw OpenRouter string into a model info dict."""
     val = input_val.strip()
     key_upper = val.upper()
@@ -206,7 +209,32 @@ def resolve_model(input_val: str):
         "cost_per_1k_out": 0.0008
     }
 
-def compute_metrics(df_clean, pred_col="ai_score", target_col="human_score"):
+# ---------------------------------------------------------
+# DATASET LOADER: Q22 OPEN-ENDED ONLY (25 Samples)
+# ---------------------------------------------------------
+def get_q22_dataset(samples=25, seed=42):
+    """Loads dataset and samples exclusively from Question 22 (Open-Ended)."""
+    dataset_path = os.path.join(script_dir, "Dataset for prompt.xlsx")
+    df_questions = pd.read_excel(dataset_path, sheet_name="Question & Answer Scheme")
+    df_responses = pd.read_excel(dataset_path, sheet_name="Response")
+    df_questions.columns = df_questions.columns.str.strip()
+    df_responses.columns = df_responses.columns.str.strip()
+
+    # Filter for Question 22
+    q22_responses = df_responses[df_responses['question_no'].astype(str).str.strip().str.replace('Q', '') == "22"]
+    sampled_responses = q22_responses.sample(n=min(samples, len(q22_responses)), random_state=seed)
+
+    matched_q = df_questions[df_questions['question_no'].astype(str).str.strip().str.replace('Q', '') == "22"]
+    if matched_q.empty:
+        raise ValueError("Question 22 not found in 'Question & Answer Scheme' sheet of dataset.")
+
+    q_info = matched_q.iloc[0]
+    return q_info, sampled_responses
+
+# ---------------------------------------------------------
+# METRIC EVALUATION FUNCTIONS (Matching Experiment 2 Standard)
+# ---------------------------------------------------------
+def compute_metrics(df_clean, pred_col="grader_score", target_col="human_score"):
     """Computes ICC(A,1), MAE, Mean Error (Bias), Pearson r, Spearman rho, Exact Match %, and ±1 Mark %."""
     if len(df_clean) < 3:
         return {}
@@ -243,238 +271,471 @@ def compute_metrics(df_clean, pred_col="ai_score", target_col="human_score"):
 
     return {
         "N": n,
-        "ICC": round(icc_val, 3),
-        "MAE": round(mae, 3),
-        "Mean_Error": round(mean_error, 3),
-        "Pearson_r": round(pearson_r, 3),
-        "Spearman_rho": round(spearman_rho, 3),
-        "Exact_Match_Pct": round(exact_match, 1),
-        "Within_1_Mark_Pct": round(within_1, 1)
+        "ICC": round(float(icc_val), 3),
+        "MAE": round(float(mae), 3),
+        "Mean_Error": round(float(mean_error), 3),
+        "Pearson_r": round(float(pearson_r), 3),
+        "Spearman_rho": round(float(spearman_rho), 3),
+        "Exact_Match_Pct": round(float(exact_match), 1),
+        "Within_1_Mark_Pct": round(float(within_1), 1)
     }
 
-def run_open_ended_experiment_for_model(model_key="A", target_q="22", samples=25, seed=42, fresh=False):
-    m_info = resolve_model(model_key)
-    m_name = m_info["name"]
-    m_str = m_info["model_str"]
-    file_tag = m_info["file_tag"]
+def compute_quality_control_metrics(df_res):
+    """Computes full Confusion Matrix for Error Detection: Recall, Precision, F1-Score, Leakage, and Automation Rate."""
+    if df_res.empty:
+        return {}
+
+    total_n = len(df_res)
+    actual_errors = df_res['actual_error_ge_1mark'].values
+    flagged = (df_res['status'] == 'flagged').values
+    
+    tp = int(((flagged) & (actual_errors)).sum())
+    fp = int(((flagged) & (~actual_errors)).sum())
+    tn = int(((~flagged) & (~actual_errors)).sum())
+    fn = int(((~flagged) & (actual_errors)).sum())
+
+    total_actual_errors = tp + fn
+    total_clean_grades = fp + tn
+
+    flag_rate = (tp + fp) / total_n * 100.0 if total_n > 0 else 0.0
+    automation_rate = 100.0 - flag_rate
+
+    recall = (tp / total_actual_errors * 100.0) if total_actual_errors > 0 else 100.0
+    precision = (tp / (tp + fp) * 100.0) if (tp + fp) > 0 else 0.0
+    
+    if (precision + recall) > 0:
+        f1_score = (2.0 * precision * recall) / (precision + recall)
+    else:
+        f1_score = 0.0
+
+    fn_leakage_rate = (fn / total_actual_errors * 100.0) if total_actual_errors > 0 else 0.0
+    fp_overflag_rate = (fp / total_clean_grades * 100.0) if total_clean_grades > 0 else 0.0
+
+    return {
+        "TP": tp, "FP": fp, "TN": tn, "FN": fn,
+        "Total_N": total_n,
+        "Flag_Rate_Pct": round(flag_rate, 1),
+        "Automation_Rate_Pct": round(automation_rate, 1),
+        "Recall_Pct": round(recall, 1),
+        "Precision_Pct": round(precision, 1),
+        "F1_Score_Pct": round(f1_score, 1),
+        "Leakage_FN_Pct": round(fn_leakage_rate, 1),
+        "Overflag_FP_Pct": round(fp_overflag_rate, 1)
+    }
+
+# ---------------------------------------------------------
+# AGENT 2: PRIMARY GRADER RUNNER (With Q22 Open-Ended Prompt)
+# ---------------------------------------------------------
+def grade_with_open_ended_agent(grader_model_info, question_no, question_text, rubric_text, max_score, student_answer):
+    clean_ans = str(student_answer).strip() if pd.notna(student_answer) else ""
+    if not clean_ans or clean_ans.lower() in ["-", "n/a", "none", "nan"]:
+        return {
+            "overall_score": 0.0,
+            "confidence_score": 1.0,
+            "status": "graded",
+            "feedback": {"summary": "Blank submission.", "breakdown": [{"question_number": f"Q{question_no}", "score_awarded": 0.0, "max_score": float(max_score), "reasoning": "Blank response"}]},
+            "highlights": []
+        }, 0.0, 0, 0, 0.0, 0
+
+    model_str = grader_model_info["model_str"]
+    combined_guidelines = f"{rubric_text}\n\n{OPEN_ENDED_GRADING_RULES.format(max_score=max_score)}"
+    structured_rubric = {
+        "structured_rules": [
+            {
+                "question_number": f"Q{question_no}",
+                "max_score": float(max_score),
+                "grading_guidelines": combined_guidelines
+            }
+        ]
+    }
+    raw_rubric_json = [{"question_number": f"Q{question_no}", "max_score": float(max_score), "criterion": combined_guidelines}]
+
+    start_time = time.time()
+    res = call_primary_grading_agent(
+        student_text=clean_ans,
+        structured_rubric=structured_rubric,
+        raw_rubric_json=raw_rubric_json,
+        model_answer=rubric_text,
+        rag_context="",
+        total_max_score=float(max_score),
+        model=model_str
+    )
+    latency_ms = round((time.time() - start_time) * 1000)
+
+    if not res:
+        return {
+            "overall_score": 0.0,
+            "confidence_score": 0.0,
+            "status": "flagged",
+            "feedback": {"summary": "Primary model call failed", "breakdown": []},
+            "highlights": []
+        }, 0.0, 0, 0, 0.0, latency_ms
+
+    score = float(res.get("overall_score", 0.0))
+    score = max(0.0, min(float(max_score), score))
+
+    usage = res.get("_usage", {})
+    actual_in_tok = usage.get("prompt_tokens", int((len(clean_ans) + len(rubric_text) + 800) / 4))
+    actual_out_tok = usage.get("completion_tokens", int(len(json.dumps(res)) / 4))
+    cost = (actual_in_tok / 1000.0 * grader_model_info.get("cost_per_1k_in", 0.0002)) + (actual_out_tok / 1000.0 * grader_model_info.get("cost_per_1k_out", 0.0008))
+
+    return res, score, actual_in_tok, actual_out_tok, cost, latency_ms
+
+# ---------------------------------------------------------
+# AGENT 3: AUDITOR VERIFICATION RUNNER
+# ---------------------------------------------------------
+def audit_with_backend_agent(auditor_model_info, question_no, rubric_text, max_score, student_answer, primary_eval):
+    clean_ans = str(student_answer).strip() if pd.notna(student_answer) else ""
+    if not clean_ans or clean_ans.lower() in ["-", "n/a", "none", "nan"]:
+        return primary_eval.get("overall_score", 0.0), True, [], "", [], 0, 0, 0.0, 0
+
+    model_str = auditor_model_info["model_str"]
+    raw_rubric_json = [{"question_number": f"Q{question_no}", "max_score": float(max_score), "criterion": rubric_text}]
+
+    start_time = time.time()
+    auditor_res = call_auditor_verification_agent(
+        student_text=clean_ans,
+        rubric_json=raw_rubric_json,
+        primary_eval=primary_eval,
+        model=model_str
+    )
+    latency_ms = round((time.time() - start_time) * 1000)
+
+    if not auditor_res:
+        return float(primary_eval.get("overall_score", 0.0)), True, [], "Audit call failed", [], 0, 0, 0.0, latency_ms
+
+    audit_passed = bool(auditor_res.get("audit_passed", True))
+    auditor_score = float(auditor_res.get("auditor_score", primary_eval.get("overall_score", 0.0)))
+    auditor_score = max(0.0, min(float(max_score), auditor_score))
+    conflicting_qs = auditor_res.get("conflicting_questions", [])
+    discrepancy_note = auditor_res.get("reconciliation_reason", auditor_res.get("discrepancy_note", ""))
+
+    auditor_breakdown = auditor_res.get("auditor_breakdown", [])
+    if not isinstance(auditor_breakdown, list):
+        auditor_breakdown = []
+
+    usage = auditor_res.get("_usage", {})
+    actual_in_tok = usage.get("prompt_tokens", int((len(clean_ans) + len(rubric_text) + 600) / 4))
+    actual_out_tok = usage.get("completion_tokens", int(len(json.dumps(auditor_res)) / 4))
+    cost = (actual_in_tok / 1000.0 * auditor_model_info.get("cost_per_1k_in", 0.0002)) + (actual_out_tok / 1000.0 * auditor_model_info.get("cost_per_1k_out", 0.0008))
+
+    return auditor_score, audit_passed, conflicting_qs, discrepancy_note, auditor_breakdown, actual_in_tok, actual_out_tok, cost, latency_ms
+
+# ---------------------------------------------------------
+# SAVE MULTI-TAB EXCEL WORKBOOK (Q22 Multi-Agent)
+# ---------------------------------------------------------
+def save_open_ended_audit_excel(df_res, pair_title, arch_type, excel_file):
+    if df_res.empty: return
+
+    tot_time_s = round(df_res['total_latency_ms'].sum() / 1000.0, 1)
+    duration_str = f"{int(tot_time_s // 60)}m {int(tot_time_s % 60)}s"
+    n_res = len(df_res)
+    tot_cost = round(df_res['total_cost_usd'].sum(), 6)
+    cost_100q = round(tot_cost * (100.0 / n_res), 4) if n_res > 0 else tot_cost
+
+    try:
+        with pd.ExcelWriter(excel_file, engine='openpyxl') as writer:
+            # 1. Summary Metrics Sheet with EXACT requested columns
+            q_all_metrics = compute_metrics(df_res, pred_col="grader_score")
+            q_unflagged = df_res[df_res['status'] == 'graded']
+            q_unflagged_metrics = compute_metrics(q_unflagged, pred_col="grader_score") if len(q_unflagged) >= 3 else {}
+            qc = compute_quality_control_metrics(df_res)
+            
+            summary_rows = [{
+                "Grader ICC": q_all_metrics.get("ICC", 0.0),
+                "Grader MAE": q_all_metrics.get("MAE", 0.0),
+                "Auto-Approved ICC": unflagged_metrics.get("ICC", q_all_metrics.get("ICC", 0.0)),
+                "Auto-Approved MAE": unflagged_metrics.get("MAE", q_all_metrics.get("MAE", 0.0)),
+                "Automation Rate (%)": f"{qc.get('Automation_Rate_Pct', 0.0)}%",
+                "Flag Rate (%)": f"{qc.get('Flag_Rate_Pct', 0.0)}%",
+                "Flagging Recall (%)": f"{qc.get('Recall_Pct', 0.0)}%",
+                "Flagging Precision (%)": f"{qc.get('Precision_Pct', 0.0)}%",
+                "Flagging F1-Score (%)": f"{qc.get('F1_Score_Pct', 0.0)}%",
+                "Leakage (FN Rate) (%)": f"{qc.get('Leakage_FN_Pct', 0.0)}%",
+                "Over-flag (FP Rate) (%)": f"{qc.get('Overflag_FP_Pct', 0.0)}%",
+                "Avg Latency (s)": round(df_res['total_latency_ms'].mean() / 1000.0, 2),
+                "Total Run Time": duration_str,
+                "Total Cost (100 Qs)": f"${cost_100q:.4f}"
+            }]
+
+            df_sum = pd.DataFrame(summary_rows)
+            df_sum.to_excel(writer, sheet_name="Audit_Summary", index=False)
+
+            # Also save Summary Metrics to CSV directly
+            summary_csv_file = excel_file.replace(".xlsx", "_summary.csv")
+            df_sum.to_csv(summary_csv_file, index=False)
+
+            # Update Master Comparison CSV
+            master_csv = os.path.join(script_dir, "results_open_ended_audit_master_summary.csv")
+            try:
+                if os.path.exists(master_csv) and os.path.getsize(master_csv) > 0:
+                    prev_master = pd.read_csv(master_csv)
+                    # Filter out old entry for this pair if exists
+                    if "Model Setup" in prev_master.columns:
+                        prev_master = prev_master[prev_master["Model Setup"] != pair_title]
+                    master_row = df_sum.copy()
+                    master_row.insert(0, "Model Setup", pair_title)
+                    master_df = pd.concat([prev_master, master_row], ignore_index=True)
+                else:
+                    master_df = df_sum.copy()
+                    master_df.insert(0, "Model Setup", pair_title)
+                master_df.to_csv(master_csv, index=False)
+            except Exception as e:
+                pass
+
+            # 2. Detailed Q22 Sheet
+            q_cols = [
+                "response_id", "question_no", "human_score", "grader_score", "auditor_score",
+                "score_discrepancy", "audit_passed", "status", "confidence_score", "flag_reasons",
+                "actual_error_ge_1mark", "grader_absolute_error", "grader_latency_ms", "auditor_latency_ms",
+                "total_cost_usd", "audit_note", "student_answer", "grader_reasoning"
+            ]
+            available_cols = [c for c in q_cols if c in df_res.columns]
+            df_res[available_cols].to_excel(writer, sheet_name="Q22_Audit", index=False)
+
+            # 3. Flagged Review Queue (Submissions sent to lecturer)
+            flagged_df = df_res[df_res['status'] == 'flagged'].copy()
+            if not flagged_df.empty:
+                f_cols = ["response_id", "question_no", "human_score", "grader_score", "auditor_score", "score_discrepancy", "flag_reasons", "audit_note", "student_answer"]
+                available_f_cols = [c for c in f_cols if c in flagged_df.columns]
+                flagged_df[available_f_cols].to_excel(writer, sheet_name="Flagged_For_Lecturer", index=False)
+
+        print(f"\n📊 Multi-Agent Excel report saved to: {excel_file}")
+        print(f"📄 Summary Metrics CSV saved to: {summary_csv_file}")
+        print(f"📁 Detailed Responses CSV saved to: {excel_file.replace('.xlsx', '.csv')}")
+    except Exception as e:
+        print(f"  ⚠️ Warning saving files: {e}")
+
+# ---------------------------------------------------------
+# RUN MULTI-AGENT EXPERIMENT ON Q22
+# ---------------------------------------------------------
+def run_q22_multi_agent_experiment(grader_model_info, auditor_model_info, samples=25, seed=42, fresh=False):
+    grader_name = grader_model_info["name"]
+    auditor_name = auditor_model_info["name"]
+    pair_tag = f"{grader_model_info['file_tag']}_to_{auditor_model_info['file_tag']}"
+    pair_title = f"{grader_name} (Grader w/ Q22 Prompt) ➔ {auditor_name} (Auditor)"
+    is_self_audit = (grader_model_info["model_str"] == auditor_model_info["model_str"])
+    arch_type = "Self-Audit" if is_self_audit else "Heterogeneous Multi-Agent"
 
     print("\n" + "="*85)
-    print(f"🚀 TESTING MODEL: {m_name} ({m_str}) [Question Q{target_q}]")
+    print(f"🚀 RUNNING MULTI-AGENT OPEN-ENDED (Q22): {pair_title}")
+    print(f"   Architecture: {arch_type} | Samples: {samples} | Seed: {seed}")
     print("="*85)
 
-    dataset_path = os.path.join(script_dir, "Dataset for prompt.xlsx")
-    df_questions = pd.read_excel(dataset_path, sheet_name="Question & Answer Scheme")
-    df_responses = pd.read_excel(dataset_path, sheet_name="Response")
-    df_questions.columns = df_questions.columns.str.strip()
-    df_responses.columns = df_responses.columns.str.strip()
+    q_info, df_sample = get_q22_dataset(samples=samples, seed=seed)
+    question_text = q_info['question']
+    rubric_text = q_info['answer']
+    max_score = float(q_info['max_mark'])
 
-    q_subset = df_responses[df_responses['question_no'].astype(str).str.strip().str.replace('Q', '') == str(target_q)]
-    df_sample = q_subset.sample(n=min(samples, len(q_subset)), random_state=seed).copy()
+    csv_file = os.path.join(script_dir, f"results_open_ended_audit_{pair_tag}_Q22.csv")
+    excel_file = os.path.join(script_dir, f"results_open_ended_audit_{pair_tag}_Q22.xlsx")
 
-    matched_q = df_questions[df_questions['question_no'].astype(str).str.strip().str.replace('Q', '') == str(target_q)].iloc[0]
-    rubric_text = matched_q['answer']
-    max_score = float(matched_q['max_mark'])
-
-    csv_file = os.path.join(script_dir, f"results_open_ended_{file_tag}_Q{target_q}.csv")
-    
     results = []
     completed_ids = set()
 
     if fresh and os.path.exists(csv_file):
         os.remove(csv_file)
-        print(f"🧹 Fresh run requested: Cleared previous checkpoint for {m_name}.")
+        print(f"🧹 Fresh run requested: Cleared previous checkpoint for {pair_title}.")
 
-    # Load checkpoint if exists (Matching run_experiment_suite.py pattern)
+    # Load checkpoint if exists
     if not fresh and os.path.exists(csv_file) and os.path.getsize(csv_file) > 0:
         try:
             prev_df = pd.read_csv(csv_file)
             results = prev_df.to_dict('records')
             completed_ids = set(str(r['response_id']) for r in results)
-            print(f"🔄 Checkpoint: Loaded {len(completed_ids)} already evaluated responses for {m_name}.")
+            print(f"🔄 Checkpoint: Loaded {len(completed_ids)} already evaluated responses.")
         except Exception:
             pass
-
-    combined_guidelines = f"{rubric_text}\n\n{OPEN_ENDED_GRADING_RULES}"
-    structured_rubric = {
-        "structured_rules": [
-            {
-                "question_number": f"Q{target_q}",
-                "max_score": max_score,
-                "grading_guidelines": combined_guidelines
-            }
-        ]
-    }
-    raw_rubric_json = [{"question_number": f"Q{target_q}", "max_score": max_score, "criterion": combined_guidelines}]
 
     for idx, row in df_sample.iterrows():
         resp_id = str(row['ID Number'])
         if resp_id in completed_ids:
             continue
 
-        human_grade = float(row['grade'])
-        ans_text = str(row['Response']).strip() if pd.notna(row['Response']) else ""
+        human_score = float(row['grade'])
+        ans_text = row['Response']
 
-        start_t = time.time()
-        res = call_primary_grading_agent(
-            student_text=ans_text,
-            structured_rubric=structured_rubric,
-            raw_rubric_json=raw_rubric_json,
-            model_answer=rubric_text,
-            rag_context="",
-            total_max_score=max_score,
-            model=m_str
+        print(f"  [{len(results)+1}/{samples}] Q22 | Student {resp_id} | Grader: {grader_name} ➔ Auditor: {auditor_name}...")
+
+        # Step 1: Execute Primary Grader using Q22 Open-Ended Prompt
+        primary_eval, grader_score, g_in_tok, g_out_tok, g_cost, g_lat = grade_with_open_ended_agent(
+            grader_model_info=grader_model_info,
+            question_no="22",
+            question_text=question_text,
+            rubric_text=rubric_text,
+            max_score=max_score,
+            student_answer=ans_text
         )
 
-        latency_ms = round((time.time() - start_t) * 1000)
-        ai_score = float(res.get("overall_score", 0.0)) if res else 0.0
-        reasoning = str(res.get("reasoning", "")) if res else ""
-        
-        usage = res.get("_usage", {}) if res else {}
-        in_tok = usage.get("prompt_tokens", 500)
-        out_tok = usage.get("completion_tokens", 300)
-        cost = (in_tok / 1000.0 * m_info["cost_per_1k_in"]) + (out_tok / 1000.0 * m_info["cost_per_1k_out"])
+        # Step 2: Execute Auditor Agent
+        auditor_score, audit_passed, conflict_qs, audit_note, a_breakdown, a_in_tok, a_out_tok, a_cost, a_lat = audit_with_backend_agent(
+            auditor_model_info=auditor_model_info,
+            question_no="22",
+            rubric_text=rubric_text,
+            max_score=max_score,
+            student_answer=ans_text,
+            primary_eval=primary_eval
+        )
+
+        score_discrepancy = round(abs(grader_score - auditor_score), 2)
+        max_denom = max_score if max_score > 0 else 6.0
+        agreement_ratio = max(0.0, 1.0 - (score_discrepancy / max_denom))
+
+        # Step 3: Attach Audit Result & Run Confidence Engine
+        primary_eval["multi_agent_audit"] = {
+            "auditor_passed": audit_passed,
+            "auditor_score": auditor_score,
+            "auditor_breakdown": a_breakdown,
+            "score_discrepancy": score_discrepancy,
+            "agreement_ratio": round(agreement_ratio, 2),
+            "conflicting_questions": conflict_qs,
+            "audit_note": audit_note,
+            "model_used": auditor_model_info["model_str"]
+        }
+
+        conf_result = evaluate_confidence_and_status(primary_eval, str(ans_text), max_score)
+        confidence_score = conf_result["confidence_score"]
+        status = conf_result["status"]  # "graded" or "flagged"
+        flag_reasons = "; ".join(conf_result.get("flag_reasons", []))
+
+        # Ground truth error definition: Was there an actual human-AI error (>= 1.0 mark)?
+        actual_error = abs(grader_score - human_score) >= 1.0
+        grader_reasoning = primary_eval.get("reasoning", "")
+        if not grader_reasoning and isinstance(primary_eval.get("feedback"), dict):
+            grader_reasoning = primary_eval["feedback"].get("summary", "")
 
         rec = {
             "response_id": resp_id,
-            "question_no": f"Q{target_q}",
-            "human_score": human_grade,
-            "ai_score": ai_score,
+            "question_no": "Q22",
+            "human_score": human_score,
             "max_score": max_score,
-            "absolute_error": round(abs(ai_score - human_grade), 2),
-            "difference (AI - Human)": round(ai_score - human_grade, 2),
-            "latency_ms": latency_ms,
-            "cost_usd": round(cost, 6),
-            "student_answer": ans_text,
-            "reasoning": reasoning,
-            "model_name": m_name,
-            "model_str": m_str
+            "grader_score": grader_score,
+            "auditor_score": auditor_score,
+            "score_discrepancy": score_discrepancy,
+            "audit_passed": audit_passed,
+            "confidence_score": confidence_score,
+            "status": status,
+            "flag_reasons": flag_reasons,
+            "actual_error_ge_1mark": actual_error,
+            "grader_absolute_error": round(abs(grader_score - human_score), 2),
+            "grader_latency_ms": g_lat,
+            "auditor_latency_ms": a_lat,
+            "total_latency_ms": g_lat + a_lat,
+            "grader_cost_usd": round(g_cost, 6),
+            "auditor_cost_usd": round(a_cost, 6),
+            "total_cost_usd": round(g_cost + a_cost, 6),
+            "audit_note": audit_note,
+            "grader_reasoning": grader_reasoning,
+            "student_answer": ans_text
         }
         results.append(rec)
 
-        # Continuous CSV Checkpoint (Matching run_experiment_suite.py pattern)
+        # Auto-save after each response (fail-safe checkpoint)
         pd.DataFrame(results).to_csv(csv_file, index=False)
-        print(f"   [Resp #{resp_id}] Human: {human_grade} | AI: {ai_score} | Time: {latency_ms/1000.0:.1f}s", flush=True)
-        time.sleep(0.5)
 
     df_res = pd.DataFrame(results)
-    metrics = compute_metrics(df_res, pred_col="ai_score")
+    save_open_ended_audit_excel(df_res, pair_title, arch_type, excel_file)
+    return df_res
 
-    tot_time_s = round(df_res['latency_ms'].sum() / 1000.0, 1)
-    avg_time_s = round(df_res['latency_ms'].mean() / 1000.0, 2)
-    tot_cost = round(df_res['cost_usd'].sum(), 4)
-
-    metrics["Model"] = m_name
-    metrics["Model_String"] = m_str
-    metrics["Avg_Time_per_Q_s"] = avg_time_s
-    metrics["Total_Run_Time"] = f"{int(tot_time_s // 60)}m {int(tot_time_s % 60)}s"
-    metrics["Total_Cost_25_Qs"] = f"${tot_cost}"
-
-    return metrics, df_res
-
+# ---------------------------------------------------------
+# CLI & MAIN ENTRYPOINT
+# ---------------------------------------------------------
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Benchmark models on open-ended exam questions.")
-    parser.add_argument("--model", type=str, choices=["A", "B", "C", "all", "a", "b", "c", "ALL"], default=None,
-                        help="Choose model: 'A' (Gemini), 'B' (Nemotron), 'C' (Claude), or 'all'.")
-    parser.add_argument("--question", type=str, choices=["22", "6", "both"], default="22",
-                        help="Target question: '22', '6', or 'both'. Default: '22'.")
-    parser.add_argument("--fresh", action="store_true",
-                        help="Force a fresh run by ignoring previously saved CSV checkpoints.")
+    parser = argparse.ArgumentParser(description="AutoGrade+ Multi-Agent Benchmark for Open-Ended Question 22")
+    parser.add_argument("--grader", "-g", "--model", "-m", type=str, default=None, help="Grader Model: A (Gemini 3.1 Flash Lite), B (Nemotron 120B), C (Claude Sonnet), or custom string")
+    parser.add_argument("--auditor", "-a", type=str, default=None, help="Auditor Model: A, B, C, or custom string")
+    parser.add_argument("--samples", "-n", type=int, default=25, help="Number of Q22 responses to evaluate (default: 25)")
+    parser.add_argument("--seed", type=int, default=42, help="Random sampling seed (default: 42)")
+    parser.add_argument("--fresh", action="store_true", help="Force a fresh run clearing previous checkpoint")
     args = parser.parse_args()
 
-    selected_model = args.model
+    grader_arg = args.grader
+    auditor_arg = args.auditor
     is_fresh = args.fresh
 
-    if not selected_model:
+    # Interactive prompt if models not passed
+    if not grader_arg or not auditor_arg:
         if sys.stdin.isatty():
-            print("\n" + "="*60)
-            print("🤖 SELECT MODEL FOR OPEN-ENDED EVALUATION")
-            print("="*60)
-            print("  [A / 1] Gemini 3.1 Flash Lite")
-            print("  [B / 2] Nemotron 3 Super 120B")
-            print("  [C / 3] Claude 4.6 Sonnet")
-            print("  [ALL / 4] Run All Models")
-            print("="*60)
+            print("="*65)
+            print("🤖 MULTI-AGENT OPEN-ENDED (Q22) BENCHMARK SELECTION")
+            print("="*65)
+            print("Available Preset Models:")
+            print("  [A / 1] Gemini 3.1 Flash Lite (Fast, High-Throughput)")
+            print("  [B / 2] Nemotron 3 Super 120B (High Reasoning, Accurate)")
+            print("  [C / 3] Claude 4.6 Sonnet (Deep Evaluation)")
+            print("="*65)
             try:
-                user_choice = input("Enter choice (A/B/C/ALL) [Default: B]: ").strip().upper()
-                if user_choice in ["1", "A"]:
-                    selected_model = "A"
-                elif user_choice in ["2", "B"]:
-                    selected_model = "B"
-                elif user_choice in ["3", "C"]:
-                    selected_model = "C"
-                elif user_choice in ["4", "ALL"]:
-                    selected_model = "ALL"
-                elif not user_choice:
-                    selected_model = "B"
-                else:
-                    selected_model = user_choice
+                if not grader_arg:
+                    g_in = input("Select GRADER model (A/B/C) [Default: B (Nemotron)]: ").strip().upper()
+                    grader_arg = {"1": "A", "2": "B", "3": "C"}.get(g_in, g_in or "B")
+                if not auditor_arg:
+                    a_in = input("Select AUDITOR model (A/B/C) [Default: A (Gemini)]: ").strip().upper()
+                    auditor_arg = {"1": "A", "2": "B", "3": "C"}.get(a_in, a_in or "A")
 
-                fresh_choice = input("Force a fresh rerun (clear previous checkpoint)? (y/N) [Default: N]: ").strip().lower()
-                if fresh_choice in ["y", "yes"]:
+                fresh_in = input("Force fresh rerun (clear previous checkpoint)? (y/N) [Default: N]: ").strip().lower()
+                if fresh_in in ["y", "yes"]:
                     is_fresh = True
             except (KeyboardInterrupt, EOFError):
                 print("\nOperation cancelled.")
                 sys.exit(0)
         else:
-            selected_model = "B"
+            grader_arg = grader_arg or "B"
+            auditor_arg = auditor_arg or "A"
 
-    selected_model = selected_model.upper()
-    models_to_run = ["A", "B", "C"] if selected_model == "ALL" else [selected_model]
-    target_qs = ["6", "22"] if args.question == "both" else [args.question]
+    grader_info = resolve_model(grader_arg, default_role="Grader")
+    auditor_info = resolve_model(auditor_arg, default_role="Auditor")
 
-    print("="*85)
-    print(f"🔬 OPEN-ENDED QUESTION MODEL BENCHMARK (Models: {', '.join(models_to_run)} | Questions: {', '.join(target_qs)})")
-    print("="*85)
+    df_res = run_q22_multi_agent_experiment(
+        grader_model_info=grader_info,
+        auditor_model_info=auditor_info,
+        samples=args.samples,
+        seed=args.seed,
+        fresh=is_fresh
+    )
 
-    all_metrics = []
-    all_responses_df_list = []
+    # Print summary metrics to terminal
+    g_metrics = compute_metrics(df_res, pred_col="grader_score")
+    a_metrics = compute_metrics(df_res, pred_col="auditor_score")
+    qc = compute_quality_control_metrics(df_res)
+    unflagged = df_res[df_res['status'] == 'graded']
+    unflagged_metrics = compute_metrics(unflagged, pred_col="grader_score") if len(unflagged) >= 3 else {}
+    tot_time_s = round(df_res['total_latency_ms'].sum() / 1000.0, 1)
+    duration_str = f"{int(tot_time_s // 60)}m {int(tot_time_s % 60)}s"
+    n_res = len(df_res)
+    tot_cost = round(df_res['total_cost_usd'].sum(), 6)
+    cost_100q = round(tot_cost * (100.0 / n_res), 4) if n_res > 0 else tot_cost
 
-    for m_key in models_to_run:
-        model_dfs = []
-        for q in target_qs:
-            _, df_res = run_open_ended_experiment_for_model(model_key=m_key, target_q=q, samples=25, seed=42, fresh=is_fresh)
-            model_dfs.append(df_res)
-        
-        combined_df = pd.concat(model_dfs, ignore_index=True)
-        m_info = resolve_model(m_key)
-        metrics = compute_metrics(combined_df, pred_col="ai_score")
+    output_row = {
+        "Grader ICC": f"{g_metrics.get('ICC', 0.0):.3f}",
+        "Grader MAE": f"{g_metrics.get('MAE', 0.0):.3f}",
+        "Auto-Approved ICC": f"{unflagged_metrics.get('ICC', g_metrics.get('ICC', 0.0)):.3f}",
+        "Auto-Approved MAE": f"{unflagged_metrics.get('MAE', g_metrics.get('MAE', 0.0)):.3f}",
+        "Automation Rate (%)": f"{qc.get('Automation_Rate_Pct', 0.0)}%",
+        "Flag Rate (%)": f"{qc.get('Flag_Rate_Pct', 0.0)}%",
+        "Flagging Recall (%)": f"{qc.get('Recall_Pct', 0.0)}%",
+        "Flagging Precision (%)": f"{qc.get('Precision_Pct', 0.0)}%",
+        "Flagging F1-Score (%)": f"{qc.get('F1_Score_Pct', 0.0)}%",
+        "Leakage (FN Rate) (%)": f"{qc.get('Leakage_FN_Pct', 0.0)}%",
+        "Over-flag (FP Rate) (%)": f"{qc.get('Overflag_FP_Pct', 0.0)}%",
+        "Avg Latency (s)": f"{round(df_res['total_latency_ms'].mean() / 1000.0, 2):.2f}",
+        "Total Run Time": duration_str,
+        "Total Cost (100 Qs)": f"${cost_100q:.4f}"
+    }
 
-        tot_time_s = round(combined_df['latency_ms'].sum() / 1000.0, 1)
-        avg_time_s = round(combined_df['latency_ms'].mean() / 1000.0, 2)
-        tot_cost = round(combined_df['cost_usd'].sum(), 4)
+    df_out = pd.DataFrame([output_row])
 
-        metrics["Model"] = m_info["name"]
-        metrics["Model_String"] = m_info["model_str"]
-        metrics["Avg_Time_per_Q_s"] = avg_time_s
-        metrics["Total_Run_Time"] = f"{int(tot_time_s // 60)}m {int(tot_time_s % 60)}s"
-        metrics["Total_Cost"] = f"${tot_cost}"
-        all_metrics.append(metrics)
-        all_responses_df_list.append(combined_df)
-
-    df_leaderboard = pd.DataFrame(all_metrics)
-    cols = ["Model", "N", "ICC", "MAE", "Mean_Error", "Pearson_r", "Spearman_rho", "Exact_Match_Pct", "Within_1_Mark_Pct", "Avg_Time_per_Q_s", "Total_Run_Time", "Total_Cost"]
-    df_leaderboard = df_leaderboard[cols].sort_values(by="ICC", ascending=False)
-
-    print("\n" + "="*85)
-    print(f"🏆 OPEN-ENDED MODEL BENCHMARK RESULTS")
-    print("="*85)
-    print(df_leaderboard.to_string(index=False))
-
-    # Save Multi-Tab Master Excel (Matching run_experiment_suite.py pattern)
-    out_excel = os.path.join(script_dir, "results_open_ended_model_benchmark.xlsx")
-    try:
-        with pd.ExcelWriter(out_excel, engine='openpyxl') as writer:
-            df_leaderboard.to_excel(writer, sheet_name="Leaderboard_Summary", index=False)
-            
-            for df_res in all_responses_df_list:
-                if not df_res.empty:
-                    m_name_clean = re.sub(r'[^a-zA-Z0-9_-]', '_', df_res['model_name'].iloc[0])[:30]
-                    df_res.to_excel(writer, sheet_name=f"{m_name_clean}_Q22", index=False)
-
-        print(f"\n📊 Excel benchmark report saved to: {out_excel}")
-    except Exception as e:
-        print(f"  ⚠️ Warning saving Excel: {e}")
+    print("\n" + "="*120)
+    print("🏆 EXPERIMENT 2 BENCHMARK OUTPUT (Q22 OPEN-ENDED)")
+    print("="*120)
+    print(f"Setup: {grader_info['name']} (Grader) ➔ {auditor_info['name']} (Auditor)")
+    print(f"Sample Size: N = {len(df_res)} | Max Mark = 6.0")
+    print("-" * 120)
+    print(df_out.to_string(index=False))
+    print("-" * 120)
+    print("📋 TAB-SEPARATED ROW (Direct copy-paste into Excel / Google Sheets):")
+    print("\t".join(output_row.keys()))
+    print("\t".join(output_row.values()))
+    print("="*120 + "\n")
 
 if __name__ == "__main__":
     main()
