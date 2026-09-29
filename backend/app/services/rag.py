@@ -18,6 +18,11 @@ def retrieve_rubric_context(assignment_id: str, student_text: str, top_k: int = 
     if not context_chunks:
         return "No specific vector context found. Evaluate strictly against provided rubric rules."
     
-    formatted_context = "\n".join([f"- {chunk}" for chunk in context_chunks])
+    cleaned_chunks = []
+    for chunk in context_chunks:
+        lines = [line for line in str(chunk).splitlines() if not line.strip().startswith("Question ID:") and "assign-" not in line]
+        cleaned_chunks.append("\n".join(lines).strip())
+
+    formatted_context = "\n".join([f"- {chunk}" for chunk in cleaned_chunks if chunk])
     return f"Retrieved Rubric & Model Answer Reference Context:\n{formatted_context}"
 

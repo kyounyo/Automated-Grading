@@ -630,10 +630,10 @@ const BulkUpload = () => {
       )}
 
       {/* 4. Acceptable Mark Difference (Tolerance Setting) */}
-      <div className="card-panel" style={{ padding: '1.35rem 1.6rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <Sliders size={18} color="var(--primary)" /> Acceptable Mark Difference (Tolerance)
+      <div className="card-panel" style={{ padding: '1.25rem 1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '0.95rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <Sliders size={16} color="var(--primary)" /> AI Discrepancy Tolerance
           </h3>
           <span style={{
             fontSize: '0.75rem',
@@ -644,15 +644,15 @@ const BulkUpload = () => {
             borderRadius: '999px',
             border: '1px solid var(--border)'
           }}>
-            {toleranceVal === 0 ? 'Strict (0%)' : toleranceVal <= 0.05 ? 'High Precision (5%)' : toleranceVal <= 0.10 ? 'Balanced (10% - Recommended)' : 'Relaxed (20%)'} • ±{(toleranceVal * totalMaxMarks).toFixed(1)} marks
+            {toleranceVal === 0 ? 'Strict (0%)' : toleranceVal <= 0.05 ? 'High Precision (5%)' : toleranceVal <= 0.10 ? 'Balanced (10%)' : 'Relaxed (20%)'}
           </span>
         </div>
 
-        <p style={{ margin: '0 0 1rem 0', fontSize: '0.825rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
-          Tolerance is the maximum score difference allowed between two AI evaluators on <strong>each individual question</strong> before that question is flagged for your manual review.
+        <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+          The maximum score difference allowed between the two AI agents before a paper is flagged for your review.
         </p>
 
-        <div style={{ maxWidth: '520px', marginBottom: '1.15rem' }}>
+        <div style={{ maxWidth: '480px' }}>
           {(() => {
             const curIdx = TOLERANCE_STEPS.findIndex(s => Math.abs(s.val - toleranceVal) < 0.01);
             const activeStep = TOLERANCE_STEPS[curIdx >= 0 ? curIdx : 2];
@@ -686,123 +686,25 @@ const BulkUpload = () => {
                   ))}
                 </div>
 
-                <div style={{ marginTop: '0.75rem', padding: '0.65rem 0.85rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  <Info size={13} style={{ marginRight: 5, verticalAlign: 'middle', color: 'var(--primary)' }} />
-                  <strong>Active Setting ({activeStep.label}):</strong> If the two AI evaluators differ by more than the allowed mark difference on any question below, the paper is flagged for your manual review.
-                  {savingTolerance && <span style={{ marginLeft: 8, color: 'var(--primary)', fontWeight: 600 }}>Saving…</span>}
+                <div style={{
+                  marginTop: '0.65rem',
+                  fontSize: '0.76rem',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}>
+                  <Info size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
+                  <span>
+                    {toleranceVal === 0
+                      ? 'Flag if AI graders differ at all (0% tolerance).'
+                      : `Auto-approves differences within ±${(toleranceVal * 100).toFixed(0)}%; flags larger disagreements.`}
+                  </span>
+                  {savingTolerance && <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Saving…</span>}
                 </div>
               </>
             );
           })()}
-        </div>
-
-        {/* Per-Question Mark Difference Table for Uploaded Questions */}
-        <div style={{ marginBottom: '1rem' }}>
-          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--secondary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span>📋 Uploaded Questions in System ({rubricQuestions.length} questions)</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-              Columns show acceptable mark difference between two AI evaluators
-            </span>
-          </div>
-
-          <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: '8px' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.825rem', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border)' }}>
-                  <th style={{ padding: '0.6rem 0.9rem', color: 'var(--secondary)', fontWeight: 700 }}>Question</th>
-                  <th style={{ padding: '0.6rem 0.9rem', color: 'var(--secondary)', fontWeight: 700 }}>Max Marks</th>
-                  <th style={{
-                    padding: '0.6rem 0.9rem',
-                    color: Math.abs(toleranceVal - 0.0) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
-                    backgroundColor: Math.abs(toleranceVal - 0.0) < 0.01 ? 'var(--primary-light)' : 'transparent',
-                    fontWeight: 700
-                  }}>
-                    Strict (0%) {Math.abs(toleranceVal - 0.0) < 0.01 && '★'}
-                  </th>
-                  <th style={{
-                    padding: '0.6rem 0.9rem',
-                    color: Math.abs(toleranceVal - 0.05) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
-                    backgroundColor: Math.abs(toleranceVal - 0.05) < 0.01 ? 'var(--primary-light)' : 'transparent',
-                    fontWeight: 700
-                  }}>
-                    High Precision (5%) {Math.abs(toleranceVal - 0.05) < 0.01 && '★'}
-                  </th>
-                  <th style={{
-                    padding: '0.6rem 0.9rem',
-                    color: Math.abs(toleranceVal - 0.10) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
-                    backgroundColor: Math.abs(toleranceVal - 0.10) < 0.01 ? 'var(--primary-light)' : 'transparent',
-                    fontWeight: 700
-                  }}>
-                    Balanced (10%) {Math.abs(toleranceVal - 0.10) < 0.01 && '★ (Default)'}
-                  </th>
-                  <th style={{
-                    padding: '0.6rem 0.9rem',
-                    color: Math.abs(toleranceVal - 0.20) < 0.01 ? 'var(--primary)' : 'var(--secondary)',
-                    backgroundColor: Math.abs(toleranceVal - 0.20) < 0.01 ? 'var(--primary-light)' : 'transparent',
-                    fontWeight: 700
-                  }}>
-                    Relaxed (20%) {Math.abs(toleranceVal - 0.20) < 0.01 && '★'}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rubricQuestions.length > 0 ? (
-                  rubricQuestions.map((q, idx) => {
-                    const qNum = q.question_number || (q.number ? `Q${q.number}` : `Q${idx + 1}`);
-                    const maxScore = parseFloat(q.max_score || q.maxMark || 10.0);
-                    const prompt = q.prompt || q.text || '';
-
-                    return (
-                      <tr key={idx} style={{ borderBottom: idx < rubricQuestions.length - 1 ? '1px solid var(--border)' : 'none', backgroundColor: idx % 2 === 0 ? '#fff' : 'var(--bg-main)' }}>
-                        <td style={{ padding: '0.65rem 0.9rem', fontWeight: 700, color: 'var(--primary)' }}>
-                          <div>{qNum}</div>
-                          {prompt && (
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {prompt}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ padding: '0.65rem 0.9rem', fontWeight: 600 }}>
-                          {maxScore} pts
-                        </td>
-                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.0) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.0) < 0.01 ? 700 : 500 }}>
-                          ±0.0 pts
-                        </td>
-                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.05) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.05) < 0.01 ? 700 : 500 }}>
-                          ±{(0.05 * maxScore).toFixed(1)} pts
-                        </td>
-                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.10) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.10) < 0.01 ? 700 : 500 }}>
-                          ±{(0.10 * maxScore).toFixed(1)} pts
-                        </td>
-                        <td style={{ padding: '0.65rem 0.9rem', backgroundColor: Math.abs(toleranceVal - 0.20) < 0.01 ? 'var(--primary-light)' : 'transparent', fontWeight: Math.abs(toleranceVal - 0.20) < 0.01 ? 700 : 500 }}>
-                          ±{(0.20 * maxScore).toFixed(1)} pts
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                      No rubric questions uploaded yet for this assignment.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Quick Reference for Standard Question Max Marks */}
-        <div style={{ padding: '0.75rem 1rem', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border)', borderRadius: '6px' }}>
-          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--secondary)', marginBottom: '0.35rem' }}>
-            💡 Quick Formula: Allowed Mark Difference = Tolerance % × Question Maximum Marks
-          </div>
-          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            <span>• <strong>5-mark question</strong>: ±0.25 pts (5%) | <strong>±0.5 pts (10%)</strong> | ±1.0 pt (20%)</span>
-            <span>• <strong>10-mark question</strong>: ±0.5 pts (5%) | <strong>±1.0 pt (10%)</strong> | ±2.0 pts (20%)</span>
-            <span>• <strong>15-mark question</strong>: ±0.75 pts (5%) | <strong>±1.5 pts (10%)</strong> | ±3.0 pts (20%)</span>
-            <span>• <strong>20-mark question</strong>: ±1.0 pt (5%) | <strong>±2.0 pts (10%)</strong> | ±4.0 pts (20%)</span>
-          </div>
         </div>
       </div>
 

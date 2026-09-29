@@ -18,23 +18,26 @@ IN_PROGRESS_STATUSES = ["processing", "extracting_answers", "retrieving_rubric",
 
 def heal_orphaned_submissions(db: Session, assignment_id: str):
     """
-    Self-healing sync: If the assignment is not actively being graded by a background task,
-    any submission left in an in-progress status is restored to its true state so frontend
-    and backend stay 100% synchronized at all times.
+    Self-healing sync: Restores submissions to their true state.
+    - If a submission already has a completed score and breakdown, ensure its status is 'flagged' or 'graded'.
+    - If an assignment is NOT actively running batch grading, reset any incomplete in-progress submissions to 'pending'.
     """
-    if assignment_id in ACTIVE_GRADING_ASSIGNMENTS:
-        return
-    orphaned = db.query(Submission).filter(
+    is_actively_grading = assignment_id in ACTIVE_GRADING_ASSIGNMENTS
+    in_progress = db.query(Submission).filter(
         Submission.assignment_id == assignment_id,
         Submission.status.in_(IN_PROGRESS_STATUSES)
     ).all()
-    if orphaned:
-        for s in orphaned:
+    if in_progress:
+        changed = False
+        for s in in_progress:
             if s.score is not None and s.feedback and isinstance(s.feedback, dict) and s.feedback.get("breakdown"):
                 s.status = "flagged" if s.feedback.get("flag_reasons") else "graded"
-            else:
+                changed = True
+            elif not is_actively_grading:
                 s.status = "pending"
-        db.commit()
+                changed = True
+        if changed:
+            db.commit()
 
 
 @router.get("/api/assignments/{assignment_id}/submissions", response_model=List[SubmissionResponse])
@@ -99,9 +102,10 @@ def _batch_grade_task(assignment_id: str):
     ACTIVE_GRADING_ASSIGNMENTS.add(assignment_id)
     db = SessionLocal()
     try:
+        heal_orphaned_submissions(db, assignment_id)
         pending_subs = db.query(Submission).filter(
             Submission.assignment_id == assignment_id,
-            Submission.status.in_(["pending", "uploaded", "processing", "extracting_answers", "retrieving_rubric", "grading"])
+            Submission.score.is_(None)
         ).all()
         total_batch = len(pending_subs)
         if total_batch == 0:
@@ -182,16 +186,25 @@ def grade_all_submissions(assignment_id: str, background_tasks: BackgroundTasks,
         assign.grading_started_at = datetime.datetime.utcnow()
         db.commit()
 
+    heal_orphaned_submissions(db, assignment_id)
     pending_count = db.query(Submission).filter(
         Submission.assignment_id == assignment_id,
-        Submission.status.in_(["pending", "uploaded", "processing", "extracting_answers", "retrieving_rubric", "grading"])
+        Submission.score.is_(None)
     ).count()
 
     if pending_count == 0:
         return {
-            "message": "No pending submissions to grade for this assignment.",
+            "message": "All submissions are already graded for this assignment.",
             "assignment_id": assignment_id,
             "status": "idle"
+        }
+
+    if assignment_id in ACTIVE_GRADING_ASSIGNMENTS:
+        print(f" [Notice] Batch grading is already active for {assignment_id}. Skipping duplicate trigger.", flush=True)
+        return {
+            "message": f"Batch grading is already actively running for assignment {assignment_id}.",
+            "assignment_id": assignment_id,
+            "status": "processing"
         }
 
     ACTIVE_GRADING_ASSIGNMENTS.add(assignment_id)

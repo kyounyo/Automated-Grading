@@ -11,6 +11,18 @@ def normalize_question_number(q_num: str) -> str:
     return re.sub(r"\s+", "", str(q_num)).lower()
 
 
+def extract_main_question_number(q_num: str) -> str:
+    """Extracts main question identifier (e.g. 'Q6(a)' -> 'Q6', '6b' -> 'Q6', 'Question 8' -> 'Q8')."""
+    if not q_num:
+        return ""
+    s = str(q_num).strip().upper()
+    m = re.search(r'(?:QUESTION|Q)?\s*(\d+)', s, re.IGNORECASE)
+    if m:
+        return f"Q{m.group(1)}"
+    clean = re.sub(r'[^A-Z0-9]', '', s)
+    return clean or s
+
+
 def evaluate_discrepancy(
     primary_score: float,
     auditor_score: float,
@@ -48,14 +60,7 @@ def evaluate_confidence_and_status(
     """
     Deterministic Confidence & Decision Engine (AutoGrade+ Architecture):
     Calculates confidence independently based on measurable grading evidence rather than self-reported LLM values.
-    
-    Formula:
-      Confidence = (0.40 * Score_Agreement) + (0.40 * Question_Agreement) + (0.20 * Audit_Factor)
-      
-    Components:
-    1. Overall Score Agreement: 1 - (|Primary_Score - Auditor_Score| / Total_Max_Score)
-    2. Question-Level Agreement: Average normalized agreement across all subquestions
-    3. Audit Factor: 1.0 if Agent 3 audit_passed else 0.5
+    Evaluates at the Question-by-Question level (not micro-subquestions).
     """
     max_sc = total_max_score if total_max_score > 0 else 20.0
     primary_score = float(llm_result.get("overall_score", 0.0))
@@ -64,6 +69,7 @@ def evaluate_confidence_and_status(
     auditor_passed = bool(multi_audit.get("auditor_passed", True))
     auditor_score = float(multi_audit.get("auditor_score", primary_score))
     score_discrepancy = float(multi_audit.get("score_discrepancy", abs(primary_score - auditor_score)))
+    disagreement_severity = str(multi_audit.get("disagreement_severity", "NONE")).upper()
     raw_conflicting_qs = multi_audit.get("conflicting_questions", [])
     if not isinstance(raw_conflicting_qs, list):
         raw_conflicting_qs = []
@@ -73,54 +79,76 @@ def evaluate_confidence_and_status(
     # Component 1: Overall Score Agreement (0.0 to 1.0)
     score_agreement = max(0.0, 1.0 - (score_discrepancy / max_sc))
 
-    # Component 2: Question-Level Agreement (0.0 to 1.0)
+    # Component 2: Main Question-Level Agreement (Question-by-Question)
     feedback = llm_result.get("feedback", {})
     primary_breakdown = feedback.get("breakdown", []) if isinstance(feedback, dict) else []
     auditor_breakdown = multi_audit.get("auditor_breakdown", [])
 
+    # Group subquestions into Main Questions (e.g. Q6, Q8)
+    def aggregate_by_main_q(items_list: list, score_key: str = "score_awarded"):
+        agg = {}
+        if not items_list or not isinstance(items_list, list):
+            return agg
+        for item in items_list:
+            if not isinstance(item, dict):
+                continue
+            raw_q = str(item.get("question_number") or item.get("criterion") or "").strip()
+            main_q = extract_main_question_number(raw_q)
+            if not main_q:
+                continue
+            sc = None
+            for k in [score_key, "score_awarded", "auditor_score", "score"]:
+                if item.get(k) is not None:
+                    try:
+                        sc = float(item[k])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+            if sc is None:
+                sc = 0.0
+            mx = float(item.get("max_score", item.get("maxMark", 10.0)))
+            if main_q not in agg:
+                agg[main_q] = {"score": sc, "max_score": mx}
+            else:
+                agg[main_q]["score"] += sc
+                agg[main_q]["max_score"] += mx
+        return agg
+
+    p_main_map = aggregate_by_main_q(primary_breakdown, "score_awarded")
+    a_main_map = aggregate_by_main_q(auditor_breakdown, "auditor_score")
+
     question_agreements: List[float] = []
     material_conflicting_qs: List[str] = []
 
-    if primary_breakdown and isinstance(primary_breakdown, list):
-        auditor_map = {}
-        if auditor_breakdown and isinstance(auditor_breakdown, list):
-            for a_item in auditor_breakdown:
-                if isinstance(a_item, dict):
-                    q_num = str(a_item.get("question_number", "")).strip()
-                    norm_key = normalize_question_number(q_num)
-                    if norm_key:
-                        auditor_map[norm_key] = float(a_item.get("auditor_score", 0.0))
+    if p_main_map:
+        for main_q, p_data in p_main_map.items():
+            p_q_score = p_data["score"]
+            q_max = p_data["max_score"] if p_data["max_score"] > 0 else 10.0
 
-        for p_item in primary_breakdown:
-            if isinstance(p_item, dict):
-                q_num = str(p_item.get("question_number", "")).strip()
-                norm_key = normalize_question_number(q_num)
-                p_q_score = float(p_item.get("score_awarded", 0.0))
-                q_max = float(p_item.get("max_score", 5.0))
-                if q_max <= 0:
-                    q_max = 5.0
-
-                if norm_key in auditor_map:
-                    a_q_score = auditor_map[norm_key]
-                    disc = evaluate_discrepancy(
-                        primary_score=p_q_score,
-                        auditor_score=a_q_score,
-                        max_score=q_max,
-                        tolerance_rate=tolerance_rate,
-                        absolute_cap=2.0
+            if main_q in a_main_map:
+                a_q_score = a_main_map[main_q]["score"]
+                disc = evaluate_discrepancy(
+                    primary_score=p_q_score,
+                    auditor_score=a_q_score,
+                    max_score=q_max,
+                    tolerance_rate=tolerance_rate,
+                    absolute_cap=2.0
+                )
+                diff = disc["difference"]
+                q_agreed = max(0.0, 1.0 - (diff / q_max))
+                # Only flag as conflict if overall severity is not NONE or auditor did not pass cleanly
+                if disc["is_conflict"] and not (auditor_passed and score_discrepancy == 0.0 and disagreement_severity == "NONE"):
+                    material_conflicting_qs.append(
+                        f"{main_q} (Primary: {p_q_score:g} pts vs Auditor: {a_q_score:g} pts | Δ{diff:.1f} pts > {disc['allowed_difference']:.1f} limit)"
                     )
-                    diff = disc["difference"]
-                    q_agreed = max(0.0, 1.0 - (diff / q_max))
-                    if disc["is_conflict"]:
-                        material_conflicting_qs.append(f"{q_num} (Δ{diff:.1f} pts > {disc['allowed_difference']:.1f} limit)")
-                else:
-                    if norm_key in [normalize_question_number(q) for q in raw_conflicting_qs]:
-                        q_agreed = 0.5
-                        material_conflicting_qs.append(q_num)
-                    else:
-                        q_agreed = score_agreement
+            else:
+                q_agreed = score_agreement
 
-                question_agreements.append(q_agreed)
+            question_agreements.append(q_agreed)
+
+    # Clean audit pass overrides any micro-rounding offset
+    if (auditor_passed and score_discrepancy == 0.0) or disagreement_severity == "NONE":
+        material_conflicting_qs = []
 
     if question_agreements:
         question_agreement = sum(question_agreements) / len(question_agreements)
@@ -162,8 +190,6 @@ def evaluate_confidence_and_status(
     # Multi-Factor Flagging Rules (Aligned with Frontend 75% threshold & realistic QA)
     flag_reasons: List[str] = []
 
-    q_str = f" on {', '.join(material_conflicting_qs)}" if material_conflicting_qs else ""
-
     # Total assignment discrepancy check
     num_qs = max(1, len(primary_breakdown) if primary_breakdown else 1)
     total_disc = evaluate_discrepancy(
@@ -175,17 +201,24 @@ def evaluate_confidence_and_status(
     )
     is_total_conflict = total_disc["is_conflict"]
 
-    # Flag as Multi-Agent Discrepancy if subquestion or total discrepancy exceeds tolerance
+    # Flag as Multi-Agent Discrepancy if question or total discrepancy exceeds tolerance
     tol_pct_label = f"{int(round(tolerance_rate * 100))}%"
     if len(material_conflicting_qs) > 0:
-        flag_reasons.append(f"🤖 Multi-Agent Discrepancy{q_str}: Exceeds {tol_pct_label} quality-control tolerance")
+        flag_reasons.append(f"🤖 Multi-Agent Discrepancy on {', '.join(material_conflicting_qs)}: Exceeds {tol_pct_label} quality-control tolerance")
     elif is_total_conflict:
-        flag_reasons.append(f"🤖 Multi-Agent Discrepancy: Overall score delta of {score_discrepancy:.1f} pts exceeds {tol_pct_label} tolerance ({total_disc['allowed_difference']:.1f} pts limit)")
+        flag_reasons.append(
+            f"🤖 Multi-Agent Discrepancy: Overall score delta of {score_discrepancy:.1f} pts (Primary: {primary_score:g} pts vs Auditor: {auditor_score:g} pts) exceeds {tol_pct_label} tolerance ({total_disc['allowed_difference']:.1f} pts limit)"
+        )
+    elif not auditor_passed and disagreement_severity in ["MAJOR", "MODERATE"]:
+        flag_reasons.append(
+            f"🤖 Multi-Agent Quality Audit Failed ({disagreement_severity} Discrepancy): {audit_note or 'Auditor rejected primary score; requires lecturer review'}"
+        )
 
     # Flag low confidence when below configured threshold (e.g. 75%, 80%)
+    # If already flagged for multi-agent discrepancy, the low confidence is a direct consequence of the discrepancy
     import os
     conf_threshold = float(os.getenv("CONFIDENCE_THRESHOLD", "0.75"))
-    if calibrated_confidence < conf_threshold:
+    if calibrated_confidence < conf_threshold and not any("Multi-Agent" in r for r in flag_reasons):
         flag_reasons.append(f"📉 Low System Confidence ({calibrated_confidence * 100:.0f}% < {conf_threshold * 100:.0f}%)")
 
     # Flag terse answers

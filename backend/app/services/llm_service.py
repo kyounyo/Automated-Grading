@@ -87,6 +87,33 @@ def _clean_json_response(content: str) -> Dict[str, Any]:
         conf_score = float(conf_m.group(1)) if conf_m else 0.9
         summary_str = summary_m.group(1) if summary_m else "AI grading evaluation completed."
 
+        # Extract breakdown items using regex if breakdown exists in clean_text
+        bd_items = []
+        bd_block_match = re.search(r'"breakdown"\s*:\s*\[(.*?)\](?:\s*,\s*"|\s*\}\s*\}|\s*\})', clean_text, flags=re.DOTALL)
+        if bd_block_match:
+            bd_content = bd_block_match.group(1)
+            raw_objs = re.findall(r'\{[^{}]*\}', bd_content)
+            for raw_obj in raw_objs:
+                try:
+                    obj = json.loads(raw_obj)
+                    if isinstance(obj, dict) and (obj.get("question_number") or obj.get("score_awarded") is not None):
+                        bd_items.append(obj)
+                except Exception:
+                    q_m = re.search(r'"question_number"\s*:\s*"([^"]+)"', raw_obj)
+                    sc_m = re.search(r'"score_awarded"\s*:\s*([0-9\.]+)', raw_obj)
+                    mx_m = re.search(r'"max_score"\s*:\s*([0-9\.]+)', raw_obj)
+                    rs_m = re.search(r'"reasoning"\s*:\s*"([^"]*)"', raw_obj)
+                    if q_m and sc_m:
+                        bd_items.append({
+                            "question_number": q_m.group(1),
+                            "score_awarded": float(sc_m.group(1)),
+                            "max_score": float(mx_m.group(1)) if mx_m else 10.0,
+                            "reasoning": rs_m.group(1) if rs_m else ""
+                        })
+
+        if bd_items and ov_score == 0.0:
+            ov_score = sum(float(b.get("score_awarded", 0.0)) for b in bd_items)
+
         return {
             "overall_score": ov_score,
             "confidence_score": conf_score,
@@ -94,7 +121,7 @@ def _clean_json_response(content: str) -> Dict[str, Any]:
             "reasoning": "Extracted via robust JSON fallback parser.",
             "feedback": {
                 "summary": summary_str,
-                "breakdown": []
+                "breakdown": bd_items
             },
             "highlights": []
         }
@@ -285,20 +312,27 @@ Model Answer / Marking Scheme:
 Student Submission:
 {student_text}
 
-GRADING PROTOCOL (v1.3-multi-question-highlights):
+GRADING PROTOCOL (v1.4-main-questions-integer-rubric):
 1. MEANING OVER EXACT WORDS: Award points for concepts matching rubric intent.
-2. STRICT CAPPING: Do not exceed maximum points allocated per question. Sum of points awarded across all questions MUST NOT exceed {total_max_score}.
-3. ZERO MARK RULE: If a student answer for a question is blank, empty, dash ('-'), 'N/A', or missing, award EXACTLY 0 marks for that question. Do NOT award partial credit for empty or missing answers.
-4. REASONING FIRST: Analyze student response against each criterion step-by-step before finalizing score.
-5. MANDATORY PER-QUESTION HIGHLIGHTS: You MUST generate at least one highlight entry for EVERY question and sub-part in the student submission (e.g., Q6(a), Q6(b), Q8(a), Q8(b)). Highlight exact quotes from the student's text for each question.
-6. DETAILED EXPLANATION REQUIREMENT: Each highlight comment MUST state:
-   (a) Exact marks awarded and key concepts matched (e.g. 'Awarded 1 mark for mentioning prolonged therapeutic effect in (a)').
+2. STRICT RUBRIC MARK ALLOCATION & INCREMENTS: Follow the rubric's marking scheme strictly. If the rubric allocates whole marks (e.g. '1 mark for each point up to 5', 'One mark for disagree'), you MUST award ONLY whole integer marks (0, 1, 2, 3...). Do NOT award 0.5 or fractional marks unless the rubric explicitly defines 0.5 increments. Never invent fractional scores.
+3. PER-QUESTION BREAKDOWN: You MUST output the score breakdown at the MAIN QUESTION level matching the rubric criteria items (e.g. 'Q6', 'Q8').
+   If a question consists of multiple sub-questions or parts (such as (a) and (b)), combine them into the single main question entry ('Q6'):
+   - question_number: Main question identifier matching rubric (e.g., 'Q6', 'Q8')
+   - score_awarded: Total marks awarded for the whole question (sum of matched points, whole marks if rubric uses whole marks)
+   - max_score: Total maximum marks for this main question (e.g. 10.0)
+   - reasoning: Detailed sub-question breakdown explaining marks awarded and missed for each part (e.g., '(a) [3/5]: ... | (b) [2/5]: ...')
+4. STRICT CAPPING: Do not exceed maximum points allocated per question. Sum of points awarded across all questions MUST NOT exceed {total_max_score}.
+5. ZERO MARK RULE: If a student answer for a question is blank, empty, dash ('-'), 'N/A', or missing, award EXACTLY 0 marks for that question. Do NOT award partial credit for empty or missing answers.
+6. REASONING FIRST: Analyze student response against each criterion step-by-step before finalizing score.
+7. MANDATORY PER-QUESTION HIGHLIGHTS: You MUST generate at least one highlight entry for EVERY question in the student submission (e.g., Q6, Q8). Highlight exact quotes from the student's text for each question.
+8. DETAILED EXPLANATION REQUIREMENT: Each highlight comment MUST state:
+   (a) Exact marks awarded and key concepts matched (e.g. 'Awarded 1 mark for mentioning prolonged therapeutic effect').
    (b) Specific rubric points missed or failed (e.g. 'Failed to address specific advantages (biodegradability) and disadvantages required by rubric').
-7. QUESTION-MATCHED EXAMINER CALIBRATION: If Examiner Calibration Benchmarks are provided above for a question, you MUST align your marking strictness and partial-credit thresholds strictly to match the examiner's demonstrated standard for that specific question. Questions without calibration examples must be evaluated directly from the standard rubric rules.
+9. QUESTION-MATCHED EXAMINER CALIBRATION: If Examiner Calibration Benchmarks are provided above for a question, you MUST align your marking strictness and partial-credit thresholds strictly to match the examiner's demonstrated standard for that specific question. Questions without calibration examples must be evaluated directly from the standard rubric rules.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
-  "overall_score": 8.5,
+  "overall_score": 14.0,
   "confidence_score": 0.90,
   "status": "graded",
   "reasoning": "Step-by-step analysis comparing student response to rubric...",
@@ -306,29 +340,35 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     "summary": "Strong submission demonstrating clear understanding of core concepts.",
     "breakdown": [
       {{
-        "question_number": "Q6(a)",
-        "score_awarded": 1.0,
-        "max_score": 2.5,
-        "reasoning": "Awarded 1 mark for mentioning prolonged therapeutic effect. Omitted biodegradability advantages."
+        "question_number": "Q6",
+        "score_awarded": 5.0,
+        "max_score": 10.0,
+        "reasoning": "(a) [3/5]: Awarded 3 marks for duration, biodegradability, and acid-labile drug limitations. | (b) [2/5]: Awarded 2 marks for describing sol-to-gel mechanism."
+      }},
+      {{
+        "question_number": "Q8",
+        "score_awarded": 9.0,
+        "max_score": 10.0,
+        "reasoning": "(a) [2/2]: Disagree, not necessary if stable. | (b) [2/2]: Agree, complexity. | (c) [2/2]: Disagree, antibody directs. | (d) [2/2]: Disagree, amber vials. | (e) [1/2]: Agree, solvent safe in small amounts."
       }}
     ]
   }},
   "highlights": [
     {{
-      "text": "Exact text quote copied verbatim from student submission for Q6(a)",
-      "question_number": "Q6(a)",
-      "score_awarded": 1.0,
-      "max_score": 2.5,
+      "text": "Exact text quote copied verbatim from student submission for Q6",
+      "question_number": "Q6",
+      "score_awarded": 3.0,
+      "max_score": 10.0,
       "type": "strength",
-      "comment": "Awarded 1 mark for mentioning prolonged therapeutic effect in (a). The response failed to address specific advantages (biodegradability, non-surgical) and disadvantages required by the rubric."
+      "comment": "Awarded marks for mentioning prolonged therapeutic effect in Q6."
     }},
     {{
-      "text": "Exact text quote copied verbatim from student submission for Q6(b)",
-      "question_number": "Q6(b)",
-      "score_awarded": 1.0,
-      "max_score": 2.5,
+      "text": "Exact text quote copied verbatim from student submission for Q8",
+      "question_number": "Q8",
+      "score_awarded": 2.0,
+      "max_score": 10.0,
       "type": "strength",
-      "comment": "Awarded 1 mark for describing the sol-to-gel mechanism in (b). Missed key physiological trigger attributes."
+      "comment": "Correctly identified that lyophilization is not the only option in Q8."
     }}
   ]
 }}
@@ -341,18 +381,26 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     return _call_openrouter_api(messages, target_model, temperature=0.0)
 
 
-def call_auditor_verification_agent(student_text: str, rubric_json: list, primary_eval: Dict[str, Any], model: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def call_auditor_verification_agent(
+    student_text: str, 
+    rubric_json: list, 
+    primary_eval: Dict[str, Any], 
+    model: Optional[str] = None,
+    question_few_shots: Optional[Dict[str, List[Dict]]] = None
+) -> Optional[Dict[str, Any]]:
     """
     Agent 3 (Auditor & Verification Agent):
-    Uses google/gemini-3.1-flash-lite to audit Agent 2's evaluation.
+    Uses nvidia/nemotron-3-super-120b-a12b to audit Agent 2's evaluation.
     Provides independent per-question auditor scores, identifies specific question conflicts, and determines audit_passed.
     """
+    few_shots_block = format_question_few_shots(question_few_shots)
+
     prompt = f"""
 You are a Senior Academic Quality Auditor. Audit the following AI grading evaluation for fairness, accuracy, score bounds, and per-question score agreement.
 
 Rubric:
 {json.dumps(rubric_json, indent=2)}
-
+{few_shots_block}
 Student Submission:
 {student_text}
 
@@ -364,41 +412,43 @@ You are the Senior Quality Auditor and Reconciliation Verifier.
 Review the Primary Grader's score, reasoning, and per-question breakdown against:
 1. Student Submission Text
 2. Rubric Criteria & Model Answer
+3. Course Examiner Calibration Benchmarks (if provided above, use them as the authoritative baseline for marking standards and partial credit)
 
 AUDIT & RECONCILIATION TASKS:
-1. Re-evaluate student text independently per rubric subquestion (e.g. Q6(a), Q6(b), Q8(a)).
-2. Provide your independent score for EVERY subquestion in "auditor_breakdown".
-3. Compare your evaluation with the Primary Grader:
+1. Re-evaluate student text independently for EACH MAIN QUESTION matching the rubric (e.g. Q6, Q8). Align with Examiner Calibration Benchmarks if provided.
+2. Follow rubric marking increments strictly: if rubric uses whole marks (e.g. 1 mark per point), do NOT award 0.5 marks.
+3. Provide your independent score for EVERY MAIN QUESTION in "auditor_breakdown" (e.g. Q6, Q8).
+4. Compare your evaluation with the Primary Grader question by question:
    - If Grader's score is accurate and well-supported: set "recommendation" to "AGREEMENT" and "reconciled_score" = primary score.
    - If Grader made an error (over-awarded / overlooked concepts): set "recommendation" to "ADOPT_AUDITOR" and "reconciled_score" = auditor score.
-4. Classify disagreement severity:
+5. Classify disagreement severity:
    - "NONE": Grader == Auditor (diff = 0)
    - "MINOR": Difference of 1 mark (within acceptable discrete grading variance, resolved by Auditor)
    - "MAJOR": Difference of >= 2 marks (major dispute requiring lecturer inspection)
-5. Set "audit_passed" to TRUE for "NONE" or "MINOR" disagreements. Set FALSE only for "MAJOR" disagreements (>= 2 marks).
-6. Provide a clear justification in "reconciliation_reason" explaining whether the Grader was confirmed or adjusted and why.
+6. Set "audit_passed" to TRUE for "NONE" or "MINOR" disagreements. Set FALSE only for "MAJOR" disagreements (>= 2 marks).
+7. Provide a clear justification in "reconciliation_reason" explaining whether the Grader was confirmed or adjusted and why.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
   "audit_passed": true,
-  "auditor_score": 5.0,
-  "reconciled_score": 5.0,
-  "recommendation": "ADOPT_AUDITOR",
-  "disagreement_severity": "MINOR",
+  "auditor_score": 14.0,
+  "reconciled_score": 14.0,
+  "recommendation": "AGREEMENT",
+  "disagreement_severity": "NONE",
   "auditor_breakdown": [
     {{
-      "question_number": "Q6(a)",
-      "auditor_score": 2.5,
-      "max_score": 2.5
+      "question_number": "Q6",
+      "auditor_score": 5.0,
+      "max_score": 10.0
     }},
     {{
-      "question_number": "Q6(b)",
-      "auditor_score": 2.5,
-      "max_score": 2.5
+      "question_number": "Q8",
+      "auditor_score": 9.0,
+      "max_score": 10.0
     }}
   ],
   "conflicting_questions": [],
-  "reconciliation_reason": "Primary grader deducted 1 mark on Q6(b), but student text explicitly mentions the thermal trigger mechanism required by the rubric. Reconciled to full credit."
+  "reconciliation_reason": "Verified scoring against rubric criteria. Scores on Q6 and Q8 are accurate and supported by student response."
 }}
 """
     messages = [
@@ -407,6 +457,101 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     ]
     target_model = model or get_auditor_model()
     return _call_openrouter_api(messages, target_model, temperature=0.0)
+
+
+def check_rubric_allows_half_marks(rubric_json: list) -> bool:
+    """Checks if the rubric criteria or model answer explicitly mentions half marks (e.g. 0.5)."""
+    if not rubric_json or not isinstance(rubric_json, list):
+        return True
+    rubric_str = json.dumps(rubric_json).lower()
+    return "0.5" in rubric_str or "half mark" in rubric_str or "half-mark" in rubric_str
+
+
+def aggregate_and_standardize_breakdown(
+    raw_breakdown: list,
+    rubric_json: list,
+    total_max_score: float = 20.0
+) -> List[Dict[str, Any]]:
+    """
+    Standardizes question breakdown to Main Question level (e.g. Q6, Q8),
+    aggregates sub-questions ((a), (b), etc.) into their parent main question,
+    and enforces strict rubric whole mark allocation (no 0.5 marks if not in rubric).
+    """
+    if not rubric_json or not isinstance(rubric_json, list) or len(rubric_json) == 0:
+        return raw_breakdown if isinstance(raw_breakdown, list) else []
+
+    allows_half = check_rubric_allows_half_marks(rubric_json)
+    from .confidence import extract_main_question_number
+
+    standardized = []
+    
+    for r_idx, r_item in enumerate(rubric_json):
+        if not isinstance(r_item, dict):
+            continue
+        q_target = r_item.get("question_number") or r_item.get("criterion") or f"Q{r_idx + 1}"
+        main_q_target = extract_main_question_number(q_target)
+        max_sc = float(r_item.get("max_score", r_item.get("maxMark", total_max_score / max(1, len(rubric_json)))))
+
+        # Find all breakdown items matching this question
+        matching_items = []
+        if isinstance(raw_breakdown, list):
+            for b_item in raw_breakdown:
+                if not isinstance(b_item, dict):
+                    continue
+                b_q = str(b_item.get("question_number") or b_item.get("criterion") or "")
+                b_main = extract_main_question_number(b_q)
+                if b_main == main_q_target or b_q.upper() == q_target.upper():
+                    matching_items.append(b_item)
+
+        # Positional index-based fallback if question name was obscured (e.g. [ADDRESS] or Part 1)
+        if not matching_items and isinstance(raw_breakdown, list) and r_idx < len(raw_breakdown):
+            candidate = raw_breakdown[r_idx]
+            if isinstance(candidate, dict):
+                matching_items.append(candidate)
+
+        if matching_items:
+            total_awarded = sum(
+                float(m.get("score_awarded", m.get("auditor_score", m.get("score", 0.0))))
+                for m in matching_items
+            )
+            # Enforce whole marks if rubric does not specify half marks
+            if not allows_half:
+                total_awarded = float(round(total_awarded))
+
+            total_awarded = max(0.0, min(max_sc, total_awarded))
+
+            # Combine reasoning from sub-parts
+            reasonings = []
+            for m in matching_items:
+                m_q = m.get("question_number", "")
+                m_sc = m.get("score_awarded", m.get("auditor_score", m.get("score", 0.0)))
+                m_mx = m.get("max_score", "")
+                m_reason = (m.get("reasoning") or "").strip()
+                if len(matching_items) > 1 and m_reason:
+                    sc_str = f" [{m_sc}/{m_mx}]" if m_mx else ""
+                    reasonings.append(f"{m_q}{sc_str}: {m_reason}")
+                elif m_reason:
+                    reasonings.append(m_reason)
+
+            combined_reasoning = " | ".join(reasonings) if reasonings else f"Evaluated against {q_target} rubric criteria."
+
+            standardized.append({
+                "question_number": q_target,
+                "score_awarded": total_awarded,
+                "auditor_score": total_awarded,
+                "max_score": max_sc,
+                "reasoning": combined_reasoning
+            })
+        else:
+            standardized.append({
+                "question_number": q_target,
+                "score_awarded": 0.0,
+                "auditor_score": 0.0,
+                "max_score": max_sc,
+                "reasoning": f"No response evaluated for {q_target}."
+            })
+
+    return standardized
 
 
 def call_llm_for_grading(
@@ -429,14 +574,36 @@ def call_llm_for_grading(
         print("[LLM Service] OPENROUTER_API_KEY not set. Running fallback structured scoring engine.", flush=True)
         return _mock_heuristic_evaluation(student_text, rubric_json, total_max_score)
 
+    # Sanitize rubric_json: remove internal database UUIDs (e.g. question_id: "assign-1608e0-q6")
+    clean_rubric = []
+    if isinstance(rubric_json, list):
+        for idx, item in enumerate(rubric_json):
+            if isinstance(item, dict):
+                c = dict(item)
+                c["question_number"] = c.get("question_number") or f"Q{idx + 1}"
+                c.pop("question_id", None)
+                c.pop("id", None)
+                clean_rubric.append(c)
+            else:
+                clean_rubric.append(item)
+    else:
+        clean_rubric = rubric_json
+
     primary_model_name = get_llm_model()
     auditor_model_name = get_auditor_model()
 
     # Step 1: Agent 1 - Rubric & Context Parser Agent
     print(f" │   ├─ [Agent 1: Rubric Parser] Structuring rubric rules & RAG context...", flush=True)
-    parser_res = call_rubric_context_parser_agent(rubric_json, model_answer, rag_context)
-    structured_rubric = parser_res if parser_res else {"structured_rules": rubric_json}
-    rule_count = len(rubric_json) if isinstance(rubric_json, list) else 1
+    parser_res = call_rubric_context_parser_agent(clean_rubric, model_answer, rag_context)
+    structured_rubric = parser_res if parser_res else {"structured_rules": clean_rubric}
+    
+    # Sanitize structured_rules question numbers to clean rubric identifiers (e.g. Q6, Q8), avoiding database IDs
+    if structured_rubric and isinstance(structured_rubric.get("structured_rules"), list):
+        for idx, rule in enumerate(structured_rubric["structured_rules"]):
+            if isinstance(rule, dict) and idx < len(clean_rubric):
+                rule["question_number"] = clean_rubric[idx].get("question_number") or f"Q{idx + 1}"
+
+    rule_count = len(clean_rubric) if isinstance(clean_rubric, list) else 1
     print(f" │   │  └─ Loaded {rule_count} rubric rule(s) & reference guidelines.", flush=True)
 
     # Step 2: Agent 2 - Primary CoT Grader Agent
@@ -445,7 +612,7 @@ def call_llm_for_grading(
     primary_res = call_primary_grading_agent(
         student_text=student_text,
         structured_rubric=structured_rubric,
-        raw_rubric_json=rubric_json,
+        raw_rubric_json=clean_rubric,
         model_answer=model_answer,
         rag_context=rag_context,
         total_max_score=total_max_score,
@@ -453,31 +620,17 @@ def call_llm_for_grading(
     )
     if not primary_res:
         print(" │   │  └─ [Warning] Primary Agent call failed. Using heuristic fallback.", flush=True)
-        return _mock_heuristic_evaluation(student_text, rubric_json, total_max_score)
+        return _mock_heuristic_evaluation(student_text, clean_rubric, total_max_score)
 
-    # Ensure feedback dictionary and breakdown list exist
+    # Ensure feedback dictionary and standardized breakdown list exist (aggregated to Main Questions)
     feedback = primary_res.get("feedback", {})
     if not isinstance(feedback, dict):
         feedback = {"summary": "AI Evaluation completed."}
         primary_res["feedback"] = feedback
 
-    breakdown = feedback.get("breakdown", [])
-    if not breakdown or not isinstance(breakdown, list):
-        breakdown = []
-        if isinstance(rubric_json, list) and len(rubric_json) > 0:
-            for idx, r_item in enumerate(rubric_json):
-                if isinstance(r_item, dict):
-                    q_num = r_item.get("question_number") or r_item.get("criterion") or f"Q{idx + 1}"
-                    max_sc = float(r_item.get("max_score", r_item.get("maxMark", 5.0)))
-                    proportion = max_sc / total_max_score if total_max_score > 0 else (1.0 / len(rubric_json))
-                    score_aw = round(float(primary_res.get("overall_score", 0.0)) * proportion, 1)
-                    breakdown.append({
-                        "question_number": q_num,
-                        "score_awarded": min(max_sc, score_aw),
-                        "max_score": max_sc,
-                        "reasoning": "Evaluated against rubric criteria."
-                    })
-        feedback["breakdown"] = breakdown
+    raw_breakdown = feedback.get("breakdown", [])
+    breakdown = aggregate_and_standardize_breakdown(raw_breakdown, clean_rubric, total_max_score)
+    feedback["breakdown"] = breakdown
 
     # Recalculate overall_score as the exact sum of score_awarded across question breakdown items
     if breakdown:
@@ -492,15 +645,32 @@ def call_llm_for_grading(
 
     # Step 3: Agent 3 - Auditor Verification Agent
     print(f" │   ├─ [Agent 3: Quality Auditor ({auditor_model_name})] Performing independent verification...", flush=True)
-    auditor_res = call_auditor_verification_agent(student_text, rubric_json, primary_res)
+    auditor_res = call_auditor_verification_agent(
+        student_text=student_text,
+        rubric_json=clean_rubric,
+        primary_eval=primary_res,
+        question_few_shots=question_few_shots
+    )
 
+    standardized_a_bd = []
     if auditor_res:
         audit_passed = bool(auditor_res.get("audit_passed", True))
-        auditor_score = float(auditor_res.get("auditor_score", primary_res.get("overall_score", 0.0)))
+        raw_a_bd = auditor_res.get("auditor_breakdown", [])
+        standardized_a_bd = aggregate_and_standardize_breakdown(raw_a_bd, clean_rubric, total_max_score)
+        auditor_res["auditor_breakdown"] = standardized_a_bd
+        
+        raw_aud_sc = float(auditor_res.get("auditor_score", auditor_res.get("reconciled_score", 0.0)))
+        if standardized_a_bd:
+            calc_aud_sum = sum(float(a.get("score_awarded", a.get("auditor_score", 0.0))) for a in standardized_a_bd)
+            auditor_score = round(calc_aud_sum, 1) if calc_aud_sum > 0 else round(raw_aud_sc if raw_aud_sc > 0 else primary_score, 1)
+        else:
+            auditor_score = round(raw_aud_sc if raw_aud_sc > 0 else primary_score, 1)
+
         reconciled_score = float(auditor_res.get("reconciled_score", auditor_score))
-        auditor_breakdown = auditor_res.get("auditor_breakdown", [])
-        if not isinstance(auditor_breakdown, list):
-            auditor_breakdown = []
+        allows_half = check_rubric_allows_half_marks(clean_rubric)
+        if not allows_half:
+            auditor_score = float(round(auditor_score))
+            reconciled_score = float(round(reconciled_score))
 
         conflicting_qs = auditor_res.get("conflicting_questions", [])
         if not isinstance(conflicting_qs, list):
@@ -523,7 +693,7 @@ def call_llm_for_grading(
             "reconciled_score": reconciled_score,
             "recommendation": recommendation,
             "disagreement_severity": severity,
-            "auditor_breakdown": auditor_breakdown,
+            "auditor_breakdown": standardized_a_bd,
             "score_discrepancy": round(score_diff, 1),
             "agreement_ratio": round(agreement_ratio, 2),
             "conflicting_questions": conflicting_qs,
@@ -553,23 +723,36 @@ def call_llm_for_grading(
         feedback["flag_reasons"] = confidence_result.get("flag_reasons", [])
 
     # Auditor-Based Reconciliation:
-    # If the disagreement is resolved (diff <= 1.0 mark or confirmed) and auto-approved ("graded"),
-    # the system adopts the Auditor-reconciled final score and updates breakdown accordingly.
-    if auditor_res and confidence_result["status"] == "graded":
+    # Adopt Auditor-reconciled final score if:
+    # 1. Submission was auto-approved ("graded")
+    # 2. OR Primary Grader awarded 0.0 marks while Auditor found valid responses and awarded marks (ADOPT_AUDITOR)
+    should_adopt_auditor = False
+    if auditor_res:
+        if confidence_result["status"] == "graded":
+            should_adopt_auditor = True
+        elif primary_score == 0.0 and auditor_score > 0.0 and recommendation == "ADOPT_AUDITOR":
+            should_adopt_auditor = True
+
+    if should_adopt_auditor:
         primary_res["overall_score"] = round(reconciled_score, 1)
         primary_res["auditor_reconciled"] = (primary_score != reconciled_score)
         primary_res["reconciliation_action"] = recommendation
         
-        # Synchronize question breakdown with auditor scores if provided
-        if auditor_breakdown and isinstance(feedback.get("breakdown"), list):
-            from .confidence import normalize_question_number
-            auditor_map = {normalize_question_number(a.get("question_number", "")): a for a in auditor_breakdown if isinstance(a, dict)}
-            for p_item in feedback["breakdown"]:
-                norm_k = normalize_question_number(p_item.get("question_number", ""))
-                if norm_k in auditor_map:
-                    a_sc = auditor_map[norm_k].get("auditor_score")
+        # Synchronize question breakdown with auditor scores
+        if standardized_a_bd and isinstance(feedback.get("breakdown"), list):
+            from .confidence import extract_main_question_number
+            auditor_map = {extract_main_question_number(a.get("question_number", "")): a for a in standardized_a_bd if isinstance(a, dict)}
+            for idx, p_item in enumerate(feedback["breakdown"]):
+                q_k = extract_main_question_number(p_item.get("question_number", ""))
+                a_candidate = auditor_map.get(q_k)
+                if not a_candidate and idx < len(standardized_a_bd):
+                    a_candidate = standardized_a_bd[idx]
+                if a_candidate:
+                    a_sc = a_candidate.get("score_awarded", a_candidate.get("auditor_score"))
                     if a_sc is not None:
                         p_item["score_awarded"] = float(a_sc)
+                        if not p_item.get("reasoning") or "No response evaluated" in str(p_item.get("reasoning", "")):
+                            p_item["reasoning"] = a_candidate.get("reasoning", p_item.get("reasoning", ""))
 
     print(f" │   └─ [Reconciliation Complete] Final Status: {primary_res['status'].upper()} | Final Score: {primary_res['overall_score']}/{total_max_score} | Confidence: {primary_res['confidence_score']*100:.1f}%", flush=True)
 
