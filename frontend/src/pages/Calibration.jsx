@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, BookOpen, CheckCircle2, ChevronRight, ArrowRight,
-  Sparkles, Loader2, Target, Info, AlertTriangle, RefreshCw, Sliders,
+  Sparkles, Loader2, Target, Info, AlertTriangle, RefreshCw,
   Edit3, Plus, Minus, FileText, Check, Save, X, Award, ShieldAlert,
   FileSpreadsheet, CheckCircle, HelpCircle, Trash2
 } from 'lucide-react';
@@ -35,59 +35,6 @@ const Card = ({ children, style = {} }) => (
   </div>
 );
 
-/* ─── Tolerance Slider ─── */
-const ToleranceSlider = ({ value, onChange, disabled }) => {
-  const steps = [
-    { v: 0,    label: 'Strict (0%)',  desc: 'Flag if AI graders differ at all (0% tolerance)' },
-    { v: 0.05, label: 'Medium (5%)',  desc: 'Flag if AI graders differ by >5% (Recommended)' },
-    { v: 0.10, label: 'Relaxed (10%)', desc: 'Flag if AI graders differ by >10%' },
-    { v: 0.20, label: 'Lenient (20%)', desc: 'Only flag major conflicts (>20% difference)' },
-  ];
-  const idx = steps.findIndex(s => Math.abs(s.v - value) < 0.01) ?? 1;
-  const current = steps[Math.max(0, idx)] || steps[1];
-
-  return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--secondary)' }}>
-          AI Graders Disagreement Sensitivity
-        </span>
-        <span style={{
-          fontSize: '0.775rem', fontWeight: 700,
-          color: 'var(--primary)', backgroundColor: 'var(--primary-light)',
-          padding: '0.2rem 0.6rem', borderRadius: '999px'
-        }}>
-          {current.label}
-        </span>
-      </div>
-
-      <input
-        type="range"
-        min={0} max={3} step={1}
-        value={idx < 0 ? 1 : idx}
-        disabled={disabled}
-        onChange={e => onChange(steps[parseInt(e.target.value)].v)}
-        style={{ width: '100%', accentColor: 'var(--primary)', cursor: disabled ? 'not-allowed' : 'pointer', height: '4px' }}
-      />
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.35rem' }}>
-        {steps.map((s, i) => (
-          <span key={i} style={{
-            fontSize: '0.68rem', color: Math.abs(s.v - value) < 0.01 ? 'var(--primary)' : 'var(--text-dim)',
-            fontWeight: Math.abs(s.v - value) < 0.01 ? 700 : 400,
-            textAlign: i === 0 ? 'left' : i === steps.length - 1 ? 'right' : 'center',
-            flex: 1
-          }}>{s.label}</span>
-        ))}
-      </div>
-
-      <p style={{ margin: '0.4rem 0 0', fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        <Info size={12} style={{ marginRight: 4, verticalAlign: 'middle', color: 'var(--primary)' }} />
-        {current.desc}. Papers where the dual AI graders diverge beyond this threshold will be flagged for your manual review.
-      </p>
-    </div>
-  );
-};
 
 /* ─── Main Calibration Component ─── */
 const Calibration = () => {
@@ -104,8 +51,6 @@ const Calibration = () => {
 
   const [calStatus, setCalStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toleranceVal, setToleranceVal] = useState(0.10);
-  const [savingTolerance, setSavingTolerance] = useState(false);
   const [targetSamples, setTargetSamples] = useState(3);
   const [savingSampleSize, setSavingSampleSize] = useState(false);
 
@@ -167,13 +112,10 @@ const Calibration = () => {
   useEffect(() => { loadStatus(); }, [loadStatus]);
 
   useEffect(() => {
-    if (currentAssignment?.tolerance_rate != null) {
-      setToleranceVal(currentAssignment.tolerance_rate);
-    }
     if (currentAssignment?.calibration_sample_size != null) {
       setTargetSamples(currentAssignment.calibration_sample_size);
     }
-  }, [currentAssignment?.tolerance_rate, currentAssignment?.calibration_sample_size]);
+  }, [currentAssignment?.calibration_sample_size]);
 
   // Active sample paper in the studio
   const activeSample = useMemo(() => {
@@ -391,17 +333,6 @@ const Calibration = () => {
     }
   };
 
-  const handleSaveTolerance = async (val) => {
-    setToleranceVal(val);
-    try {
-      setSavingTolerance(true);
-      await handleUpdateAssignment(currentAssignmentId, { tolerance_rate: val });
-    } catch (e) {
-      alert(`Could not save: ${e.message}`);
-    } finally {
-      setSavingTolerance(false);
-    }
-  };
 
   // Smart Header File Picker & Instant Preview
   const handleFileSelect = async (file) => {
@@ -1653,26 +1584,6 @@ const Calibration = () => {
         </Card>
       )}
 
-      {/* ── AI GRADERS CONFLICT THRESHOLD CARD ── */}
-      <Card>
-        <h3 style={{ margin: '0 0 0.3rem', fontSize: '0.95rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{ width: 28, height: 28, borderRadius: '50%', backgroundColor: 'var(--bg-subtle)', border: '1.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Sliders size={14} color="var(--primary)" />
-          </div>
-          AI graders conflict threshold
-        </h3>
-        <p style={{ margin: '0 0 1.1rem 2.35rem', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
-          Set the disagreement threshold between the dual AI graders. If the difference in scores awarded by the two AI graders exceeds this threshold, the submission is automatically flagged for your human review.
-        </p>
-        <div style={{ marginLeft: '2.35rem', maxWidth: 420 }}>
-          <ToleranceSlider
-            value={toleranceVal}
-            onChange={handleSaveTolerance}
-            disabled={savingTolerance}
-          />
-          {savingTolerance && <p style={{ margin: '0.35rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Saving…</p>}
-        </div>
-      </Card>
 
       {/* ── STEP 3: READY TO GRADE WHOLE CLASS ── */}
       <Card style={{ backgroundColor: isReady ? 'var(--primary-light)' : 'var(--surface)', borderColor: isReady ? 'var(--border)' : 'var(--border)' }}>

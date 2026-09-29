@@ -7,7 +7,28 @@ export const AssignmentContext = createContext();
 
 export const AssignmentProvider = ({ children }) => {
   const [assignments, setAssignments] = useState([]);
-  const [currentAssignmentId, setCurrentAssignmentId] = useState('');
+  const [currentAssignmentId, setCurrentAssignmentIdState] = useState(() => {
+    try {
+      return localStorage.getItem('autograde_active_assignment_id') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const setCurrentAssignmentId = useCallback((valOrFn) => {
+    setCurrentAssignmentIdState(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      try {
+        if (next) {
+          localStorage.setItem('autograde_active_assignment_id', next);
+        } else {
+          localStorage.removeItem('autograde_active_assignment_id');
+        }
+      } catch {}
+      return next;
+    });
+  }, []);
+
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isGradingActive, setIsGradingActive] = useState(false);
@@ -19,14 +40,32 @@ export const AssignmentProvider = ({ children }) => {
   const loadAssignments = useCallback(async () => {
     try {
       const data = await fetchAssignments();
-      setAssignments(data);
-      if (data && data.length > 0) {
-        setCurrentAssignmentId(prev => (prev && data.some(a => a.id === prev)) ? prev : data[0].id);
+      if (Array.isArray(data)) {
+        setAssignments(data);
+        if (data.length > 0) {
+          let saved = '';
+          try { saved = localStorage.getItem('autograde_active_assignment_id') || ''; } catch {}
+          setCurrentAssignmentIdState(prev => {
+            if (prev && data.some(a => a.id === prev)) return prev;
+            if (saved && data.some(a => a.id === saved)) return saved;
+            // Default to the latest active assignment in the list
+            return data[data.length - 1].id;
+          });
+        }
       }
     } catch (err) {
       console.warn('[AssignmentContext] Failed to fetch from backend API:', err);
     }
   }, []);
+
+  // Self-healing auto-retry: if assignments array is empty, retry fetching every 2.5 seconds
+  useEffect(() => {
+    if (assignments.length > 0) return;
+    const interval = setInterval(() => {
+      loadAssignments();
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [assignments.length, loadAssignments]);
 
   // Load submissions whenever currentAssignmentId changes with backend sync
   const loadSubmissions = useCallback(async (assignId, isSilent = true) => {

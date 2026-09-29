@@ -24,6 +24,12 @@ const SubmissionsList = () => {
   }, [location.state?.filter, location.search]);
 
   useEffect(() => {
+    if (currentAssignmentId) {
+      loadSubmissions(currentAssignmentId);
+    }
+  }, [currentAssignmentId, loadSubmissions]);
+
+  useEffect(() => {
     fetch('/api/assignments/qc-settings')
       .then(res => res.json())
       .then(data => {
@@ -128,8 +134,10 @@ const SubmissionsList = () => {
     }
   };
 
+  const hasTriggeredInitialBatch = React.useRef(false);
   useEffect(() => {
-    if (location.state?.startGrading && currentAssignmentId && !gradingBatch) {
+    if (location.state?.startGrading && currentAssignmentId && !hasTriggeredInitialBatch.current) {
+      hasTriggeredInitialBatch.current = true;
       handleGradeAllBatch();
       navigate(location.pathname, { replace: true, state: {} });
     }
