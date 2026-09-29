@@ -3,7 +3,7 @@ import re
 import json
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import requests
 from dotenv import load_dotenv
 from .confidence import evaluate_confidence_and_status
