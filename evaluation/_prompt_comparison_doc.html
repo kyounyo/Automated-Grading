@@ -1,0 +1,764 @@
+<h1>AutoGrade+ Prompt Architecture Comparison</h1>
+<p><i>Two grading-prompt approaches evaluated for Q6, Q8, Q9, and Q22, with the complete, exact prompt text used by each, copied directly from llm_service.py.</i></p>
+<h2>1. Overview</h2>
+<p>AutoGrade+ currently implements two different prompt architectures for grading student responses:</p>
+<table border="1" cellpadding="8" cellspacing="0"><tr><td><b></b></td><td><b>Approach 1 &mdash; Hardcoded, Question-Specific</b></td><td><b>Approach 2 &mdash; Dynamic Rubric Interpreter</b></td></tr><tr><td><b>Routing</b></td><td>By question NUMBER (is this Q6? Q8? Q9? Q22?)</td><td>By question TYPE, determined from the rubric's own structure (SHORT_ANSWER / CALCULATION / OPEN_ENDED / UNSUPPORTED)</td></tr><tr><td><b>Where the criteria/answer key live</b></td><td>Hand-written Python constants specific to each of the four benchmark questions (<code>_Q6_CHECKLIST_GROUPS</code>, <code>_Q8_CHECKLIST_GROUPS</code>, <code>_Q9_CALCULATION_ITEMS</code>, <code>_Q22_STOCK_CRITERIA_VERBATIM</code> / <code>_Q22_NOT_STOCK_CRITERIA_VERBATIM</code>)</td><td>Extracted at runtime from the raw question text + rubric text by an LLM 'Rubric Interpreter' call, into a structured Grading Specification</td></tr><tr><td><b>LLM calls per response</b></td><td>1 (SHORT_ANSWER, OPEN_ENDED) -- the same call also grades; 1 extraction call for CALCULATION (Q9)</td><td>1 Interpreter call PER QUESTION (not per response, shared across every student answering that question) + 1 grading call per response</td></tr><tr><td><b>New question, same shape (e.g. a future Q31 that is another calculation question)</b></td><td>Requires a developer to hand-write a new Python constant and add a new routing line</td><td>No code change -- the Interpreter reads the new rubric and produces a new Grading Specification automatically</td></tr><tr><td><b>Validation status</b></td><td>Empirically validated: real ICC results exist for all four questions (see Section 5)</td><td>Logic-tested (unit tests on the scoring/validation code with mocked LLM output) but NOT YET benchmarked against real graded responses</td></tr><tr><td><b>Main risk</b></td><td>Does not generalise to new questions without more engineering</td><td>The Interpreter itself is a new, unvalidated source of error (e.g. a CALCULATION answer it derives itself rather than copies from the rubric)</td></tr></table>
+<h2>2. Approach 1 &mdash; Hardcoded, Question-Specific Prompts (Criterion Checklist)</h2>
+<p>Grading is routed by literal question number. <code>call_primary_grading_agent()</code> checks <code>if question_no == "6"</code>, <code>"8"</code>, <code>"9"</code>, or <code>"22"</code> and sends the response to a dedicated template pre-loaded with that question's own hand-written criteria/answer key. Q6 and Q8 share one reusable checklist template (<code>_build_checklist_grading_prompt</code>) fed different hardcoded criteria and a different strictness setting; Q9 uses an extraction-then-Python-scoring template fed a hardcoded answer key; Q22 uses the <b>rubric_semantic</b> template (the version currently selected for production use, in preference to the earlier v8 and lenient variants) fed the lecturer's literal rubric wording as two hardcoded, mutually exclusive criteria lists.</p>
+<h3>2.1 &mdash; Q6 (Short Answer / Checklist)</h3>
+<p>Max score: 10.0. Matching strictness: <b>meaning</b> (paraphrases accepted). Half marks: not allowed.</p>
+<pre style="white-space:pre-wrap; font-family:'Courier New',monospace; font-size:9pt; background:#f6f6f6; border:1px solid #ccc; padding:10px; line-height:1.35;">
+You are an expert academic evaluator. Grade the student&#x27;s submission using CRITERION
+CHECKLIST MATCHING, not holistic essay judgement. The question is organized into fixed
+groups below; each group is a list of marking criteria worth 1 mark each, and each
+group has its own mark cap that may be lower than its criteria count.
+
+Q6(a) (max 5.0 marks -- 1 mark per criterion met, capped at 5.0 even if more of the 7 criteria below are met):
+    1. Biodegradable / does not need surgical removal
+    2. Longer duration of action than lipid-based systems -&gt; reduces dosing frequency / improves compliance
+    3. Injectable, does not require surgical implantation
+    4. No visible/palpable lump at the injection site (aesthetic benefit)
+    5. Not suitable for acid-labile drugs (limits which drugs can use this system)
+    6. Requires a skilled health worker to administer -&gt; may exclude remote/rural patients
+    7. Complex, expensive manufacturing process
+
+Q6(b) (max 5.0 marks -- 1 mark per criterion met, capped at 5.0 even if more of the 8 criteria below are met):
+    1. Contains a solvent, or uses temperature-sensitive polymers
+    2. Typically made from a biodegradable polymer
+    3. Drug must be soluble in the polymer/solvent system
+    4. On injection, the solvent diffuses away from the depot
+    5. Drug is released via degradation/erosion of the polymer matrix
+    6. Correctly judges there is NO clinical benefit over microspheres (a student claiming a clinical benefit does NOT earn this criterion, though they can still earn the others)
+    7. Cheaper / easier to manufacture and sterilise than microspheres
+    8. Avoids needle blockage (a practical advantage of the solvent-based system)
+
+MATCHING STRICTNESS: Award a criterion if the student&#x27;s answer conveys the SAME MEANING as it, even in different words -- paraphrases, synonyms, and reordered phrasing all count as a match. Do not require exact wording.
+
+Total Assignment Max Score: 10.0
+
+Student Submission:
+&lt;&lt;STUDENT RESPONSE TEXT APPEARS HERE&gt;&gt;
+
+GRADING PROTOCOL:
+1. Work through the groups in order. Route the student&#x27;s content to the correct group
+   by meaning and context -- students often don&#x27;t label their points to match the
+   groups above.
+2. For each criterion, FIRST locate and quote the exact verbatim span of the
+   student&#x27;s own text that relates to it (if any), THEN judge whether it satisfies
+   the criterion under the matching strictness above. Never award a mark without a
+   supporting quote from the student&#x27;s own text.
+3. Whole marks only for each criterion -- DO NOT award 0.5 marks. Sum the satisfied criteria within a group, but never exceed that
+   group&#x27;s own max_score even if more criteria are satisfied than the cap allows.
+4. Never award the same criterion twice for two restatements of the same idea, and
+   never award a criterion using content that clearly belongs to a different group.
+5. Treat criteria within a group as independent unless the checklist text itself
+   states a dependency between them -- do not invent extra conditions beyond what&#x27;s
+   written above.
+6. If the student gives no relevant content for a group, that group scores 0 -- do
+   not guess or award sympathy marks.
+7. ZERO MARK RULE: if the entire student answer is blank, &#x27;-&#x27;, &#x27;N/A&#x27;, or missing,
+   award 0 for every group.
+8. Double-check every group&#x27;s cap and the final sum before finalizing. Show your
+   criterion-by-criterion matching (with quotes) in &quot;reasoning&quot;, and mirror it in
+   &quot;feedback.breakdown&quot; as exactly one entry per group (&quot;Q6(a)&quot;, &quot;Q6(b)&quot;), each with
+   score_awarded (capped at that group&#x27;s max_score) and max_score. overall_score
+   MUST equal the sum of the group scores in &quot;feedback.breakdown&quot;.
+
+OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
+{
+  &quot;overall_score&quot;: 0.0,
+  &quot;confidence_score&quot;: 0.90,
+  &quot;status&quot;: &quot;graded&quot;,
+  &quot;reasoning&quot;: &quot;Group-by-group: quote the relevant student text for each criterion, state whether it was met or missed, then sum.&quot;,
+  &quot;feedback&quot;: {
+    &quot;summary&quot;: &quot;One-sentence overview of which groups were strong and which lost marks.&quot;,
+    &quot;breakdown&quot;: [
+      {&quot;question_number&quot;: &quot;Q6(a)&quot;, &quot;score_awarded&quot;: 0.0, &quot;max_score&quot;: 0.0, &quot;reasoning&quot;: &quot;Which numbered criteria were matched and which were missed, and why, with supporting quotes.&quot;}
+    ]
+  },
+  &quot;highlights&quot;: [
+    {&quot;text&quot;: &quot;Exact quote copied verbatim from student submission&quot;, &quot;question_number&quot;: &quot;Q6(a)&quot;, &quot;score_awarded&quot;: 0.0, &quot;max_score&quot;: 0.0, &quot;type&quot;: &quot;strength&quot;, &quot;comment&quot;: &quot;Which criteria this quote satisfies or misses.&quot;}
+  ]
+}
+</pre>
+<h3>2.2 &mdash; Q8 (Short Answer / Checklist, Verdict + Justification)</h3>
+<p>Max score: 10.0. Matching strictness: <b>explicit</b> (vague/partial alignment not accepted). Half marks: allowed.</p>
+<pre style="white-space:pre-wrap; font-family:'Courier New',monospace; font-size:9pt; background:#f6f6f6; border:1px solid #ccc; padding:10px; line-height:1.35;">
+You are an expert academic evaluator. Grade the student&#x27;s submission using CRITERION
+CHECKLIST MATCHING, not holistic essay judgement. The question is organized into fixed
+groups below; each group is a list of marking criteria worth 1 mark each, and each
+group has its own mark cap that may be lower than its criteria count.
+
+Q8(a) (max 2.0 marks -- 1 mark per criterion met, capped at 2.0 even if more of the 2 criteria below are met):
+    1. Verdict: DISAGREE with the statement &#x27;Lyophilization is the only option for preparing peptides for injectable administration.&#x27;
+    2. Reason: not necessary if the drug is stable in solution (freeze-drying is only needed for solution-unstable drugs)
+
+Q8(b) (max 2.0 marks -- 1 mark per criterion met, capped at 2.0 even if more of the 2 criteria below are met):
+    1. Verdict: AGREE with the statement &#x27;Protein structure is more complex than peptides, so instability is often a greater issue.&#x27;
+    2. Reason (either is sufficient): hydrophobic regions of proteins can associate/stick to surfaces, OR tertiary structure may be disrupted by unwanted chemical reactions
+
+Q8(c) (max 2.0 marks -- 1 mark per criterion met, capped at 2.0 even if more of the 2 criteria below are met):
+    1. Verdict: DISAGREE with the statement &#x27;Antibody-drug conjugates use the natural distribution of a drug to get the antibody to bind to its target on cells.&#x27;
+    2. Reason: it is the antibody that directs/targets the drug to the target cells -- the statement has the direction of targeting reversed
+
+Q8(d) (max 2.0 marks -- 1 mark per criterion met, capped at 2.0 even if more of the 2 criteria below are met):
+    1. Verdict: DISAGREE with the statement &#x27;Proteins and peptides are not light sensitive, so light-protective packaging is never used.&#x27;
+    2. Reason: proteins/peptides commonly do require light protection, e.g. packaging in amber vials
+
+Q8(e) (max 2.0 marks -- 1 mark per criterion met, capped at 2.0 even if more of the 2 criteria below are met):
+    1. Verdict: AGREE with the statement &#x27;Co-solvents are used to dissolve peptides to enable safe injection.&#x27;
+    2. Reason (either is sufficient): unsafe to inject if the protein/peptide is not completely dissolved, OR injectable co-solvents are acceptable to use in small amounts
+
+MATCHING STRICTNESS: STRICTLY follow the checklist. Award a criterion ONLY if the student&#x27;s answer explicitly and clearly states it. Do NOT award a criterion for a vague answer, or one that merely &quot;somewhat aligns&quot; with it without clearly stating it.
+
+Total Assignment Max Score: 10.0
+
+Student Submission:
+&lt;&lt;STUDENT RESPONSE TEXT APPEARS HERE&gt;&gt;
+
+GRADING PROTOCOL:
+1. Work through the groups in order. Route the student&#x27;s content to the correct group
+   by meaning and context -- students often don&#x27;t label their points to match the
+   groups above.
+2. For each criterion, FIRST locate and quote the exact verbatim span of the
+   student&#x27;s own text that relates to it (if any), THEN judge whether it satisfies
+   the criterion under the matching strictness above. Never award a mark without a
+   supporting quote from the student&#x27;s own text.
+3. You may award 0.5 for a criterion the student&#x27;s answer partially but incompletely satisfies. Sum the satisfied criteria within a group, but never exceed that
+   group&#x27;s own max_score even if more criteria are satisfied than the cap allows.
+4. Never award the same criterion twice for two restatements of the same idea, and
+   never award a criterion using content that clearly belongs to a different group.
+5. Treat criteria within a group as independent unless the checklist text itself
+   states a dependency between them -- do not invent extra conditions beyond what&#x27;s
+   written above.
+6. If the student gives no relevant content for a group, that group scores 0 -- do
+   not guess or award sympathy marks.
+7. ZERO MARK RULE: if the entire student answer is blank, &#x27;-&#x27;, &#x27;N/A&#x27;, or missing,
+   award 0 for every group.
+8. Double-check every group&#x27;s cap and the final sum before finalizing. Show your
+   criterion-by-criterion matching (with quotes) in &quot;reasoning&quot;, and mirror it in
+   &quot;feedback.breakdown&quot; as exactly one entry per group (&quot;Q8(a)&quot;, &quot;Q8(b)&quot;, &quot;Q8(c)&quot;, &quot;Q8(d)&quot;, &quot;Q8(e)&quot;), each with
+   score_awarded (capped at that group&#x27;s max_score) and max_score. overall_score
+   MUST equal the sum of the group scores in &quot;feedback.breakdown&quot;.
+
+OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
+{
+  &quot;overall_score&quot;: 0.0,
+  &quot;confidence_score&quot;: 0.90,
+  &quot;status&quot;: &quot;graded&quot;,
+  &quot;reasoning&quot;: &quot;Group-by-group: quote the relevant student text for each criterion, state whether it was met or missed, then sum.&quot;,
+  &quot;feedback&quot;: {
+    &quot;summary&quot;: &quot;One-sentence overview of which groups were strong and which lost marks.&quot;,
+    &quot;breakdown&quot;: [
+      {&quot;question_number&quot;: &quot;Q8(a)&quot;, &quot;score_awarded&quot;: 0.0, &quot;max_score&quot;: 0.0, &quot;reasoning&quot;: &quot;Which numbered criteria were matched and which were missed, and why, with supporting quotes.&quot;}
+    ]
+  },
+  &quot;highlights&quot;: [
+    {&quot;text&quot;: &quot;Exact quote copied verbatim from student submission&quot;, &quot;question_number&quot;: &quot;Q8(a)&quot;, &quot;score_awarded&quot;: 0.0, &quot;max_score&quot;: 0.0, &quot;type&quot;: &quot;strength&quot;, &quot;comment&quot;: &quot;Which criteria this quote satisfies or misses.&quot;}
+  ]
+}
+</pre>
+<h3>2.3 &mdash; Q9 (Calculation)</h3>
+<p>Max score: 6.0. Extraction-only prompt -- the LLM never reports a score; Python computes the final mark deterministically from the extracted fields.</p>
+<pre style="white-space:pre-wrap; font-family:'Courier New',monospace; font-size:9pt; background:#f6f6f6; border:1px solid #ccc; padding:10px; line-height:1.35;">
+You are extracting evidence from a pharmacy student&#x27;s dosing-calculation response.
+Do NOT calculate, award, or report a score yourself -- you are only identifying
+what the student explicitly wrote, for each of Melissa, Tony, Bella, Bobby, independently.
+
+Reference (for your judgement only -- do not quote this back as if the student wrote it):
+    - Melissa: correct final answer is EXACTLY 6 whole squares (examples of acceptable working for this person: 64 x 10 = 640, 640mg, 64/10 = 6.4, 6.4 squares)
+    - Tony: correct final answer is EXACTLY 7 whole squares (examples of acceptable working for this person: 73 x 10 = 730, 730mg, 73/10 = 7.3, 7.3 squares, 7.2 squares)
+    - Bella: correct final answer is EXACTLY 4 whole squares (examples of acceptable working for this person: 39 x 10 = 390, 390mg, 39/10 = 3.9, 3.9 squares)
+    - Bobby: correct final answer is EXACTLY 2 whole squares (examples of acceptable working for this person: 23 x 10 = 230, 230mg, 23/10 = 2.3, 2.3 squares)
+
+Student Submission:
+&lt;&lt;STUDENT RESPONSE TEXT APPEARS HERE&gt;&gt;
+
+For EACH person, extract exactly two fields from the student&#x27;s own text:
+
+1. &quot;working_shown&quot;: true if the student explicitly wrote ANY intermediate
+   calculation step for this person -- an equation (e.g. &quot;64 x 10 = 640&quot;), the dose
+   in milligrams (e.g. &quot;640mg&quot;), or the exact unrounded square value (e.g. &quot;6.4
+   squares&quot;). ANY ONE of these forms is sufficient; the student does not need to
+   show all of them. A bare final rounded whole-number answer with NONE of these
+   shown does NOT count -- set this to false in that case. Do not infer or assume
+   working that was not actually written.
+
+2. &quot;final_squares&quot;: the exact whole number of squares the student&#x27;s final
+   ADMINISTRATION INSTRUCTION recommends giving this person, as an integer, or null
+   if it isn&#x27;t a clean whole number. Do not round or infer this yourself.
+
+   IMPORTANT: the correct answer is a clean whole number of squares with NO cutting
+   or halving. If the student&#x27;s final instruction involves cutting, halving, or
+   otherwise splitting a square -- e.g. &quot;6 full squares plus a half&quot;, &quot;6 and a HALF
+   chocolate squares&quot;, &quot;6.5 squares&quot;, &quot;cut one square in half&quot; -- this is NOT a
+   match for the whole-number answer, even though a whole number like &quot;6&quot; appears
+   somewhere in that instruction. In that case set final_squares to null (or to the
+   student&#x27;s literal total including the fraction, e.g. 6.5, which will correctly
+   fail to match the required integer) -- do not simplify &quot;6 full + a half&quot; down to
+   just &quot;6&quot;. Route content to the correct person by name, not by position/order.
+
+Do not award marks, compute totals, apply any cap, or invent any additional
+category beyond these two fields -- scoring is handled separately from this
+extraction.
+
+OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
+{
+  &quot;extractions&quot;: [
+    {&quot;label&quot;: &quot;Melissa&quot;, &quot;working_shown&quot;: true, &quot;working_quote&quot;: &quot;verbatim quote, or null if working_shown is false&quot;, &quot;final_squares&quot;: 6}
+  ],
+  &quot;reasoning&quot;: &quot;Brief note per person on what evidence was found and why.&quot;
+}
+</pre>
+<h3>2.4 &mdash; Q22 (Open-Ended &mdash; rubric_semantic)</h3>
+<p>Max score: 6.0. This is the rubric_semantic version specifically (not v8, not lenient) -- the version currently selected for Q22. Grades directly from the lecturer's literal rubric wording, refuses to credit a fact the student never stated, and includes the calibration-against-false-negatives and mandatory false-negative recheck rules added during this project's Q22 tuning work.</p>
+<pre style="white-space:pre-wrap; font-family:'Courier New',monospace; font-size:9pt; background:#f6f6f6; border:1px solid #ccc; padding:10px; line-height:1.35;">
+You are grading an open-ended response from an undergraduate pharmacy student.
+
+This is a ONE-MODEL benchmark. There is NO auditor, second grader, or
+adjudicator. Do NOT calculate or report a numerical total -- Python will
+calculate the score from your criterion decisions.
+
+Use the QUESTION and the MARKING RUBRIC below as the AUTHORITATIVE grading
+standard. Do not invent additional scoring restrictions, exclusions, or
+requirements beyond what the rubric states or clearly implies.
+
+QUESTION / SCENARIO:
+You are working in a community pharmacy in Wangaratta, a regional town in Victoria, Australia. A sales representative, Braydon, comes into your pharmacy and asks whether you can stock a new hair restoring serum that his company has developed that can improve hair loss in men. Its use has been approved by the Therapeutic Goods Administration and it is listed on the Australian Register of Therapeutic Goods. It contains a medicine called cetirizine that is a histamine receptor antagonist and is commonly used in tablet form for the prevention of allergies such as hay fever. You ask what evidence Braydon has that it works, and he claims it is “backed by science”, and produces a pamphlet that states the following:
+
+Cetirizine has anti-inflammatory properties and decreases the production of prostaglandin D2 (PGD2) which, unlike other prostaglandins, may play a negative role in hair growth. It is safe and has a lower potential side effect profile, potentially resulting in improved compliance compared with other topical hair loss treatments. 
+One case-controlled study of 60 patients with hair loss showed significantly higher hair regrowth and patient satisfaction in the group that received 1% topical cetirizine (n = 30) than in the control group (Zaky et al.: Therapeutic implications of topical cetirizine 1% in treatment of male androgenetic alopecia: A case controlled study. J Cosmet Dermatol. 2021; 20(4): 1154–9). 
+In a pilot study of 67 patients who received 1% topical cetirizine, there were increases in total and terminal hair density as well as diameter (Rossi et al.: A preliminary study on topical cetirizine in the therapeutic management of androgenetic alopecia. J Dermatolog Treat. 2018; 29(2): 149–51.)
+
+Would you stock this product in the pharmacy for sale to the public? Write in your own words why or why not? 
+
+STUDENT RESPONSE:
+&lt;&lt;STUDENT RESPONSE TEXT APPEARS HERE&gt;&gt;
+
+MARKING RUBRIC
+
+If the student&#x27;s overall decision is to STOCK the product, award 1 mark for
+each of the following, to a maximum of 6 marks:
+1. This is a product that is ok to stock in community pharmacies
+2. It is approved by the TGA
+3. It is listed on the register of therapeutic goods
+4. There is some scientific evidence for its effectiveness
+5. There is a pharmacological rationale explained for its effectiveness
+6. Safety risk is minimal
+7. This is because it is already used in oral form by many people OR topical forms are unlikely to pose a safety risk
+8. Any other reasonable point regarding safety or efficacy
+
+If the student&#x27;s overall decision is NOT to stock the product, award 1 mark
+for each of the following, to a maximum of 3 marks:
+1. The evidence is only based on a limited number of patients
+2. No evidence is provided for safety
+3. Any other reasonable point regarding lack of safety or efficacy
+
+OPEN-ENDED PROFESSIONAL JUDGMENT GRADING PROTOCOL
+
+1. IDENTIFY THE STUDENT&#x27;S DECISION
+Determine the student&#x27;s overall answer, recommendation, position, or
+professional decision from the response as a whole. When the response
+discusses arguments on both sides, distinguish between the student&#x27;s own
+final position and counterarguments or limitations they merely discuss. Do
+not change the student&#x27;s position merely because they acknowledge an
+opposing argument.
+
+POSITION RESOLUTION: if the response opens with an explicit recommendation
+and later discusses limitations, risks, or counterarguments WITHOUT stating a
+new final recommendation, retain the original explicit recommendation --
+critically discussing weaknesses in the evidence is not the same as reversing
+the decision. Only treat the position as the opposite branch when the student
+clearly states that different final recommendation themselves. If the
+response is genuinely ambiguous even after this check (no explicit final
+recommendation either way), choose the position most strongly supported by
+the balance of the student&#x27;s own reasoning and note the ambiguity in
+`position_reason`.
+
+2. APPLY THE APPLICABLE RUBRIC
+Identify the numbered criteria above that apply to the student&#x27;s chosen
+position. Follow the mark values and maximum score stated exactly. Grade
+ONLY the applicable branch&#x27;s numbered list -- never combine marks from both.
+
+3. GRADE BY MEANING
+For each applicable numbered criterion, determine whether the student has
+demonstrated the underlying concept. Accept synonyms, paraphrases, different
+terminology, concise explanations, examples that clearly demonstrate the
+concept, and implicit but unambiguous meaning. Do not require the student&#x27;s
+wording to match the rubric.
+
+Before withholding a mark, ask: &quot;Would a reasonable pharmacy educator
+recognise that the student&#x27;s own words demonstrate the underlying concept
+required by this specific criterion, even though it is expressed differently
+from the rubric?&quot; If yes, award it.
+
+Do not award a mark for an idea that requires you to invent knowledge the
+student did not actually communicate. A response that never mentions a fact
+required by a criterion (e.g. regulatory approval, a safety conclusion, a
+mechanism) does not earn that criterion merely because the fact is true or
+was given in the scenario -- the STUDENT must communicate it.
+
+CALIBRATION AGAINST FALSE NEGATIVES: for this open-ended professional-
+judgement question, avoid an overly literal interpretation of the rubric. The
+rubric describes the concepts that should receive credit; it is not a
+required vocabulary list. Award a criterion even when the student uses
+broader or less technical terminology, states the conclusion concisely,
+communicates it through an explanation rather than the rubric&#x27;s exact
+wording, or demonstrates the underlying concern without naming the rubric
+category itself. Do not require the student to reproduce a specific fact,
+phrase, or level of technical precision unless that precision is essential to
+what the criterion is actually assessing. This is semantic credit, not
+generosity -- it does not permit inventing an idea absent from the response,
+using scenario information as though the student stated it, awarding a
+merely related idea, or awarding the same underlying idea twice.
+
+DECISION PROCESS for every applicable criterion:
+  A. What underlying knowledge, reasoning, safety/efficacy judgement, or
+     professional concern is this criterion assessing?
+  B. Search the ENTIRE response for the student&#x27;s strongest evidence for that
+     underlying concept.
+  C. Ask whether a reasonable pharmacy educator would recognise the
+     student&#x27;s own words as demonstrating substantially the same concept.
+     If YES -&gt; MET.
+  D. If the match is not literal, ask whether the difference is merely one
+     of wording, terminology, level of detail, or presentation. If YES -&gt; MET.
+  E. If it is genuinely a different idea, ask whether it qualifies as a
+     distinct scientifically or professionally reasonable point under the
+     rubric&#x27;s &quot;any other reasonable point&quot; criterion (see rule 4 below).
+     If YES -&gt; award that open-ended criterion.
+  F. Otherwise -&gt; NOT MET.
+
+When uncertain between MET and NOT MET, do not default to NOT MET merely
+because the student&#x27;s wording is less precise or less technical than the
+rubric. Withhold the mark only when the required underlying concept is
+genuinely absent, contradicted, or merely topic-related rather than actually
+demonstrated. A reasonable-sounding argument is not by itself a reason to
+award a mark -- the underlying idea must still be explicitly stated or
+unambiguously communicated by the student; do not supply missing reasoning on
+the student&#x27;s behalf.
+
+CONCEPTUAL EQUIVALENCE EXAMPLES (defining the boundary of a rubric concept,
+not an exhaustive answer key):
+
+Rubric concept: &quot;The evidence is only based on a limited number of patients.&quot;
+A student does not need the exact phrase &quot;limited number of patients&quot; if
+their response clearly communicates that the CURRENT evidence base is too
+limited, too small, too preliminary, or insufficient to justify confidence in
+efficacy. A generic statement such as &quot;more research is always good&quot; does
+NOT earn this criterion unless it communicates a limitation of the evidence
+actually presented in this case.
+
+Rubric concept: &quot;No evidence is provided for safety.&quot;
+Accept semantically equivalent reasoning when the student clearly
+communicates that safety has not been established, that the available
+information is insufficient to judge safety, that relevant safety/side-effect
+information is missing or unclear, or that further safety evidence is
+required before the product can be considered adequately supported. Do not
+require the literal phrase &quot;no safety evidence.&quot; Do not award this criterion
+for a generic statement that all medicines may carry some risk unless the
+response communicates an actual deficiency in the available safety evidence.
+
+4. VALID ALTERNATIVE REASONING
+The rubric&#x27;s &quot;any other reasonable point&quot; criterion is genuinely open-ended.
+Award it for one distinct, scientifically, clinically, pharmacologically, or
+pharmaceutically reasonable point that satisfies the rubric&#x27;s stated purpose
+and is not already credited under another numbered criterion. It does not
+need to resemble a model answer.
+
+5. EVIDENCE
+Every awarded mark must be supported by evidence from the student&#x27;s own
+response. Quote the strongest relevant evidence verbatim. One passage may
+demonstrate more than one DISTINCT numbered criterion when it genuinely
+communicates multiple ideas.
+
+6. NO DOUBLE COUNTING
+Award each underlying scoring point only once. Do not award the same idea
+twice using different wording.
+
+7. NO NEGATIVE MARKING
+Incorrect or irrelevant information does not remove marks already earned
+unless the rubric explicitly specifies a penalty.
+
+8. MANDATORY FALSE-NEGATIVE RECHECK
+After your first pass, review ONLY the criteria you marked NOT MET. For each:
+  1. Re-read the full student response.
+  2. Identify the closest student-authored statement to that criterion.
+  3. Ask whether you rejected it only because: terminology differed; the
+     wording was less technical than the rubric; the reasoning was indirect
+     but still unambiguous; the student expressed the implication rather
+     than the rubric&#x27;s exact conclusion; or the concept was spread across
+     multiple sentences.
+  4. If any of these is true AND the underlying concept is still clearly
+     demonstrated, change the decision to MET and record the evidence.
+  5. Keep it NOT MET only when you can state the substantive concept that is
+     genuinely missing, contradicted, or merely related rather than
+     demonstrated. Do not change a criterion to MET merely to increase the
+     score.
+Also confirm: no point was counted twice, and the correct branch&#x27;s maximum
+applies.
+
+OUTPUT ONLY VALID JSON:
+{
+  &quot;final_position&quot;: &quot;STOCK&quot;,
+  &quot;final_recommendation_evidence&quot;: &quot;verbatim quote establishing the recommendation, or null&quot;,
+  &quot;position_reason&quot;: &quot;brief explanation of the position determination, especially if ambiguous&quot;,
+  &quot;decisions&quot;: [
+    {
+      &quot;criterion_number&quot;: 1,
+      &quot;met&quot;: true,
+      &quot;evidence&quot;: &quot;verbatim student quote or null&quot;,
+      &quot;reason&quot;: &quot;brief explanation&quot;
+    }
+  ]
+}
+</pre>
+<h2>3. Approach 2 &mdash; Dynamic Rubric Interpreter (Scalable Architecture)</h2>
+<p>Grading is routed by question TYPE, not question number. A new 'Rubric Interpreter' LLM call reads the raw question text and rubric text and produces a structured <b>Grading Specification</b> -- classifying the question as SHORT_ANSWER, CALCULATION, OPEN_ENDED, or UNSUPPORTED, and extracting the criteria/answer key/branches directly from the rubric text. That specification is then handed to one of three reusable grading strategies. Because the Interpreter is only run ONCE per question (not once per student), its cost is shared across the whole cohort answering that question.</p>
+<h3>3.1 &mdash; The Rubric Interpreter Prompt (shared by every question)</h3>
+<p>This exact prompt is used for EVERY question regardless of type -- only the QUESTION, MARKING RUBRIC, and MAXIMUM SCORE values change per question. Shown below as rendered for Q22 (the most structurally complex of the four, since it is the only one with a branched rubric). The table beneath it shows what gets substituted in for each of the other three questions.</p>
+<pre style="white-space:pre-wrap; font-family:'Courier New',monospace; font-size:9pt; background:#f6f6f6; border:1px solid #ccc; padding:10px; line-height:1.35;">
+You are an Academic Rubric Interpreter. Convert the question and marking rubric
+below into a structured Grading Specification for an automated grading system.
+
+QUESTION:
+You are working in a community pharmacy in Wangaratta, a regional town in Victoria, Australia. A sales representative, Braydon, comes into your pharmacy and asks whether you can stock a new hair restoring serum that his company has developed that can improve hair loss in men. Its use has been approved by the Therapeutic Goods Administration and it is listed on the Australian Register of Therapeutic Goods. It contains a medicine called cetirizine that is a histamine receptor antagonist and is commonly used in tablet form for the prevention of allergies such as hay fever. You ask what evidence Braydon has that it works, and he claims it is “backed by science”, and produces a pamphlet that states the following:
+
+Cetirizine has anti-inflammatory properties and decreases the production of prostaglandin D2 (PGD2) which, unlike other prostaglandins, may play a negative role in hair growth. It is safe and has a lower potential side effect profile, potentially resulting in improved compliance compared with other topical hair loss treatments. 
+One case-controlled study of 60 patients with hair loss showed significantly higher hair regrowth and patient satisfaction in the group that received 1% topical cetirizine (n = 30) than in the control group (Zaky et al.: Therapeutic implications of topical cetirizine 1% in treatment of male androgenetic alopecia: A case controlled study. J Cosmet Dermatol. 2021; 20(4): 1154–9). 
+In a pilot study of 67 patients who received 1% topical cetirizine, there were increases in total and terminal hair density as well as diameter (Rossi et al.: A preliminary study on topical cetirizine in the therapeutic management of androgenetic alopecia. J Dermatolog Treat. 2018; 29(2): 149–51.)
+
+Would you stock this product in the pharmacy for sale to the public? Write in your own words why or why not? 
+
+MARKING RUBRIC (this is the lecturer&#x27;s authoritative answer key -- do not add,
+remove, or reinterpret anything it does not actually say or clearly imply):
+1 mark for each of the following to a maximum of 6 marks:
+This is a product that is ok to stock in community pharmacies 
+It is approved by the TGA
+It is listed on the register of therapeutic goods
+There is some scientific evidence for its effectiveness
+There is a pharmacological rationale explained for its effectiveness
+Safety risk is minimal 
+This is because it is already used in oral form by many people OR topical forms are unlikely to pose a safety risk
+Any other reasonable point regarding safety or efficacy
+OR, if students choose not to stock this product, 1 mark each to a maximum of 3 marks:
+The evidence is only based on a limited number of patients
+No evidence is provided for safety
+Any other reasonable point regarding lack of safety or efficacy
+
+MAXIMUM SCORE: 6.0
+
+STEP 1 -- CLASSIFY THE GRADING STRATEGY FROM THE RUBRIC&#x27;S STRUCTURE, NOT FROM THE
+QUESTION NUMBER OR TOPIC
+
+Choose exactly one:
+
+SHORT_ANSWER
+Use when the rubric awards marks for a set of identifiable, independently
+verifiable points -- facts, explanations, comparisons, a verdict plus a
+justification, or similar discrete criteria. Marks are typically 1 (or a stated
+fraction) per criterion, sometimes grouped into sub-parts with their own caps.
+
+CALCULATION
+Use when marks substantially depend on mathematical working and/or a specific
+numeric result -- doses, concentrations, conversions, formula application. There
+is a computable correct answer, possibly per sub-part/per-person.
+
+OPEN_ENDED
+Use when the student must construct a professional judgement, critical appraisal,
+recommendation, or argument, and the rubric&#x27;s criteria require semantic/conceptual
+matching rather than a single correct fact or number. If the rubric gives two (or
+more) mutually exclusive criteria lists keyed to a stated position or decision
+(e.g. &quot;if the student agrees... / if the student disagrees...&quot;, &quot;1 mark each for
+X, OR if Y, 1 mark each for Z&quot;), this is BRANCHED. If it is one flat list of
+criteria that always applies regardless of any stance the student takes, this is
+INDEPENDENT_CRITERIA.
+
+UNSUPPORTED
+Use when the rubric requires something none of the above can grade from text alone
+-- e.g. assessing a diagram, image, chemical structure drawing, or other non-textual
+artefact. Do not force a non-textual rubric into OPEN_ENDED.
+
+STEP 2 -- EXTRACT THE SPECIFICATION FOR THE CHOSEN STRATEGY
+
+For SHORT_ANSWER, extract:
+- groups: the rubric&#x27;s own sub-parts (or a single group if it isn&#x27;t split into
+  sub-parts), each with its own max_score and the list of distinct criteria the
+  rubric awards within it. Preserve the rubric&#x27;s own wording for each criterion.
+- matching_strictness: &quot;explicit&quot; if the rubric&#x27;s own instructions say to require
+  clear/explicit statements and not award vague or partial alignment; &quot;meaning&quot;
+  if the rubric is silent on this or explicitly accepts paraphrasing. Do not guess
+  &quot;explicit&quot; merely because the rubric is terse.
+- allow_half_marks: true only if the rubric explicitly permits partial/fractional
+  marks for a criterion.
+
+For CALCULATION, extract per sub-part/person:
+- label: how the rubric/question identifies this sub-part (a name, a letter, etc).
+- expected_answer: the exact correct final numeric answer, computed from the
+  rubric/model answer&#x27;s own worked example. Show your own working internally
+  before committing to this number; if the rubric&#x27;s worked example is itself
+  ambiguous or inconsistent, extract the value the rubric&#x27;s final stated answer
+  actually uses.
+- answer_source: &quot;RUBRIC_EXPLICIT&quot; if the rubric&#x27;s own worked example already
+  states this exact final number (you are copying it, not computing it).
+  &quot;DERIVED&quot; if the rubric only gives the formula/method and you had to compute
+  the number yourself from data in the question or rubric. Be honest about
+  which one this is -- do not mark something DERIVED as RUBRIC_EXPLICIT merely
+  because you are confident in the arithmetic.
+- source_evidence: if RUBRIC_EXPLICIT, the exact rubric text you copied the
+  number from. If DERIVED, the calculation you performed to reach it (e.g.
+  &quot;65 kg x 8 mg/kg = 520 mg&quot;), so a human can check your arithmetic.
+- tolerance: 0 unless the rubric explicitly allows a margin (e.g. rounding).
+- unit: the unit of the final answer as the rubric expresses it (e.g. &quot;mg&quot;,
+  &quot;tablets&quot;, &quot;mL&quot;, &quot;squares&quot;), or null if dimensionless.
+- working_mark / answer_mark: the mark value the rubric assigns to showing
+  correct working vs. stating the correct final answer, for this sub-part.
+- acceptable_working_forms: 2-4 short EXAMPLES of what showing valid working
+  might look like for this sub-part (derived from the rubric&#x27;s own working, not
+  invented), to help a grader recognise working shown in different valid forms.
+
+For OPEN_ENDED, extract:
+- scoring_structure: &quot;BRANCHED&quot; or &quot;INDEPENDENT_CRITERIA&quot; per Step 1.
+- If BRANCHED: branches, each with an id, a short description of when it applies
+  (`condition`), its own max_score, and its own criteria list (the rubric&#x27;s own
+  wording). Set position_linked_criterion to the 1-based index of a criterion in
+  that branch&#x27;s list that is ITSELF the position/decision statement (e.g. a
+  criterion that just says &quot;this is a reasonable position to take&quot;), if one
+  exists -- otherwise null.
+- If INDEPENDENT_CRITERIA: a single flat criteria list (the rubric&#x27;s own wording)
+  and use the overall max_score.
+
+Do not invent scoring rules, criteria, numeric answers, or caps the rubric does
+not support. If the rubric is ambiguous about strictness, partial credit, or
+tolerance, prefer the stricter/narrower reading rather than assuming leniency.
+
+OUTPUT ONLY VALID JSON matching the Grading Specification schema, including only
+the fields relevant to the chosen question_type:
+{
+  &quot;question_type&quot;: &quot;SHORT_ANSWER&quot;,
+  &quot;max_score&quot;: 6.0,
+  &quot;groups&quot;: [
+    {&quot;group&quot;: &quot;string label&quot;, &quot;max_score&quot;: 0.0, &quot;criteria&quot;: [&quot;criterion text&quot;, &quot;criterion text&quot;]}
+  ],
+  &quot;matching_strictness&quot;: &quot;meaning&quot;,
+  &quot;allow_half_marks&quot;: false,
+  &quot;items&quot;: [
+    {&quot;label&quot;: &quot;string&quot;, &quot;expected_answer&quot;: 0.0, &quot;answer_source&quot;: &quot;RUBRIC_EXPLICIT&quot;,
+      &quot;source_evidence&quot;: &quot;quoted rubric text or shown derivation&quot;, &quot;tolerance&quot;: 0.0,
+      &quot;unit&quot;: &quot;mg&quot;, &quot;working_mark&quot;: 0.5, &quot;answer_mark&quot;: 1.0,
+      &quot;acceptable_working_forms&quot;: [&quot;example&quot;]}
+  ],
+  &quot;scoring_structure&quot;: &quot;BRANCHED&quot;,
+  &quot;branches&quot;: [
+    {&quot;id&quot;: &quot;B1&quot;, &quot;condition&quot;: &quot;string&quot;, &quot;max_score&quot;: 0.0, &quot;criteria&quot;: [&quot;criterion text&quot;], &quot;position_linked_criterion&quot;: 1}
+  ],
+  &quot;criteria&quot;: [&quot;criterion text&quot;]
+}
+</pre>
+<table border="1" cellpadding="6" cellspacing="0"><tr><td><b>Question</b></td><td><b>MAXIMUM SCORE substituted</b></td><td><b>Resulting classification</b></td></tr><tr><td>Q6</td><td>10.0</td><td>SHORT_ANSWER</td></tr><tr><td>Q8</td><td>10.0</td><td>SHORT_ANSWER</td></tr><tr><td>Q9</td><td>6.0</td><td>CALCULATION</td></tr><tr><td>Q22</td><td>6.0</td><td>OPEN_ENDED (BRANCHED)</td></tr></table>
+<h3>3.2 &mdash; SHORT_ANSWER Strategy (used for Q6 and Q8)</h3>
+<p><b>This strategy does not have a separate prompt of its own.</b> It reuses the exact same <code>_build_checklist_grading_prompt</code> template already shown in Sections 2.1 and 2.2, unchanged -- the only difference is that the criteria/groups/strictness data now comes from the Interpreter's Grading Specification instead of the hardcoded <code>_Q6_CHECKLIST_GROUPS</code> / <code>_Q8_CHECKLIST_GROUPS</code> constants. If the Interpreter extracts Q6's criteria correctly, the resulting prompt sent to the grader is byte-for-byte identical to Section 2.1 above.</p>
+<h3>3.3 &mdash; CALCULATION Strategy (used for Q9)</h3>
+<p>A generalised version of the Q9 extraction prompt -- parameterised by each item's own unit and tolerance instead of the Q9-specific 'chocolate squares' wording, so it applies to any calculation question (doses in mg, tablet counts, mL, etc). Shown below rendered with Q9's own answer key reshaped into the new schema.</p>
+<pre style="white-space:pre-wrap; font-family:'Courier New',monospace; font-size:9pt; background:#f6f6f6; border:1px solid #ccc; padding:10px; line-height:1.35;">
+You are extracting evidence from a student&#x27;s calculation response. Do NOT
+calculate, award, or report a score yourself -- you are only identifying what
+the student explicitly wrote, for each of Melissa, Tony, Bella, Bobby, independently.
+
+Reference (for your judgement only -- do not quote this back as if the student wrote it):
+    - Melissa: correct final answer is EXACTLY 6.0 squares (examples of acceptable working: 64 x 10 = 640, 640mg, 64/10 = 6.4, 6.4 squares)
+    - Tony: correct final answer is EXACTLY 7.0 squares (examples of acceptable working: 73 x 10 = 730, 730mg, 73/10 = 7.3, 7.3 squares, 7.2 squares)
+    - Bella: correct final answer is EXACTLY 4.0 squares (examples of acceptable working: 39 x 10 = 390, 390mg, 39/10 = 3.9, 3.9 squares)
+    - Bobby: correct final answer is EXACTLY 2.0 squares (examples of acceptable working: 23 x 10 = 230, 230mg, 23/10 = 2.3, 2.3 squares)
+
+Student Submission:
+&lt;&lt;STUDENT RESPONSE TEXT APPEARS HERE&gt;&gt;
+
+For EACH labelled item, extract exactly two fields from the student&#x27;s own text:
+
+1. &quot;working_shown&quot;: true if the student explicitly wrote ANY intermediate
+   calculation step for this item -- an equation, an intermediate value, a
+   formula application. A bare final answer with no working shown does NOT
+   count -- set this to false in that case. Do not infer or assume working that
+   was not actually written.
+
+2. &quot;final_answer&quot;: the exact final numeric answer the student&#x27;s response states
+   for this item, as a number, or null if none is given. Do not round, infer, or
+   correct it yourself -- extract exactly what the student wrote. Route content
+   to the correct item by its label, not by position/order in the response.
+
+Do not award marks, compute totals, apply any cap, or invent any additional
+category beyond these two fields -- scoring is handled separately.
+
+OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
+{
+  &quot;extractions&quot;: [
+    {&quot;label&quot;: &quot;Melissa&quot;, &quot;working_shown&quot;: true, &quot;working_quote&quot;: &quot;verbatim quote, or null if working_shown is false&quot;, &quot;final_answer&quot;: 6.0}
+  ],
+  &quot;reasoning&quot;: &quot;Brief note per item on what evidence was found and why.&quot;
+}
+</pre>
+<h3>3.4 &mdash; OPEN_ENDED Strategy (used for Q22)</h3>
+<p>Carries over every validated grading behaviour from the rubric_semantic prompt (grade by meaning, calibration against false negatives, the A-F decision process, mandatory false-negative recheck) but driven by the Interpreter's dynamically extracted branches/criteria instead of the hardcoded <code>_Q22_STOCK_CRITERIA_VERBATIM</code> / <code>_Q22_NOT_STOCK_CRITERIA_VERBATIM</code> constants, and supports both a branched shape (like Q22) and a flat independent-criteria shape for open-ended questions that don't branch at all. Shown below rendered with Q22's own criteria reshaped into the new branch schema.</p>
+<pre style="white-space:pre-wrap; font-family:'Courier New',monospace; font-size:9pt; background:#f6f6f6; border:1px solid #ccc; padding:10px; line-height:1.35;">
+You are grading an open-ended response.
+
+This is a ONE-MODEL benchmark. There is NO auditor, second grader, or
+adjudicator. Do NOT calculate or report a numerical total -- Python will
+calculate the score from your criterion decisions.
+
+Use the QUESTION and the MARKING RUBRIC below as the AUTHORITATIVE grading
+standard. Do not invent additional scoring restrictions, exclusions, or
+requirements beyond what the rubric states or clearly implies.
+
+QUESTION / SCENARIO:
+You are working in a community pharmacy in Wangaratta, a regional town in Victoria, Australia. A sales representative, Braydon, comes into your pharmacy and asks whether you can stock a new hair restoring serum that his company has developed that can improve hair loss in men. Its use has been approved by the Therapeutic Goods Administration and it is listed on the Australian Register of Therapeutic Goods. It contains a medicine called cetirizine that is a histamine receptor antagonist and is commonly used in tablet form for the prevention of allergies such as hay fever. You ask what evidence Braydon has that it works, and he claims it is “backed by science”, and produces a pamphlet that states the following:
+
+Cetirizine has anti-inflammatory properties and decreases the production of prostaglandin D2 (PGD2) which, unlike other prostaglandins, may play a negative role in hair growth. It is safe and has a lower potential side effect profile, potentially resulting in improved compliance compared with other topical hair loss treatments. 
+One case-controlled study of 60 patients with hair loss showed significantly higher hair regrowth and patient satisfaction in the group that received 1% topical cetirizine (n = 30) than in the control group (Zaky et al.: Therapeutic implications of topical cetirizine 1% in treatment of male androgenetic alopecia: A case controlled study. J Cosmet Dermatol. 2021; 20(4): 1154–9). 
+In a pilot study of 67 patients who received 1% topical cetirizine, there were increases in total and terminal hair density as well as diameter (Rossi et al.: A preliminary study on topical cetirizine in the therapeutic management of androgenetic alopecia. J Dermatolog Treat. 2018; 29(2): 149–51.)
+
+Would you stock this product in the pharmacy for sale to the public? Write in your own words why or why not? 
+
+STUDENT RESPONSE:
+&lt;&lt;STUDENT RESPONSE TEXT APPEARS HERE&gt;&gt;
+
+MARKING RUBRIC
+
+If the student&#x27;s overall decision/position satisfies one of the branches below,
+grade ONLY that branch&#x27;s numbered criteria -- never combine marks from
+different branches.
+
+BRANCH &quot;STOCK&quot; -- applies when: the student&#x27;s overall decision is to stock the product
+(maximum 6.0 marks)
+1. This is a product that is ok to stock in community pharmacies
+2. It is approved by the TGA
+3. It is listed on the register of therapeutic goods
+4. There is some scientific evidence for its effectiveness
+5. There is a pharmacological rationale explained for its effectiveness
+6. Safety risk is minimal
+7. This is because it is already used in oral form by many people OR topical forms are unlikely to pose a safety risk
+8. Any other reasonable point regarding safety or efficacy
+
+BRANCH &quot;DO_NOT_STOCK&quot; -- applies when: the student&#x27;s overall decision is not to stock the product
+(maximum 3.0 marks)
+1. The evidence is only based on a limited number of patients
+2. No evidence is provided for safety
+3. Any other reasonable point regarding lack of safety or efficacy
+
+OPEN-ENDED PROFESSIONAL JUDGMENT GRADING PROTOCOL
+
+STEP 1 -- DETERMINE THE APPLICABLE BRANCH
+Determine the student&#x27;s overall answer, recommendation, position, or decision
+from the response as a whole. When the response discusses arguments on more
+than one side, distinguish between the student&#x27;s own final position and
+counterarguments or limitations they merely discuss. Do not change the
+student&#x27;s position merely because they acknowledge an opposing argument. If
+the response opens with an explicit position and later discusses limitations
+WITHOUT stating a new final position, retain the original explicit position.
+Only treat a different branch as applicable when the student clearly states
+that different final position themselves. If genuinely ambiguous, choose the
+branch most strongly supported by the balance of the student&#x27;s own reasoning.
+
+STEP 2 -- APPLY ONLY THE CHOSEN BRANCH
+
+GRADE BY MEANING
+For each applicable numbered criterion, determine whether the student has
+demonstrated the underlying concept. Accept synonyms, paraphrases, different
+terminology, concise explanations, examples that clearly demonstrate the
+concept, and implicit but unambiguous meaning. Do not require the student&#x27;s
+wording to match the rubric.
+
+Before withholding a mark, ask: &quot;Would a reasonable educator recognise that
+the student&#x27;s own words demonstrate the underlying concept required by this
+specific criterion, even though it is expressed differently from the rubric?&quot;
+If yes, award it.
+
+Do not award a mark for an idea that requires you to invent knowledge the
+student did not actually communicate. A response that never mentions a fact
+required by a criterion does not earn that criterion merely because the fact
+is true or was given in the scenario -- the STUDENT must communicate it.
+
+CALIBRATION AGAINST FALSE NEGATIVES: avoid an overly literal interpretation of
+the rubric. The rubric describes the concepts that should receive credit; it
+is not a required vocabulary list. Award a criterion even when the student
+uses broader or less technical terminology, states the conclusion concisely,
+or demonstrates the underlying concern without naming the rubric category
+itself. Do not require the student to reproduce a specific fact, phrase, or
+level of technical precision unless that precision is essential to what the
+criterion is actually assessing. This is semantic credit, not generosity -- it
+does not permit inventing an idea absent from the response, using scenario
+information as though the student stated it, awarding a merely related idea,
+or awarding the same underlying idea twice.
+
+DECISION PROCESS for every applicable criterion:
+  A. What underlying knowledge, reasoning, or judgement is this criterion assessing?
+  B. Search the ENTIRE response for the student&#x27;s strongest evidence for that concept.
+  C. Ask whether a reasonable educator would recognise the student&#x27;s own words
+     as demonstrating substantially the same concept. If YES -&gt; MET.
+  D. If the match is not literal, ask whether the difference is merely one of
+     wording, terminology, level of detail, or presentation. If YES -&gt; MET.
+  E. If it is genuinely a different idea, ask whether it qualifies as a
+     distinct, reasonable point under an explicit open &quot;any other reasonable
+     point&quot; style criterion, if the rubric has one. If YES -&gt; award it there.
+  F. Otherwise -&gt; NOT MET.
+
+When uncertain between MET and NOT MET, do not default to NOT MET merely
+because the student&#x27;s wording is less precise or less technical than the
+rubric. Withhold the mark only when the required underlying concept is
+genuinely absent, contradicted, or merely topic-related rather than actually
+demonstrated. A reasonable-sounding argument is not by itself a reason to
+award a mark -- the underlying idea must still be explicitly stated or
+unambiguously communicated by the student; do not supply missing reasoning on
+the student&#x27;s behalf.
+
+VALID ALTERNATIVE REASONING
+If the rubric includes an open-ended &quot;any other reasonable point&quot; style
+criterion, award it for one distinct, reasonable point that satisfies the
+rubric&#x27;s stated purpose and is not already credited under another numbered
+criterion. It does not need to resemble a model answer.
+
+EVIDENCE
+Every awarded mark must be supported by evidence from the student&#x27;s own
+response. Quote the strongest relevant evidence verbatim. One passage may
+demonstrate more than one DISTINCT numbered criterion when it genuinely
+communicates multiple ideas.
+
+NO DOUBLE COUNTING
+Award each underlying scoring point only once. Do not award the same idea
+twice using different wording.
+
+NO NEGATIVE MARKING
+Incorrect or irrelevant information does not remove marks already earned
+unless the rubric explicitly specifies a penalty.
+
+MANDATORY FALSE-NEGATIVE RECHECK
+After your first pass, review ONLY the criteria you marked NOT MET. For each:
+identify the closest student-authored statement to that criterion; ask whether
+you rejected it only because terminology differed, the wording was less
+technical, the reasoning was indirect but still unambiguous, the student
+expressed the implication rather than the rubric&#x27;s exact conclusion, or the
+concept was spread across multiple sentences; if so and the underlying concept
+is still clearly demonstrated, change the decision to MET. Keep it NOT MET
+only when you can state the substantive concept that is genuinely missing.
+Do not change a criterion to MET merely to increase the score.
+
+OUTPUT ONLY VALID JSON:
+{
+  &quot;chosen_branch_id&quot;: &quot;B1&quot;,
+  &quot;branch_evidence&quot;: &quot;verbatim quote establishing the position, or null&quot;,
+  &quot;decisions&quot;: [
+    {
+      &quot;criterion_number&quot;: 1,
+      &quot;met&quot;: true,
+      &quot;evidence&quot;: &quot;verbatim student quote or null&quot;,
+      &quot;reason&quot;: &quot;brief explanation&quot;
+    }
+  ]
+}
+</pre>
+<h2>4. Compare and Contrast</h2>
+<table border="1" cellpadding="8" cellspacing="0"><tr><td><b>Dimension</b></td><td><b>Approach 1: Hardcoded</b></td><td><b>Approach 2: Dynamic</b></td></tr><tr><td>Adding a new question of an already-supported shape</td><td>Developer writes a new Python constant + a new routing line</td><td>No code change -- upload the new rubric, the Interpreter classifies and extracts automatically</td></tr><tr><td>Consistency across runs</td><td>Deterministic content (the criteria never change); only the LLM's judgement varies</td><td>Two sources of run-to-run variation: the Interpreter's extraction AND the grader's judgement</td></tr><tr><td>Auditability of the criteria used</td><td>Fully human-authored and reviewed in advance</td><td>Machine-extracted; a deterministic validator (<code>_validate_grading_spec</code>) checks structural correctness, and CALCULATION answers carry an <code>answer_source</code> tag (RUBRIC_EXPLICIT vs DERIVED) so a human can see which answers were copied from the rubric versus computed by the AI itself</td></tr><tr><td>Cost/latency per cohort</td><td>1 call per student per question</td><td>1 call per question (Interpreter, shared) + 1 call per student per question -- slightly higher for small cohorts, converges to the same per-student cost as cohort size grows</td></tr><tr><td>Q22 branch handling</td><td>Hardcoded to exactly two branches: STOCK and DO_NOT_STOCK</td><td>Generalised: any number of branches, or a flat non-branching list, inferred from the rubric's own structure</td></tr><tr><td>Empirical evidence so far</td><td>Real ICC results exist for all four questions (Section 5)</td><td>Not yet run against the real API/lecturer-marked responses at the time of writing</td></tr></table>
+<h2>5. Current Empirical Status</h2>
+<p>Real results from the Approach 1 (hardcoded) pipeline, N = 25 responses per question, Gemini 3.1 Flash Lite, temperature 0:</p>
+<table border="1" cellpadding="6" cellspacing="0"><tr><td><b>Question</b></td><td><b>Max Mark</b></td><td><b>ICC (A,1)</b></td><td><b>MAE</b></td><td><b>Bias</b></td><td><b>Pearson r</b></td><td><b>Spearman &rho;</b></td></tr><tr><td>Q6</td><td>10</td><td>0.790</td><td>1.04</td><td>&minus;0.40</td><td>0.802</td><td>0.770</td></tr><tr><td>Q8</td><td>10</td><td>0.797</td><td>0.88</td><td>0.72</td><td>0.871</td><td>0.853</td></tr><tr><td>Q9</td><td>6</td><td>0.989</td><td>0.04</td><td>&minus;0.04</td><td>0.989</td><td>0.984</td></tr></table><p>Q22 (rubric_semantic), N = 25, three models compared:</p><table border="1" cellpadding="6" cellspacing="0"><tr><td><b>Model</b></td><td><b>ICC (A,1)</b></td><td><b>MAE</b></td><td><b>Bias</b></td><td><b>Pearson r</b></td><td><b>Spearman &rho;</b></td></tr><tr><td>Gemini 3.1 Flash Lite</td><td>0.591</td><td>1.08</td><td>&minus;1.08</td><td>0.742</td><td>0.706</td></tr><tr><td>Nemotron 3 Super 120B</td><td>0.679</td><td>1.16</td><td>&minus;1.16</td><td>0.870</td><td>0.845</td></tr><tr><td>Claude 4.6 Sonnet</td><td>0.675</td><td>1.13</td><td>&minus;1.04</td><td>0.833</td><td>0.798</td></tr></table><p><b>Approach 2 (dynamic) has not yet been run against real graded data.</b> It has been verified with unit tests against mocked LLM responses -- confirming the Interpreter is called once per question rather than once per response, the deterministic scoring math is correct for both CALCULATION and OPEN_ENDED (including branch-cap enforcement and the position-linked-criterion auto-award), and a malformed specification is rejected rather than silently graded -- but the actual ICC it achieves on real student responses is not yet known. The recommended next step is to run:</p><pre style="font-family:'Courier New',monospace; background:#f6f6f6; border:1px solid #ccc; padding:10px;">cd &quot;C:\Users\Owner\OneDrive\Desktop\Final Year Project\Automated-Grading\evaluation&quot;
+python run_experiment_suite.py --model all --architecture dynamic</pre><p>and compare the resulting <code>results_DYNAMIC_&lt;model&gt;.csv</code> ICC/MAE/bias per question directly against the table above, to determine whether the scalability gained by Approach 2 comes at a measurable cost to grading agreement.</p>
