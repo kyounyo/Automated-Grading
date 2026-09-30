@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Upload, BookOpen, CheckCircle2, ChevronRight, ArrowRight,
@@ -164,66 +164,142 @@ const Calibration = () => {
     return [];
   }, [rubricQuestions, activeSample]);
 
-  // Helper to extract student answer for a given question
-  const extractStudentAnswer = (rawText, qKey) => {
+  // Helper to extract student answer completely for a given question without arbitrary truncation
+  const extractStudentAnswer = (rawText, qKey, allQKeys = []) => {
     if (!rawText) return '';
-    const cleanQ = qKey.replace(/[^A-Za-z0-9]/g, '');
-    const numOnly = cleanQ.replace(/^[A-Za-z]+/, '');
+    const rawClean = rawText.trim();
+    if (!rawClean) return '';
+
+    const cleanQ = String(qKey || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const numMatch = cleanQ.match(/\d+/);
+    const numOnly = numMatch ? numMatch[0] : cleanQ;
+
     const lines = rawText.split('\n');
 
-    const patterns = [
-      new RegExp(`^(?:Question|Q|Problem)\\s*${numOnly}\\b`, 'i'),
-      new RegExp(`^${cleanQ}\\b`, 'i'),
-      new RegExp(`^${numOnly}\\.\\s+`, 'i'),
-      new RegExp(`\\bQuestion\\s+${numOnly}\\b`, 'i')
+    // 1. Target question matching patterns
+    // Matches headers like: "Question Q9:", "Question 9:", "Q9:", "Q9", "### Question Q9", "**Question 9:**", "Problem 9:", "9."
+    const targetPatterns = [
+      new RegExp(`^[#*_\\s>\\[\\(]*(?:Question|Problem|Part|Item|Task)\\s*[#\\.\\-\\:]*\\s*(?:Q\\s*)?${numOnly}\\b`, 'i'),
+      new RegExp(`^[#*_\\s>\\[\\(]*Q\\s*[#\\.\\-\\:]*\\s*${numOnly}\\b`, 'i'),
+      new RegExp(`^[#*_\\s>\\[\\(]*${cleanQ}\\b`, 'i'),
+      new RegExp(`^[#*_\\s>\\[\\(]*${numOnly}[\\.\\:\\)]\\s+`, 'i'),
+      new RegExp(`\\b(?:Question|Problem)\\s+(?:Q\\s*)?${numOnly}\\b`, 'i')
     ];
 
     let startIdx = -1;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (patterns.some(p => p.test(line))) {
+      if (targetPatterns.some(p => p.test(line))) {
         startIdx = i;
         break;
       }
     }
 
-    if (startIdx !== -1) {
-      const collected = [];
-      for (let j = startIdx; j < lines.length; j++) {
-        const line = lines[j];
-        if (j > startIdx) {
-          const isNextQ = /^(?:Question|Q|Problem)\\s*\\d+/i.test(line.trim()) || /^[0-9]+\\.\\s+/.test(line.trim());
-          if (isNextQ) break;
-        }
-        collected.push(line);
-        if (collected.length >= 25) break;
+    // Fallback: If not found and only 1 question exists, entire text is the answer
+    if (startIdx === -1) {
+      if (allQKeys && allQKeys.length === 1) {
+        return rawClean;
       }
-      return collected.join('\n').trim();
+      for (let i = 0; i < lines.length; i++) {
+        const stripped = lines[i].replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        if (stripped.includes(cleanQ)) {
+          startIdx = i;
+          break;
+        }
+      }
     }
 
-    return rawText.slice(0, 600);
+    // If still not found, return full text without arbitrary slicing
+    if (startIdx === -1) {
+      return rawClean;
+    }
+
+    // 2. Build patterns for other questions to know where to stop
+    const otherPatterns = [];
+    if (allQKeys && allQKeys.length > 1) {
+      allQKeys.forEach(otherKey => {
+        if (!otherKey || String(otherKey).trim().toUpperCase() === String(qKey).trim().toUpperCase()) return;
+        const otherClean = String(otherKey).replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        const oNumMatch = otherClean.match(/\d+/);
+        if (oNumMatch) {
+          const oNum = oNumMatch[0];
+          otherPatterns.push(new RegExp(`^[#*_\\s>\\[\\(]*(?:Question|Problem|Part|Item|Task)\\s*[#\\.\\-\\:]*\\s*(?:Q\\s*)?${oNum}\\b`, 'i'));
+          otherPatterns.push(new RegExp(`^[#*_\\s>\\[\\(]*Q\\s*[#\\.\\-\\:]*\\s*${oNum}\\b`, 'i'));
+          otherPatterns.push(new RegExp(`^[#*_\\s>\\[\\(]*${oNum}[\\.\\:\\)]\\s+`, 'i'));
+        }
+        otherPatterns.push(new RegExp(`^[#*_\\s>\\[\\(]*${otherClean}\\b`, 'i'));
+        otherPatterns.push(new RegExp(`\\b(?:Question|Problem)\\s+(?:Q\\s*)?${otherClean}\\b`, 'i'));
+      });
+    }
+
+    const genericNextPattern = /^[#*_\s>\[\(]*(?:Question|Problem|Task)\s*[#\.\-\:]*\s*(?:Q\s*)?(\d+)\b/i;
+    const genericQPattern = /^[#*_\s>\[\(]*Q\s*[#\.\-\\:]*\s*(\d+)\b/i;
+
+    // 3. Extract lines starting from startIdx
+    const firstLine = lines[startIdx].trim();
+    const collected = [];
+
+    // Strip header prefix from first line, e.g. "Question Q9: Melissa: 6..." -> "Melissa: 6..."
+    const headerStripPattern = new RegExp(`^[#*_\\s>\\[\\(]*(?:Question|Problem|Part|Item|Task)?\\s*[#\\.\\-\\:]*\\s*(?:Q\\s*)?${numOnly}(?:[A-Za-z])?[\\:\\.\\)\\-\\]\\*\\_]*\\s*(.*)$`, 'i');
+    const headerMatch = firstLine.match(headerStripPattern);
+
+    if (headerMatch) {
+      const remainder = headerMatch[1].trim();
+      if (remainder) {
+        collected.push(remainder);
+      }
+    } else {
+      collected.push(firstLine);
+    }
+
+    for (let j = startIdx + 1; j < lines.length; j++) {
+      const lineTrim = lines[j].trim();
+
+      // Check if line marks start of another specific question
+      const isOtherQ = otherPatterns.some(p => p.test(lineTrim));
+      if (isOtherQ) break;
+
+      // Check generic next question header with different number
+      const mGen = lineTrim.match(genericNextPattern) || lineTrim.match(genericQPattern);
+      if (mGen && mGen[1] !== numOnly) {
+        break;
+      }
+
+      collected.push(lines[j]);
+    }
+
+    return collected.join('\n').trim();
   };
 
   // Sync state whenever activeSample changes
+  const activeSampleIdRef = useRef(null);
   useEffect(() => {
     if (!activeSample) return;
+    const isDifferentSample = activeSampleIdRef.current !== activeSample.id;
+    activeSampleIdRef.current = activeSample.id;
+
     const rawText = activeSample.raw_text || activeSample.extracted_text || '';
-    const initial = {};
-    effectiveQuestions.forEach((q, idx) => {
-      const qKey = q.question_number || `Q${idx + 1}`;
-      const defaultStudentAnswer = extractStudentAnswer(rawText, qKey);
-      initial[qKey] = {
-        score: q.score_awarded != null ? q.score_awarded : q.max_score,
-        anchorType: 'full_credit',
-        feedback: q.reasoning || '',
-        studentText: defaultStudentAnswer,
-        saving: false,
-        saveSuccess: false,
-        saveError: null
-      };
+    const allQKeys = effectiveQuestions.map((q, idx) => q.question_number || `Q${idx + 1}`);
+
+    setCalCardState(prev => {
+      const next = {};
+      effectiveQuestions.forEach((q, idx) => {
+        const qKey = q.question_number || `Q${idx + 1}`;
+        const defaultStudentAnswer = extractStudentAnswer(rawText, qKey, allQKeys);
+        const existing = isDifferentSample ? null : prev[qKey];
+        next[qKey] = {
+          score: existing?.score != null ? existing.score : (q.score_awarded != null ? q.score_awarded : q.max_score),
+          anchorType: existing?.anchorType || 'full_credit',
+          feedback: existing?.feedback !== undefined ? existing.feedback : (q.reasoning || ''),
+          studentText: defaultStudentAnswer,
+          saving: false,
+          saveSuccess: false,
+          saveError: null
+        };
+      });
+      return next;
     });
-    setCalCardState(initial);
-  }, [activeSample?.id, effectiveQuestions.length]);
+  }, [activeSample?.id, activeSample?.raw_text, effectiveQuestions.length]);
 
   const updateCalCard = (qKey, updates) => {
     setCalCardState(prev => ({
@@ -956,18 +1032,40 @@ const Calibration = () => {
                           </div>
                         )}
 
-                        {/* Student Response Input */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-                            Student Answer for {qKey}:
-                          </span>
+                        {/* Student Response Display (Read-Only) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                              Student Answer for {qKey}:
+                            </span>
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: 600,
+                              color: 'var(--text-muted)',
+                              backgroundColor: 'rgba(100, 116, 139, 0.12)',
+                              padding: '0.1rem 0.45rem',
+                              borderRadius: '4px'
+                            }}>
+                              Submitted Answer (Read-only)
+                            </span>
+                          </div>
                           <textarea
-                            rows={3}
+                            readOnly
+                            rows={Math.min(7, Math.max(3, (card.studentText || '').split('\n').length + 1))}
                             className="input-field"
                             value={card.studentText || ''}
-                            onChange={(e) => updateCalCard(qKey, { studentText: e.target.value })}
-                            placeholder="Student response for this question..."
-                            style={{ fontSize: '0.82rem', padding: '0.5rem', resize: 'vertical' }}
+                            placeholder="No student response found for this question."
+                            style={{
+                              fontSize: '0.82rem',
+                              padding: '0.55rem 0.65rem',
+                              resize: 'vertical',
+                              backgroundColor: 'var(--surface)',
+                              color: 'var(--text-main)',
+                              cursor: 'default',
+                              lineHeight: '1.5',
+                              border: '1px solid var(--border)',
+                              opacity: card.studentText ? 1 : 0.7
+                            }}
                           />
                         </div>
 

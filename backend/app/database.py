@@ -14,6 +14,8 @@ try:
         # Test connection
         with engine.connect() as conn:
             pass
+    elif DATABASE_URL.startswith("sqlite"):
+        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 30})
     else:
         engine = create_engine(DATABASE_URL)
 except Exception as e:

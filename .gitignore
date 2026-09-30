@@ -18,6 +18,8 @@ backend/venv/
 
 # Database, Vector Stores & Uploads
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
 *.bin
 chroma_db/
@@ -43,3 +45,8 @@ evaluation/backend_icc_results.csv
 evaluation/raw_grading_results.csv
 evaluation/icc_summary_results.csv
 evaluation/ai_json_responses*.json
+
+
+backend/autograde_dev.db
+backend/autograde_dev.db-wal
+backend/autograde_dev.db-shm
