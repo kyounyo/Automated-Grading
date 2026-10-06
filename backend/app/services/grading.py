@@ -2,12 +2,12 @@ import time
 import os
 import random
 import datetime
+from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 from ..models import Submission, Assignment, EvaluationLog
 from .document_parser import extract_text_from_file
-from .rag import retrieve_rubric_context
 from .llm_service import call_llm_for_grading
-from .confidence import evaluate_confidence_and_status
+from .confidence import evaluate_confidence_and_status, normalize_question_number
 
 PROMPT_VERSION = os.getenv("PROMPT_VERSION", "v1.2-rubric-cot")
 LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-2.5-flash")
@@ -37,11 +37,14 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     2. Extract document text from PDF / DOCX / raw_text
     3. Calculate total assignment max score (sum of question max_score)
     4. If submission is blank, award 0.0 marks directly
-    5. Query ChromaDB for top-k relevant rubric context
-    6. Call Multi-Agent LLM for structured scoring & feedback
-    7. Evaluate confidence score & determine status
-    8. Save score, duration, model, & prompt_version into PostgreSQL
-    9. Log evaluation metrics into EvaluationLog table
+    5. Call the dynamic Rubric Interpreter architecture for structured scoring &
+       feedback (_get_cached_spec/_save_spec below cache each question's
+       interpreted Grading Specification on the Assignment row, so this is one
+       Interpreter call per question for the whole assignment, not one per
+       submission)
+    6. Evaluate confidence score & determine status
+    7. Save score, duration, model, & prompt_version into PostgreSQL
+    8. Log evaluation metrics into EvaluationLog table
     """
     start_time = time.time()
     
@@ -121,23 +124,28 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
 
         return submission
 
-    # Step 3: Query ChromaDB for RAG context
-    submission.status = "retrieving_rubric"
-    db.commit()
-    rag_context = retrieve_rubric_context(assignment.id, extracted_text)
-
-    # Step 4: Execute Multi-Agent LLM Grading Prompt
+    # Step 3: Execute the dynamic Rubric Interpreter grading pipeline
     submission.status = "grading"
     db.commit()
+
+    def _get_cached_spec(question_number: str) -> Optional[Dict[str, Any]]:
+        key = normalize_question_number(question_number)
+        return (assignment.interpreted_specs or {}).get(key)
+
+    def _save_spec(question_number: str, spec: Dict[str, Any]) -> None:
+        key = normalize_question_number(question_number)
+        assignment.interpreted_specs = {**(assignment.interpreted_specs or {}), key: spec}
+        db.commit()
+
     llm_result = call_llm_for_grading(
         student_text=extracted_text,
         rubric_json=rubric_data,
-        model_answer=assignment.model_answer or "",
-        rag_context=rag_context,
-        total_max_score=total_max_score
+        total_max_score=total_max_score,
+        get_cached_spec=_get_cached_spec,
+        save_spec=_save_spec,
     )
 
-    # Step 5: Save Record to PostgreSQL
+    # Step 4: Save Record to PostgreSQL
     duration = time.time() - start_time
     raw_overall_score = float(llm_result.get("overall_score", 0.0))
     # Cap score between 0.0 and total_max_score
@@ -176,7 +184,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     submission.prompt_version = PROMPT_VERSION
     submission.graded_at = datetime.datetime.utcnow()
 
-    # Step 7: Create EvaluationLog Entry
+    # Step 5: Create EvaluationLog Entry
     eval_log = EvaluationLog(
         submission_id=submission.id,
         ai_score=submission.score,

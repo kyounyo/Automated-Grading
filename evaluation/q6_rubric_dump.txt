@@ -1,0 +1,22 @@
+
+(a) Polymer-based injectable modified release systems come in a range of formats. One format is a polymer microsphere. Describe in point form the advantages and disadvantages of polymer microspheres as a dose form and what each means for the patient.  (5 marks)
+(1 mark each point up to 5)
+Advantages
+-May be biodegradable - do not need removal
+-Provides a longer duration than lipid systems, reducing frequency of administration
+-Injectable system, does not require surgical implantation
+-Aesthetics – no physical lump where the implant is injected
+Disadvantages
+•⁠  ⁠Limited to non-acid labile drugs – patient may need alternative system in this case
+•⁠  ⁠Need skilled health worker to administer – may exclude remote patients
+•⁠  ⁠Complex manufacture - expensive
+(b) A rival technology to microspheres is ‘in situ gelling’ polymer systems. In point form briefly describe the attributes of these systems. Is there a clinical benefit to the patient for these systems over microspheres? Why do you think they are of interest?
+(5 marks)
+-Systems contain a solvent, or polymers that are temperature sensitive
+-Generally prepared using a biodegradable polymer
+-drug must be soluble with polymer in solvent
+-on administration solvent diffuses away 
+-drug released by degradation and erosion of the polymer matrix
+-No clinical benefit, may be cheaper, 
+-easier to manufacture, easier to sterilise
+•⁠  ⁠Avoids needle blocking

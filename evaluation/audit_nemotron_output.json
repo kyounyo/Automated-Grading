@@ -1,0 +1,298 @@
+{
+  "6": {
+    "spec": {
+      "question_type": "SHORT_ANSWER",
+      "max_score": 10.0,
+      "groups": [
+        {
+          "group": "(a)",
+          "max_score": 5.0,
+          "criteria": [
+            "May be biodegradable - do not need removal",
+            "Provides a longer duration than lipid systems, reducing frequency of administration",
+            "Injectable system, does not require surgical implantation",
+            "Aesthetics – no physical lump where the implant is injected",
+            "Limited to non-acid labile drugs – patient may need alternative system in this case",
+            "Need skilled health worker to administer – may exclude remote patients",
+            "Complex manufacture - expensive"
+          ]
+        },
+        {
+          "group": "(b)",
+          "max_score": 5.0,
+          "criteria": [
+            "Systems contain a solvent, or polymers that are temperature sensitive",
+            "Generally prepared using a biodegradable polymer",
+            "drug must be soluble with polymer in solvent",
+            "on administration solvent diffuses away",
+            "drug released by degradation and erosion of the polymer matrix",
+            "No clinical benefit, may be cheaper,",
+            "easier to manufacture, easier to sterilise",
+            "Avoids needle blocking"
+          ]
+        }
+      ],
+      "matching_strictness": "explicit",
+      "allow_half_marks": false,
+      "_usage": {
+        "prompt_tokens": 2875,
+        "completion_tokens": 1936,
+        "total_tokens": 4811,
+        "cost": 0.0011012,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0011012,
+          "upstream_inference_prompt_cost": 0.00023,
+          "upstream_inference_completions_cost": 0.0008712
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1600,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    "is_valid": true,
+    "issues": [],
+    "review_flags": []
+  },
+  "8": {
+    "spec": {
+      "question_type": "SHORT_ANSWER",
+      "max_score": 10.0,
+      "groups": [
+        {
+          "group": "(a)",
+          "max_score": 2.0,
+          "criteria": [
+            "disagree",
+            "not necessary if drug is stable in solution"
+          ]
+        },
+        {
+          "group": "(b)",
+          "max_score": 2.0,
+          "criteria": [
+            "agree",
+            "hydrophobic parts of proteins can associate and stick to surfaces or the tertiary structure may be disrupted by unwanted chemical reactions"
+          ]
+        },
+        {
+          "group": "(c)",
+          "max_score": 2.0,
+          "criteria": [
+            "disagree",
+            "the antibody directs the drug to the target not the other way around"
+          ]
+        },
+        {
+          "group": "(d)",
+          "max_score": 2.0,
+          "criteria": [
+            "disagree",
+            "mentioning amber vials"
+          ]
+        },
+        {
+          "group": "(e)",
+          "max_score": 2.0,
+          "criteria": [
+            "agree",
+            "unsafe if proteins/peptides not completely dissolved or injectable co-solvents are OK to use in small amounts"
+          ]
+        }
+      ],
+      "matching_strictness": "meaning",
+      "allow_half_marks": false,
+      "_usage": {
+        "prompt_tokens": 2936,
+        "completion_tokens": 876,
+        "total_tokens": 3812,
+        "cost": 0.00062908,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00062908,
+          "upstream_inference_prompt_cost": 0.00023488,
+          "upstream_inference_completions_cost": 0.0003942
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 539,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    "is_valid": true,
+    "issues": [],
+    "review_flags": []
+  },
+  "9": {
+    "spec": {
+      "question_type": "CALCULATION",
+      "max_score": 6.0,
+      "items": [
+        {
+          "label": "[PERSON_NAME]",
+          "expected_answer": 6,
+          "answer_source": "RUBRIC_EXPLICIT",
+          "source_evidence": "[PERSON_NAME] = 64kg x 10mg = 640mg = 6.4 squares = 6 squares",
+          "tolerance": 0,
+          "unit": "squares",
+          "working_mark": 0.5,
+          "answer_mark": 1.0,
+          "acceptable_working_forms": [
+            "64 kg × 10 mg/kg = 640 mg",
+            "640 mg ÷ 100 mg per square = 6.4 squares",
+            "6.4 squares → 6 squares"
+          ]
+        },
+        {
+          "label": "[PERSON_NAME], [PERSON_NAME]’s husband",
+          "expected_answer": 7,
+          "answer_source": "RUBRIC_EXPLICIT",
+          "source_evidence": "[PERSON_NAME] = 73kg x 10mg = 730mg = 7.2 squares = 7 squares",
+          "tolerance": 0,
+          "unit": "squares",
+          "working_mark": 0.5,
+          "answer_mark": 1.0,
+          "acceptable_working_forms": [
+            "73 kg × 10 mg/kg = 730 mg",
+            "730 mg ÷ 100 mg per square = 7.2 squares",
+            "7.2 squares → 7 squares"
+          ]
+        },
+        {
+          "label": "Bella, their first child",
+          "expected_answer": 4,
+          "answer_source": "RUBRIC_EXPLICIT",
+          "source_evidence": "[PERSON_NAME] = 39kg x 10mg = 390mg = 3.9 squares = 4 squares",
+          "tolerance": 0,
+          "unit": "squares",
+          "working_mark": 0.5,
+          "answer_mark": 1.0,
+          "acceptable_working_forms": [
+            "39 kg × 10 mg/kg = 390 mg",
+            "390 mg ÷ 100 mg per square = 3.9 squares",
+            "3.9 squares → 4 squares"
+          ]
+        },
+        {
+          "label": "[PERSON_NAME], their youngest child",
+          "expected_answer": 2,
+          "answer_source": "RUBRIC_EXPLICIT",
+          "source_evidence": "[PERSON_NAME] = 23kg x 10mg = 230mg = 2.3 squares = 2 squares",
+          "tolerance": 0,
+          "unit": "squares",
+          "working_mark": 0.5,
+          "answer_mark": 1.0,
+          "acceptable_working_forms": [
+            "23 kg × 10 mg/kg = 230 mg",
+            "230 mg ÷ 100 mg per square = 2.3 squares",
+            "2.3 squares → 2 squares"
+          ]
+        }
+      ],
+      "_usage": {
+        "prompt_tokens": 2886,
+        "completion_tokens": 2596,
+        "total_tokens": 5482,
+        "cost": 0.00139908,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00139908,
+          "upstream_inference_prompt_cost": 0.00023088,
+          "upstream_inference_completions_cost": 0.0011682
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1673,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    "is_valid": true,
+    "issues": [],
+    "review_flags": []
+  },
+  "22": {
+    "spec": {
+      "question_type": "OPEN_ENDED",
+      "max_score": 6.0,
+      "scoring_structure": "BRANCHED",
+      "branches": [
+        {
+          "id": "B1",
+          "condition": "student chooses to stock the product",
+          "max_score": 6.0,
+          "criteria": [
+            "This is a product that is ok to stock in community pharmacies",
+            "It is approved by the TGA",
+            "It is listed on the register of therapeutic goods",
+            "There is some scientific evidence for its effectiveness",
+            "There is a pharmacological rationale explained for its effectiveness",
+            "Safety risk is minimal",
+            "This is because it is already used in oral form by many people OR topical forms are unlikely to pose a safety risk",
+            "Any other reasonable point regarding safety or efficacy"
+          ],
+          "position_linked_criterion": 1
+        },
+        {
+          "id": "B2",
+          "condition": "student chooses not to stock the product",
+          "max_score": 3.0,
+          "criteria": [
+            "The evidence is only based on a limited number of patients",
+            "No evidence is provided for safety",
+            "Any other reasonable point regarding lack of safety or efficacy"
+          ],
+          "position_linked_criterion": null
+        }
+      ],
+      "calibration_notes": "The rubric awards 1 mark per distinct point made, up to the branch maximum. For the stock branch, the first criterion is satisfied simply by stating that the product is ok to stock; any paraphrase that conveys acceptability to stock counts. The remaining criteria require the student to mention TGA approval, listing on the ARTG, scientific evidence, pharmacological rationale, minimal safety risk, the oral-use safety argument, or any other reasonable safety/efficacy point. For the not‑stock branch, marks are given for noting the limited patient sample, lack of safety evidence, or any other reasonable critique of safety/efficacy. Paraphrasing is acceptable; the grader should focus on whether the underlying idea is present, not on exact wording. No half‑marks are awarded.",
+      "_usage": {
+        "prompt_tokens": 3047,
+        "completion_tokens": 2345,
+        "total_tokens": 5392,
+        "cost": 0.00129901,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00129901,
+          "upstream_inference_prompt_cost": 0.00024376,
+          "upstream_inference_completions_cost": 0.00105525
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1843,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    "is_valid": true,
+    "issues": [],
+    "review_flags": []
+  }
+}

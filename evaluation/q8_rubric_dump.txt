@@ -1,0 +1,16 @@
+Consider the following five statements, answering whether you (1) agree or disagree and (2) provide a brief reason for your answer.
+(a) Lyophilization is the only option for preparation of peptides for injectable administration. (2 marks)
+•⁠  ⁠One mark for disagree, 
+•⁠  ⁠one mark for not necessary if drug is stable in solution
+(b) Protein structure is more complex than peptides, meaning instability is often a greater issue. (2 marks)
+•⁠  ⁠One mark for agree, 
+•⁠  ⁠one mark for either hydrophobic parts of proteins can associate and stick to surfaces, or the tertiary structure may be disrupted by unwanted chemical reactions
+(c) Antibody-drug conjugates use the natural distribution of a drug to get the antibody to bind to its target on cells to deliver a therapeutic effect. (2 marks)
+•⁠  ⁠One mark for disagree, 
+•⁠  ⁠the antibody directs the drug to the target not the other way around
+(d) Proteins and peptides are not light sensitive, so packaging to protect the drug from light is never used. (2 marks)
+•⁠  ⁠One mark for disagree, 
+•⁠  ⁠One mark for mentioning amber vials
+(e) Co-solvents are used to dissolve peptides to enable safe injection. (2 marks)
+•⁠  ⁠One mark for agree, 
+•⁠  ⁠one mark for saying either: unsafe if proteins/peptides not completely dissolved, or injectable co-solvents are OK to use in small amounts

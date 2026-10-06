@@ -16,6 +16,11 @@ class Assignment(Base):
     average_score = Column(Float, default=0.0)
     rubric_data = Column(JSON, nullable=True)  # JSON structure of rubric criteria & weightage
     model_answer = Column(Text, nullable=True)  # Text or model answer reference
+    interpreted_specs = Column(JSON, nullable=True)  # {question_number: Grading Specification}, populated lazily by
+    # the dynamic Rubric Interpreter the first time any submission is graded against this assignment, then reused
+    # for every subsequent submission -- see get_or_create_grading_spec() in services/grading.py. NOTE: a plain
+    # dict mutation on this column is NOT tracked by SQLAlchemy; writers must reassign the whole attribute
+    # (assignment.interpreted_specs = {...}) before commit(), not just mutate the dict in place.
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     submissions = relationship("Submission", back_populates="assignment", cascade="all, delete-orphan")

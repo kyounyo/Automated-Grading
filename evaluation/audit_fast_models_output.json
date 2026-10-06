@@ -1,0 +1,603 @@
+{
+  "6": {
+    "Gemini": {
+      "spec": {
+        "question_type": "SHORT_ANSWER",
+        "max_score": 10.0,
+        "groups": [
+          {
+            "group": "(a) Polymer microspheres",
+            "max_score": 5.0,
+            "criteria": [
+              "May be biodegradable - do not need removal",
+              "Provides a longer duration than lipid systems, reducing frequency of administration",
+              "Injectable system, does not require surgical implantation",
+              "Aesthetics – no physical lump where the implant is injected",
+              "Limited to non-acid labile drugs – patient may need alternative system in this case",
+              "Need skilled health worker to administer – may exclude remote patients",
+              "Complex manufacture - expensive"
+            ]
+          },
+          {
+            "group": "(b) In situ gelling systems",
+            "max_score": 5.0,
+            "criteria": [
+              "Systems contain a solvent, or polymers that are temperature sensitive",
+              "Generally prepared using a biodegradable polymer",
+              "drug must be soluble with polymer in solvent",
+              "on administration solvent diffuses away",
+              "drug released by degradation and erosion of the polymer matrix",
+              "No clinical benefit, may be cheaper",
+              "easier to manufacture, easier to sterilise",
+              "Avoids needle blocking"
+            ]
+          }
+        ],
+        "matching_strictness": "meaning",
+        "allow_half_marks": false,
+        "_usage": {
+          "prompt_tokens": 2826,
+          "completion_tokens": 331,
+          "total_tokens": 3157,
+          "cost": 0.001203,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.001203,
+            "upstream_inference_prompt_cost": 0.0007065,
+            "upstream_inference_completions_cost": 0.0004965
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    },
+    "Claude": {
+      "spec": {
+        "question_type": "SHORT_ANSWER",
+        "max_score": 10.0,
+        "groups": [
+          {
+            "group": "(a) Polymer microspheres – advantages and disadvantages",
+            "max_score": 5.0,
+            "criteria": [
+              "May be biodegradable – do not need removal",
+              "Provides a longer duration than lipid systems, reducing frequency of administration",
+              "Injectable system, does not require surgical implantation",
+              "Aesthetics – no physical lump where the implant is injected",
+              "Limited to non-acid labile drugs – patient may need alternative system in this case",
+              "Need skilled health worker to administer – may exclude remote patients",
+              "Complex manufacture – expensive"
+            ]
+          },
+          {
+            "group": "(b) In situ gelling polymer systems – attributes and clinical interest",
+            "max_score": 5.0,
+            "criteria": [
+              "Systems contain a solvent, or polymers that are temperature sensitive",
+              "Generally prepared using a biodegradable polymer",
+              "Drug must be soluble with polymer in solvent",
+              "On administration solvent diffuses away",
+              "Drug released by degradation and erosion of the polymer matrix",
+              "No clinical benefit over microspheres",
+              "May be cheaper and/or easier to manufacture",
+              "Easier to sterilise",
+              "Avoids needle blocking"
+            ]
+          }
+        ],
+        "matching_strictness": "meaning",
+        "allow_half_marks": false,
+        "_usage": {
+          "prompt_tokens": 3034,
+          "completion_tokens": 385,
+          "total_tokens": 3419,
+          "cost": 0.014877,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.014877,
+            "upstream_inference_prompt_cost": 0.009102,
+            "upstream_inference_completions_cost": 0.005775
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    }
+  },
+  "8": {
+    "Gemini": {
+      "spec": {
+        "question_type": "SHORT_ANSWER",
+        "max_score": 10.0,
+        "groups": [
+          {
+            "group": "(a)",
+            "max_score": 2.0,
+            "criteria": [
+              "disagree",
+              "not necessary if drug is stable in solution"
+            ]
+          },
+          {
+            "group": "(b)",
+            "max_score": 2.0,
+            "criteria": [
+              "agree",
+              "hydrophobic parts of proteins can associate and stick to surfaces OR the tertiary structure may be disrupted by unwanted chemical reactions"
+            ]
+          },
+          {
+            "group": "(c)",
+            "max_score": 2.0,
+            "criteria": [
+              "disagree",
+              "the antibody directs the drug to the target not the other way around"
+            ]
+          },
+          {
+            "group": "(d)",
+            "max_score": 2.0,
+            "criteria": [
+              "disagree",
+              "mentioning amber vials"
+            ]
+          },
+          {
+            "group": "(e)",
+            "max_score": 2.0,
+            "criteria": [
+              "agree",
+              "unsafe if proteins/peptides not completely dissolved OR injectable co-solvents are OK to use in small amounts"
+            ]
+          }
+        ],
+        "matching_strictness": "meaning",
+        "allow_half_marks": false,
+        "_usage": {
+          "prompt_tokens": 2888,
+          "completion_tokens": 350,
+          "total_tokens": 3238,
+          "cost": 0.001247,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.001247,
+            "upstream_inference_prompt_cost": 0.000722,
+            "upstream_inference_completions_cost": 0.000525
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    },
+    "Claude": {
+      "spec": {
+        "question_type": "SHORT_ANSWER",
+        "max_score": 10.0,
+        "groups": [
+          {
+            "group": "(a) Lyophilization is the only option for preparation of peptides for injectable administration.",
+            "max_score": 2.0,
+            "criteria": [
+              "Disagree",
+              "Not necessary if drug is stable in solution"
+            ]
+          },
+          {
+            "group": "(b) Protein structure is more complex than peptides, meaning instability is often a greater issue.",
+            "max_score": 2.0,
+            "criteria": [
+              "Agree",
+              "Hydrophobic parts of proteins can associate and stick to surfaces, OR the tertiary structure may be disrupted by unwanted chemical reactions"
+            ]
+          },
+          {
+            "group": "(c) Antibody-drug conjugates use the natural distribution of a drug to get the antibody to bind to its target on cells to deliver a therapeutic effect.",
+            "max_score": 2.0,
+            "criteria": [
+              "Disagree",
+              "The antibody directs the drug to the target, not the other way around"
+            ]
+          },
+          {
+            "group": "(d) Proteins and peptides are not light sensitive, so packaging to protect the drug from light is never used.",
+            "max_score": 2.0,
+            "criteria": [
+              "Disagree",
+              "Mention of amber vials"
+            ]
+          },
+          {
+            "group": "(e) Co-solvents are used to dissolve peptides to enable safe injection.",
+            "max_score": 2.0,
+            "criteria": [
+              "Agree",
+              "Unsafe if proteins/peptides are not completely dissolved, OR injectable co-solvents are OK to use in small amounts"
+            ]
+          }
+        ],
+        "matching_strictness": "meaning",
+        "allow_half_marks": false,
+        "_usage": {
+          "prompt_tokens": 3140,
+          "completion_tokens": 486,
+          "total_tokens": 3626,
+          "cost": 0.01671,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.01671,
+            "upstream_inference_prompt_cost": 0.00942,
+            "upstream_inference_completions_cost": 0.00729
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    }
+  },
+  "9": {
+    "Gemini": {
+      "spec": {
+        "question_type": "CALCULATION",
+        "max_score": 6.0,
+        "items": [
+          {
+            "label": "[PERSON_NAME]",
+            "expected_answer": 6.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 64kg x 10mg = 640mg = 6.4 squares = 6 squares",
+            "tolerance": 0.0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "64kg * 10mg = 640mg",
+              "640mg / 100mg per square = 6.4 squares"
+            ]
+          },
+          {
+            "label": "[PERSON_NAME]",
+            "expected_answer": 7.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 73kg x 10mg = 730mg = 7.2 squares = 7 squares",
+            "tolerance": 0.0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "73kg * 10mg = 730mg",
+              "730mg / 100mg per square = 7.3 squares"
+            ]
+          },
+          {
+            "label": "Bella",
+            "expected_answer": 4.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 39kg x 10mg = 390mg = 3.9 squares = 4 squares",
+            "tolerance": 0.0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "39kg * 10mg = 390mg",
+              "390mg / 100mg per square = 3.9 squares"
+            ]
+          },
+          {
+            "label": "[PERSON_NAME]",
+            "expected_answer": 2.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 23kg x 10mg = 230mg = 2.3 squares = 2 squares",
+            "tolerance": 0.0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "23kg * 10mg = 230mg",
+              "230mg / 100mg per square = 2.3 squares"
+            ]
+          }
+        ],
+        "_usage": {
+          "prompt_tokens": 2819,
+          "completion_tokens": 742,
+          "total_tokens": 3561,
+          "cost": 0.00181775,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00181775,
+            "upstream_inference_prompt_cost": 0.00070475,
+            "upstream_inference_completions_cost": 0.001113
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    },
+    "Claude": {
+      "spec": {
+        "question_type": "CALCULATION",
+        "max_score": 6.0,
+        "items": [
+          {
+            "label": "[PERSON_NAME]",
+            "expected_answer": 6.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 64kg x 10mg = 640mg = 6.4 squares = 6 squares",
+            "tolerance": 0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "64kg x 10mg/kg = 640mg; 640mg ÷ 100mg per square = 6.4 squares = 6 squares",
+              "64 x 10 = 640mg = 6.4 squares, rounded down to 6",
+              "Dose = 640mg; 640/100 = 6.4 → 6 squares",
+              "64kg × 10 = 640mg → 6 whole squares"
+            ]
+          },
+          {
+            "label": "[PERSON_NAME]'s husband",
+            "expected_answer": 7.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 73kg x 10mg = 730mg = 7.2 squares = 7 squares",
+            "tolerance": 0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "73kg x 10mg/kg = 730mg; 730mg ÷ 100mg per square = 7.3 squares = 7 squares",
+              "73 x 10 = 730mg = 7.2 squares, rounded down to 7",
+              "Dose = 730mg; 730/100 = 7.3 → 7 squares",
+              "73kg × 10 = 730mg → 7 whole squares"
+            ]
+          },
+          {
+            "label": "Bella",
+            "expected_answer": 4.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 39kg x 10mg = 390mg = 3.9 squares = 4 squares",
+            "tolerance": 0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "39kg x 10mg/kg = 390mg; 390mg ÷ 100mg per square = 3.9 squares = 4 squares",
+              "39 x 10 = 390mg = 3.9 squares, rounded up to 4",
+              "Dose = 390mg; 390/100 = 3.9 → 4 squares",
+              "39kg × 10 = 390mg → 4 whole squares"
+            ]
+          },
+          {
+            "label": "[PERSON_NAME]",
+            "expected_answer": 2.0,
+            "answer_source": "RUBRIC_EXPLICIT",
+            "source_evidence": "[PERSON_NAME] = 23kg x 10mg = 230mg = 2.3 squares = 2 squares",
+            "tolerance": 0,
+            "unit": "squares",
+            "working_mark": 0.5,
+            "answer_mark": 1.0,
+            "acceptable_working_forms": [
+              "23kg x 10mg/kg = 230mg; 230mg ÷ 100mg per square = 2.3 squares = 2 squares",
+              "23 x 10 = 230mg = 2.3 squares, rounded down to 2",
+              "Dose = 230mg; 230/100 = 2.3 → 2 squares",
+              "23kg × 10 = 230mg → 2 whole squares"
+            ]
+          }
+        ],
+        "_usage": {
+          "prompt_tokens": 2988,
+          "completion_tokens": 1047,
+          "total_tokens": 4035,
+          "cost": 0.024669,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.024669,
+            "upstream_inference_prompt_cost": 0.008964,
+            "upstream_inference_completions_cost": 0.015705
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    }
+  },
+  "22": {
+    "Gemini": {
+      "spec": {
+        "question_type": "OPEN_ENDED",
+        "max_score": 6.0,
+        "scoring_structure": "BRANCHED",
+        "branches": [
+          {
+            "id": "STOCK",
+            "condition": "Student decides to stock the product",
+            "max_score": 6.0,
+            "criteria": [
+              "This is a product that is ok to stock in community pharmacies",
+              "It is approved by the TGA",
+              "It is listed on the register of therapeutic goods",
+              "There is some scientific evidence for its effectiveness",
+              "There is a pharmacological rationale explained for its effectiveness",
+              "Safety risk is minimal",
+              "This is because it is already used in oral form by many people OR topical forms are unlikely to pose a safety risk",
+              "Any other reasonable point regarding safety or efficacy"
+            ],
+            "position_linked_criterion": 1
+          },
+          {
+            "id": "NOT_STOCK",
+            "condition": "Student decides not to stock the product",
+            "max_score": 3.0,
+            "criteria": [
+              "The evidence is only based on a limited number of patients",
+              "No evidence is provided for safety",
+              "Any other reasonable point regarding lack of safety or efficacy"
+            ],
+            "position_linked_criterion": null
+          }
+        ],
+        "calibration_notes": "The rubric allows for flexibility in phrasing; students do not need to use the exact terminology provided, provided the underlying concept is clear. For the 'STOCK' branch, the criteria regarding TGA approval and registration are factual checks, while the pharmacological rationale and safety points should be assessed for logical consistency with the provided case study. For the 'NOT_STOCK' branch, markers should accept any well-reasoned argument that identifies gaps in the evidence base or safety profile, even if the student uses different terminology than the rubric.",
+        "_usage": {
+          "prompt_tokens": 2975,
+          "completion_tokens": 430,
+          "total_tokens": 3405,
+          "cost": 0.00138875,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00138875,
+            "upstream_inference_prompt_cost": 0.00074375,
+            "upstream_inference_completions_cost": 0.000645
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    },
+    "Claude": {
+      "spec": {
+        "question_type": "OPEN_ENDED",
+        "max_score": 6.0,
+        "scoring_structure": "BRANCHED",
+        "branches": [
+          {
+            "id": "B1",
+            "condition": "Student chooses TO stock the product",
+            "max_score": 6.0,
+            "criteria": [
+              "This is a product that is ok to stock in community pharmacies",
+              "It is approved by the TGA",
+              "It is listed on the register of therapeutic goods",
+              "There is some scientific evidence for its effectiveness",
+              "There is a pharmacological rationale explained for its effectiveness",
+              "Safety risk is minimal",
+              "This is because it is already used in oral form by many people OR topical forms are unlikely to pose a safety risk",
+              "Any other reasonable point regarding safety or efficacy"
+            ],
+            "position_linked_criterion": 1
+          },
+          {
+            "id": "B2",
+            "condition": "Student chooses NOT to stock the product",
+            "max_score": 3.0,
+            "criteria": [
+              "The evidence is only based on a limited number of patients",
+              "No evidence is provided for safety",
+              "Any other reasonable point regarding lack of safety or efficacy"
+            ],
+            "position_linked_criterion": null
+          }
+        ],
+        "calibration_notes": "For B1, criterion 2 (TGA approval) and criterion 3 (ARTG listing) are distinct points even though both relate to regulatory status — award each separately if the student mentions both. Criterion 5 (pharmacological rationale) requires the student to actually explain a mechanism, such as the role of PGD2 inhibition or cetirizine's anti-inflammatory action on hair follicles; merely saying 'it has a scientific basis' is insufficient and should be credited under criterion 4 instead. Criteria 6 and 7 are separate: criterion 6 is the general claim that safety risk is minimal, while criterion 7 requires a specific supporting reason (oral use precedent or low systemic absorption from topical application); a student must provide the reason to earn criterion 7, not just restate that it is safe. For B2, criterion 1 (limited patient numbers) is met by any reference to the small sample sizes (30 or 67 patients) or the preliminary/pilot nature of the studies; criterion 2 (no safety evidence) requires the student to note an absence of safety data, not merely that the product could be unsafe.",
+        "_usage": {
+          "prompt_tokens": 3169,
+          "completion_tokens": 604,
+          "total_tokens": 3773,
+          "cost": 0.018567,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.018567,
+            "upstream_inference_prompt_cost": 0.009507,
+            "upstream_inference_completions_cost": 0.00906
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        }
+      },
+      "is_valid": true,
+      "issues": [],
+      "review_flags": []
+    }
+  }
+}

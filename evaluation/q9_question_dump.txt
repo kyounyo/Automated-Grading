@@ -1,0 +1,7 @@
+You are working in a community pharmacy. You have a patient, Melissa, who comes in complaining of an itchy bottom. She says her whole family have the same symptoms. You assess that they have threadworm by completing a thorough history-taking, and recommend Melissa and her family use pyrantel chocolate squares to treat their threadworm. The patient asks for your help dosing herself, and her family. 
+Melissa: 30 years old and weighs 64kg
+Tony, Melissa’s husband: 32 years old and weighs 73kg
+Bella, their first child: 12 years old, weighs 39kg
+Bobby, their youngest child: 7 years old, weighs 23kg
+Instructions: Using the information provided to you above, calculate how many chocolate squares each member of the family will require for their first dose. 
+Please include in your answer your calculations of the doses, and provide practical advice to Melissa about how she should administer the pyrantel chocolate squares (i.e. consider whether or not it is practical or necessary for Melissa to have to cut the chocolate squares into small chunks). 
