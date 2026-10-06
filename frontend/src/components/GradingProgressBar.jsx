@@ -50,9 +50,9 @@ const GradingProgressBar = ({ submissions = [], isGrading = false }) => {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-        <Loader2 size={16} color="#2563EB" style={{ animation: 'spin 1s linear infinite' }} />
+        <Loader2 size={16} color="#2563EB" className="spin" />
         <span style={{ fontWeight: 700, fontSize: '0.82rem', color: '#1D4ED8' }}>
-          AI Grading in Progress…
+          Grading Submissions…
         </span>
       </div>
 

@@ -324,10 +324,15 @@ GRADING PROTOCOL (v1.4-main-questions-integer-rubric):
 4. STRICT CAPPING: Do not exceed maximum points allocated per question. Sum of points awarded across all questions MUST NOT exceed {total_max_score}.
 5. ZERO MARK RULE: If a student answer for a question is blank, empty, dash ('-'), 'N/A', or missing, award EXACTLY 0 marks for that question. Do NOT award partial credit for empty or missing answers.
 6. REASONING FIRST: Analyze student response against each criterion step-by-step before finalizing score.
-7. MANDATORY PER-QUESTION HIGHLIGHTS: You MUST generate at least one highlight entry for EVERY question in the student submission (e.g., Q6, Q8). Highlight exact quotes from the student's text for each question.
+7. MANDATORY MULTI-POINT HIGHLIGHT EVIDENCE (CRITICAL):
+   - For EVERY question where marks are awarded, you MUST highlight EACH distinct sentence or clause in the student's response that earned marks.
+   - DO NOT lump all marks into a single sentence quote if the question tests multiple points or if the student's answer has multiple parts!
+   - For example, if Q6 earns 5 marks across two points (part a: 3 marks, part b: 2 marks), you MUST output TWO separate highlight entries (one for the part a sentence earning 3.0, and one for the part b sentence earning 2.0).
+   - If a question earns 6 marks across 3 criteria, highlight all 3 corresponding sentences with their respective scores (+2.0, +2.0, +2.0).
+   - The SUM of score_awarded across all highlights for any question MUST EXACTLY EQUAL that question's total score_awarded!
 8. DETAILED EXPLANATION REQUIREMENT: Each highlight comment MUST state:
-   (a) Exact marks awarded and key concepts matched (e.g. 'Awarded 1 mark for mentioning prolonged therapeutic effect').
-   (b) Specific rubric points missed or failed (e.g. 'Failed to address specific advantages (biodegradability) and disadvantages required by rubric').
+   (a) Exact marks awarded and key concepts matched.
+   (b) Specific rubric points missed or failed.
 9. QUESTION-MATCHED EXAMINER CALIBRATION: If Examiner Calibration Benchmarks are provided above for a question, you MUST align your marking strictness and partial-credit thresholds strictly to match the examiner's demonstrated standard for that specific question. Questions without calibration examples must be evaluated directly from the standard rubric rules.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
@@ -355,20 +360,36 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
   }},
   "highlights": [
     {{
-      "text": "Exact text quote copied verbatim from student submission for Q6",
+      "text": "Exact sentence quote from student answering part (a)",
       "question_number": "Q6",
       "score_awarded": 3.0,
       "max_score": 10.0,
       "type": "strength",
-      "comment": "Awarded marks for mentioning prolonged therapeutic effect in Q6."
+      "comment": "Awarded 3 marks for duration and biodegradability in Q6(a)."
     }},
     {{
-      "text": "Exact text quote copied verbatim from student submission for Q8",
+      "text": "Exact sentence quote from student answering part (b)",
+      "question_number": "Q6",
+      "score_awarded": 2.0,
+      "max_score": 10.0,
+      "type": "strength",
+      "comment": "Awarded 2 marks for describing sol-to-gel transition in Q6(b)."
+    }},
+    {{
+      "text": "Exact sentence quote from student answering part (a)",
       "question_number": "Q8",
       "score_awarded": 2.0,
       "max_score": 10.0,
       "type": "strength",
-      "comment": "Correctly identified that lyophilization is not the only option in Q8."
+      "comment": "Awarded 2 marks for correctly disagreeing with lyophilization requirement."
+    }},
+    {{
+      "text": "Exact sentence quote from student answering part (b)",
+      "question_number": "Q8",
+      "score_awarded": 2.0,
+      "max_score": 10.0,
+      "type": "strength",
+      "comment": "Awarded 2 marks for correctly identifying formulation complexity."
     }}
   ]
 }}
@@ -417,7 +438,7 @@ Review the Primary Grader's score, reasoning, and per-question breakdown against
 AUDIT & RECONCILIATION TASKS:
 1. Re-evaluate student text independently for EACH MAIN QUESTION matching the rubric (e.g. Q6, Q8). Align with Examiner Calibration Benchmarks if provided.
 2. Follow rubric marking increments strictly: if rubric uses whole marks (e.g. 1 mark per point), do NOT award 0.5 marks.
-3. Provide your independent score for EVERY MAIN QUESTION in "auditor_breakdown" (e.g. Q6, Q8).
+3. Provide your independent score and detailed justification/reasoning for EVERY MAIN QUESTION in "auditor_breakdown" (e.g. Q6, Q8). Explain what concepts were correct, missing, or why marks were adjusted against the rubric.
 4. Compare your evaluation with the Primary Grader question by question:
    - If Grader's score is accurate and well-supported: set "recommendation" to "AGREEMENT" and "reconciled_score" = primary score.
    - If Grader made an error (over-awarded / overlooked concepts): set "recommendation" to "ADOPT_AUDITOR" and "reconciled_score" = auditor score.
@@ -439,12 +460,14 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     {{
       "question_number": "Q6",
       "auditor_score": 5.0,
-      "max_score": 10.0
+      "max_score": 10.0,
+      "reasoning": "Awarded 3 marks for biodegradability and 2 marks for in situ gelling attributes; deducted for missing clinical benefit comparison."
     }},
     {{
       "question_number": "Q8",
       "auditor_score": 9.0,
-      "max_score": 10.0
+      "max_score": 10.0,
+      "reasoning": "Correctly evaluated statements (a) through (d); minor discrepancy on statement (e)."
     }}
   ],
   "conflicting_questions": [],
@@ -753,6 +776,9 @@ def call_llm_for_grading(
                         p_item["score_awarded"] = float(a_sc)
                         if not p_item.get("reasoning") or "No response evaluated" in str(p_item.get("reasoning", "")):
                             p_item["reasoning"] = a_candidate.get("reasoning", p_item.get("reasoning", ""))
+        
+        # Re-synchronize highlight scores with reconciled breakdown scores
+        _enrich_highlights_with_question_info(primary_res, student_text)
 
     print(f" │   └─ [Reconciliation Complete] Final Status: {primary_res['status'].upper()} | Final Score: {primary_res['overall_score']}/{total_max_score} | Confidence: {primary_res['confidence_score']*100:.1f}%", flush=True)
 
@@ -925,22 +951,97 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
             if m_q:
                 q_pos = m_q.start()
 
+        extracted_sentences = []
         if q_pos != -1:
-            snippet = student_text[q_pos:q_pos + 120].strip()
-        else:
-            snippet = student_text[:120].strip() if student_text else f"Answer section for {b_q}"
+            # Look ahead up to 500 characters for the answer body
+            section_chunk = student_text[q_pos:q_pos + 600]
+            # Strip off the question header (e.g. "Question 6: ")
+            body_match = re.search(r'(?:Question|Q|Problem)\s*[A-Za-z0-9_()]+:?\s*([\s\S]*)', section_chunk, re.IGNORECASE)
+            raw_body = body_match.group(1) if body_match else section_chunk
+            # Split into sentences
+            all_s = [s.strip() for s in re.split(r'(?<=[.?!])\s+', raw_body) if len(s.strip()) > 8]
+            # Next question boundary check
+            cleaned_s = []
+            for s in all_s:
+                if re.match(r'^(?:Question|Q|Problem)\s+[A-Za-z0-9_()]+', s, re.IGNORECASE):
+                    break
+                cleaned_s.append(s)
+            extracted_sentences = cleaned_s
 
-        new_hl = {
-            "text": snippet,
-            "question_number": b_q,
-            "score_awarded": score_aw,
-            "max_score": max_sc,
-            "type": "strength" if score_aw > 0 else "weakness",
-            "comment": f"Evaluated for {b_q} ({score_aw}/{max_sc} marks). Reasoning: {reasoning}",
-            "location_in_raw_text": f"Question {b_q} Section"
-        }
-        highlights.append(new_hl)
-        existing_q_nums.add(b_q)
+        if not extracted_sentences:
+            extracted_sentences = [f"Response section for {b_q}"]
+
+        num_to_take = min(len(extracted_sentences), max(1, min(3, int(round(score_aw)))))
+        for s_idx in range(num_to_take):
+            snippet = extracted_sentences[s_idx]
+            new_hl = {
+                "text": snippet,
+                "question_number": b_q,
+                "score_awarded": 1.0 if score_aw > 0 else 0.0,
+                "max_score": max_sc,
+                "type": "strength" if score_aw > 0 else "weakness",
+                "comment": f"Evaluated for {b_q}. Reasoning: {reasoning}",
+                "location_in_raw_text": f"Question {b_q} Section"
+            }
+            highlights.append(new_hl)
+    # Ensure highlight scores strictly align with each question's score_awarded
+    for b in breakdown:
+        if not isinstance(b, dict):
+            continue
+        b_q = b.get("question_number", "")
+        if not b_q:
+            continue
+        target_score = float(b.get("score_awarded", 0.0) or 0.0)
+
+        clean_bq = re.sub(r'[^a-zA-Z0-9]', '', b_q).upper()
+        q_hls = [
+            h for h in highlights
+            if isinstance(h, dict) and re.sub(r'[^a-zA-Z0-9]', '', str(h.get("question_number", ""))).upper() == clean_bq
+        ]
+
+        if not q_hls:
+            continue
+
+        positive_hls = [h for h in q_hls if h.get("type") == "strength" or float(h.get("score_awarded", 0.0) or 0.0) > 0]
+        if not positive_hls:
+            positive_hls = q_hls
+
+        current_sum = sum(float(h.get("score_awarded", 0.0) or 0.0) for h in positive_hls)
+
+        if target_score == 0:
+            for h in q_hls:
+                h["score_awarded"] = 0.0
+                h["type"] = "weakness"
+        elif abs(current_sum - target_score) > 0.05:
+            # Rebalance scores cleanly into integer or standard half-mark increments
+            if len(positive_hls) == 1:
+                clean_target = int(target_score) if target_score.is_integer() else target_score
+                positive_hls[0]["score_awarded"] = clean_target
+                positive_hls[0]["type"] = "strength"
+            else:
+                is_fractional = (target_score % 1) != 0
+                step = 0.5 if is_fractional else 1.0
+                total_units = int(round(target_score / step))
+                total_weight = sum(float(h.get("score_awarded", 0.0) or 1.0) for h in positive_hls)
+
+                allocated_units = []
+                remainders = []
+                for h in positive_hls:
+                    w = float(h.get("score_awarded", 0.0) or 1.0)
+                    exact = (w / (total_weight if total_weight > 0 else len(positive_hls))) * total_units
+                    base = int(exact)
+                    allocated_units.append(base)
+                    remainders.append(exact - base)
+
+                remaining_units = total_units - sum(allocated_units)
+                sorted_indices = sorted(range(len(positive_hls)), key=lambda i: remainders[i], reverse=True)
+                for i in range(min(remaining_units, len(positive_hls))):
+                    allocated_units[sorted_indices[i]] += 1
+
+                for idx, h in enumerate(positive_hls):
+                    final_score = allocated_units[idx] * step
+                    h["score_awarded"] = int(final_score) if (isinstance(final_score, float) and final_score.is_integer()) else final_score
+                    h["type"] = "strength" if final_score > 0 else "weakness"
 
     primary_res["highlights"] = highlights
 

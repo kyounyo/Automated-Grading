@@ -154,19 +154,20 @@ const SubmissionsList = () => {
         <span
           className="status-badge"
           style={{
-            backgroundColor: 'rgba(59, 130, 246, 0.12)',
-            color: '#1d4ed8',
-            padding: '0.35rem 0.75rem',
-            borderRadius: '6px',
+            backgroundColor: 'rgba(59, 130, 246, 0.08)',
+            color: '#2563eb',
+            padding: '0.2rem 0.55rem',
+            borderRadius: '4px',
             display: 'inline-flex',
             alignItems: 'center',
             fontWeight: 600,
-            fontSize: '0.825rem',
-            border: '1px solid rgba(59, 130, 246, 0.35)'
+            fontSize: '0.75rem',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            gap: '0.35rem'
           }}
         >
-          <Loader2 size={15} className="spin" style={{ marginRight: '6px', flexShrink: 0, color: '#2563eb' }} />
-          AI Grading in progress...
+          <Loader2 size={12} className="spin" style={{ color: '#2563eb', flexShrink: 0 }} />
+          Grading
         </span>
       );
     }
@@ -408,27 +409,8 @@ const SubmissionsList = () => {
                     }}
                   >
                     <td style={{ padding: '1.2rem 1.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                          {formatStudentName(sub.student_name, sub.student_id, sub.student_email)}
-                        </div>
-                        {isGrading && (
-                          <span
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '0.75rem',
-                              padding: '0.15rem 0.5rem',
-                              borderRadius: '12px',
-                              backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                              color: '#1d4ed8',
-                              fontWeight: 600
-                            }}
-                          >
-                            <Loader2 size={12} className="spin" /> Grading AI...
-                          </span>
-                        )}
+                      <div style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                        {formatStudentName(sub.student_name, sub.student_id, sub.student_email)}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.15rem' }}>
                         <span>ID: <strong>{sub.student_id}</strong></span>
@@ -439,8 +421,8 @@ const SubmissionsList = () => {
                     <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-main)', fontSize: '0.9rem' }}>{sub.file_name}</td>
                     <td style={{ padding: '1.2rem 1.5rem', fontWeight: 600 }}>
                       {isGrading ? (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#2563eb', fontSize: '0.85rem', fontStyle: 'italic' }}>
-                          <Loader2 size={13} className="spin" /> Evaluating...
+                        <span style={{ color: 'var(--text-dim)', fontWeight: 500 }}>
+                          — <span style={{ color: 'var(--text-dim)', fontSize: '0.875rem' }}>/ {getSubmissionMaxScore(sub)}</span>
                         </span>
                       ) : sub.score != null ? (
                         <span>{sub.score} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.875rem' }}>/ {getSubmissionMaxScore(sub)}</span></span>
@@ -456,19 +438,16 @@ const SubmissionsList = () => {
                             className="btn"
                             disabled
                             style={{
-                              padding: '0.4rem 0.85rem',
+                              padding: '0.4rem 0.8rem',
                               fontSize: '0.85rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem',
-                              backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                              color: '#1d4ed8',
-                              border: '1px solid rgba(59, 130, 246, 0.3)',
-                              cursor: 'wait',
-                              fontWeight: 600
+                              opacity: 0.55,
+                              cursor: 'not-allowed',
+                              color: 'var(--text-muted)',
+                              backgroundColor: 'transparent',
+                              border: '1px solid var(--border)'
                             }}
                           >
-                            <Loader2 size={14} className="spin" /> AI Running...
+                            Grading...
                           </button>
                         ) : (sub.status === 'pending' || sub.status === 'uploaded') ? (
                           <button

@@ -13,7 +13,7 @@ const TOLERANCE_STEPS = [
 
 const BulkUpload = () => {
   const navigate = useNavigate();
-  const { assignments, currentAssignmentId, setCurrentAssignmentId, currentAssignment, loadSubmissions, loadAssignments, submissions, handleUpdateAssignment, isAssignmentCreationPending, setIsAssignmentCreationPending } = useAssignment();
+  const { assignments, currentAssignmentId, setCurrentAssignmentId, currentAssignment, loadSubmissions, loadAssignments, submissions, handleUpdateAssignment } = useAssignment();
 
   const [toleranceVal, setToleranceVal] = useState(0.10);
   const [savingTolerance, setSavingTolerance] = useState(false);
@@ -240,50 +240,6 @@ const BulkUpload = () => {
         </div>
       </div>
 
-      {/* Alert if lecturer navigated from Create Assignment without clicking create */}
-      {isAssignmentCreationPending && (
-        <div style={{
-          padding: '0.85rem 1.15rem',
-          backgroundColor: '#FEF2F2',
-          border: '1px solid #FCA5A5',
-          borderRadius: '8px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.75rem'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <AlertTriangle size={20} color="#DC2626" style={{ flexShrink: 0 }} />
-            <div>
-              <strong style={{ color: '#991B1B', fontSize: '0.875rem' }}>
-                Step 1 Incomplete: No new assignment was created.
-              </strong>
-              <p style={{ margin: 0, fontSize: '0.775rem', color: '#B91C1C', lineHeight: 1.45 }}>
-                You opened "Create Assignment" but navigated to Submissions Upload without clicking the create button. Any files uploaded here will attach to <strong>"{selectedAssignment?.title || 'the current assignment'}"</strong>.
-              </p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setIsAssignmentCreationPending(false)}
-              style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', borderColor: '#FCA5A5', color: '#991B1B', backgroundColor: '#fff' }}
-            >
-              Use Current Assignment
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => navigate('/create-assignment')}
-              style={{ fontSize: '0.75rem', padding: '0.35rem 0.85rem', backgroundColor: '#DC2626', border: 'none', color: '#fff', fontWeight: 600 }}
-            >
-              Go Back to Step 1 & Create →
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 2. SIDE-BY-SIDE SECTION: Step 1 (Target Assignment) + Step 2 (Upload Student Submissions) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '1.25rem', alignItems: 'stretch' }}>

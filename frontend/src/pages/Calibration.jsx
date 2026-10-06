@@ -64,6 +64,7 @@ const Calibration = () => {
   const [calCardState, setCalCardState] = useState({});
   const [expandedAnswers, setExpandedAnswers] = useState({});
   const [savingAllCal, setSavingAllCal] = useState(false);
+  const [savedSampleIds, setSavedSampleIds] = useState(new Set());
 
   // Upload & Smart Preview State
   const [importFile, setImportFile] = useState(null);
@@ -340,18 +341,16 @@ const Calibration = () => {
         anchor_type: anchor
       });
 
-      updateCalCard(qKey, { saving: false, saveSuccess: true });
+      // Persistently retain saved state so user knows the AI received it
+      updateCalCard(qKey, { saving: false, saveSuccess: true, saveError: null });
       await loadStatus();
-      setTimeout(() => {
-        updateCalCard(qKey, { saveSuccess: false });
-      }, 4000);
     } catch (err) {
-      updateCalCard(qKey, { saving: false, saveError: err.message });
+      updateCalCard(qKey, { saving: false, saveError: err.message, saveSuccess: false });
       alert(`Could not save exemplar for ${qKey}: ${err.message}`);
     }
   };
 
-  // Save all marks for the current calibration sample paper
+  // 1-Click: Save all marks AND automatically register all question exemplars for this calibration sample paper!
   const handleSaveAllCalibrationMarks = async () => {
     if (!activeSample || !currentAssignmentId) return;
     try {
@@ -372,6 +371,7 @@ const Calibration = () => {
       const totalCalculated = updatedBreakdown.reduce((sum, item) => sum + (parseFloat(item.score_awarded) || 0), 0);
       const roundedTotal = Math.round(totalCalculated * 10) / 10;
 
+      // 1. Save confirmed paper marks in database
       await handleScoreOverride(
         activeSample.id,
         roundedTotal,
@@ -379,10 +379,45 @@ const Calibration = () => {
         updatedBreakdown
       );
 
+      // 2. Automatically register/update EVERY question as a calibration exemplar in 1 click
+      let registeredCount = 0;
+      for (let idx = 0; idx < effectiveQuestions.length; idx++) {
+        const q = effectiveQuestions[idx];
+        const qKey = q.question_number || `Q${idx + 1}`;
+        const card = calCardState[qKey] || {};
+        const studentText = (card.studentText || '').trim();
+        const scoreVal = card.score != null ? parseFloat(card.score) : (q.score_awarded ?? 0);
+        const maxSc = q.max_score || 10;
+        const feedbackText = (card.feedback || '').trim();
+        const anchor = (scoreVal >= maxSc * 0.8) ? 'full_credit' : (scoreVal <= maxSc * 0.3) ? 'common_error' : 'partial_credit';
+
+        if (studentText) {
+          try {
+            await saveCalibrationExample(currentAssignmentId, {
+              submission_id: activeSample.id,
+              question_number: qKey,
+              student_text: studentText,
+              examiner_score: scoreVal,
+              max_score: maxSc,
+              examiner_feedback: feedbackText || `Exemplar baseline for ${qKey}`,
+              anchor_type: anchor
+            });
+            registeredCount++;
+            updateCalCard(qKey, { saveSuccess: true, saveError: null });
+          } catch (exErr) {
+            console.warn(`Could not auto-register exemplar for ${qKey}:`, exErr);
+          }
+        }
+      }
+
+      // 3. Mark current sample paper as fully saved & calibrated
+      setSavedSampleIds(prev => new Set([...prev, activeSample.id]));
+
+      // 4. Synchronize status & submissions
+      await loadStatus();
       if (loadSubmissions) {
         await loadSubmissions(currentAssignmentId, true);
       }
-      alert(`Sample paper marks saved successfully! Total score: ${roundedTotal} pts.`);
     } catch (err) {
       alert(`Could not save paper marks: ${err.message}`);
     } finally {
@@ -515,6 +550,37 @@ const Calibration = () => {
     return Object.values(calCardState).reduce((acc, v) => acc + (parseFloat(v?.score) || 0), 0);
   }, [calCardState]);
 
+  // Lookup map of saved calibration examples keyed by `${submission_id}_${question_number}`
+  const savedExemplarsMap = useMemo(() => {
+    if (!calStatus?.questions) return {};
+    const map = {};
+    for (const q of calStatus.questions) {
+      const qClean = (q.question_number || '').trim().toUpperCase();
+      if (q.examples && Array.isArray(q.examples)) {
+        for (const ex of q.examples) {
+          if (ex.submission_id) {
+            map[`${ex.submission_id}_${qClean}`] = ex;
+          }
+        }
+      }
+    }
+    return map;
+  }, [calStatus]);
+
+  // Determines whether the currently active sample paper has all marks & exemplars registered
+  const isPaperFullySaved = useMemo(() => {
+    if (!activeSample) return false;
+    if (savedSampleIds.has(activeSample.id)) return true;
+    if (activeSample.score != null || activeSample.status === 'graded' || activeSample.status === 'approved') return true;
+    if (effectiveQuestions.length > 0 && effectiveQuestions.every(q => {
+      const qClean = (q.question_number || '').trim().toUpperCase();
+      return Boolean(savedExemplarsMap[`${activeSample.id}_${qClean}`]);
+    })) {
+      return true;
+    }
+    return false;
+  }, [activeSample, savedSampleIds, effectiveQuestions, savedExemplarsMap]);
+
   if (!currentAssignmentId) {
     return (
       <div style={{ maxWidth: 640, margin: '4rem auto', textAlign: 'center' }}>
@@ -568,26 +634,6 @@ const Calibration = () => {
         </div>
       )}
 
-      {/* ── Status summary ── */}
-      {!loading && (
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          {[
-            { label: 'Calibration examples', value: calibrated, total: targetSamples, color: isReady ? '#16A34A' : 'var(--primary)' },
-            { label: 'Sample papers set aside', value: calSamples.length, color: 'var(--primary)' },
-            { label: 'Sample papers marked', value: gradedCalSamples.length, color: '#D97706' },
-          ].map((s, i) => (
-            <div key={i} style={{
-              flex: '1 1 150px', padding: '0.85rem 1.1rem',
-              backgroundColor: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px'
-            }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: s.color, lineHeight: 1 }}>
-                {s.value}{s.total ? <span style={{ fontSize: '0.95rem', color: 'var(--text-muted)', fontWeight: 600 }}>/{s.total}</span> : ''}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', fontWeight: 600 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {loading && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '2rem', color: 'var(--text-muted)' }}>
@@ -940,17 +986,40 @@ const Calibration = () => {
                   </div>
                 </div>
 
+                {/* 1-Click Calibration Tip */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.65rem 0.95rem',
+                  backgroundColor: '#F0FDF4',
+                  border: '1px solid #BBF7D0',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  color: '#166534',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Sparkles size={15} style={{ flexShrink: 0, color: '#16A34A' }} />
+                    <span>
+                      <strong>1-Click Quick Calibration:</strong> Adjust marks per question below, then click <strong>"Save All Marks & Register Exemplars"</strong> at the bottom to register all questions at once.
+                    </span>
+                  </div>
+                </div>
+
                 {/* Questions List */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   {effectiveQuestions.map((q, idx) => {
                     const qKey = q.question_number || `Q${idx + 1}`;
+                    const cleanQKey = qKey.trim().toUpperCase();
                     const card = calCardState[qKey] || {};
                     const currentScoreVal = card.score != null ? card.score : (q.score_awarded ?? q.max_score);
                     const maxSc = q.max_score || 10;
                     const isExpanded = Boolean(expandedAnswers[qKey]);
 
-                    const qStatusObj = calStatus?.questions?.find(qs => qs.question_number.toUpperCase() === qKey.toUpperCase());
+                    const qStatusObj = calStatus?.questions?.find(qs => qs.question_number.toUpperCase() === cleanQKey);
                     const isQuestionCalibrated = (qStatusObj?.sample_count || 0) > 0;
+                    const isExemplarSaved = Boolean(savedExemplarsMap[`${activeSample?.id}_${cleanQKey}`]) || Boolean(card.saveSuccess);
 
                     return (
                       <div
@@ -959,7 +1028,7 @@ const Calibration = () => {
                           padding: '1.1rem',
                           borderRadius: '8px',
                           backgroundColor: 'var(--bg-main)',
-                          border: card.saveSuccess ? '1.5px solid #10b981' : isQuestionCalibrated ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid var(--border)',
+                          border: isExemplarSaved ? '1.5px solid #10b981' : isQuestionCalibrated ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid var(--border)',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '0.75rem',
@@ -982,7 +1051,23 @@ const Calibration = () => {
                             <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                               Max: {maxSc} pts
                             </span>
-                            {isQuestionCalibrated && (
+                            {isExemplarSaved && (
+                              <span style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 700,
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                backgroundColor: '#ECFDF5',
+                                color: '#059669',
+                                border: '1px solid #A7F3D0',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}>
+                                <Check size={11} /> Saved for this student
+                              </span>
+                            )}
+                            {isQuestionCalibrated && !isExemplarSaved && (
                               <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '4px', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#059669', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
                                 ✓ {qStatusObj.sample_count} Exemplar{qStatusObj.sample_count === 1 ? '' : 's'} (v{qStatusObj.version})
                               </span>
@@ -1149,23 +1234,37 @@ const Calibration = () => {
                         </div>
 
                         {/* Action Button: Save Exemplar */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <div>
-                            {card.saveSuccess && (
-                              <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                <Check size={14} /> Exemplar Saved Successfully!
+                            {isExemplarSaved ? (
+                              <span style={{
+                                fontSize: '0.75rem',
+                                color: '#059669',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                backgroundColor: '#ECFDF5',
+                                padding: '0.2rem 0.55rem',
+                                borderRadius: '4px',
+                                border: '1px solid #A7F3D0'
+                              }}>
+                                <Check size={13} /> Active in AI Calibration ({currentScoreVal}/{maxSc} pts)
                               </span>
-                            )}
-                            {card.saveError && (
+                            ) : card.saveError ? (
                               <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600 }}>
                                 ⚠️ {card.saveError}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>
+                                Ready to register with score {currentScoreVal}/{maxSc} pts
                               </span>
                             )}
                           </div>
 
                           <button
                             type="button"
-                            className="btn btn-primary"
+                            className="btn"
                             onClick={() => handleSaveExemplar(qKey, q)}
                             disabled={card.saving}
                             style={{
@@ -1174,19 +1273,23 @@ const Calibration = () => {
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.35rem',
-                              backgroundColor: card.saveSuccess ? '#059669' : '#4f46e5',
-                              borderColor: card.saveSuccess ? '#059669' : '#4f46e5',
-                              fontWeight: 600
+                              backgroundColor: isExemplarSaved ? '#059669' : '#4f46e5',
+                              borderColor: isExemplarSaved ? '#059669' : '#4f46e5',
+                              color: '#ffffff',
+                              fontWeight: 600,
+                              borderRadius: '6px',
+                              cursor: 'pointer'
                             }}
+                            title="Click to update or re-save this question exemplar"
                           >
                             {card.saving ? (
                               <Loader2 size={13} className="spin" />
-                            ) : card.saveSuccess ? (
+                            ) : isExemplarSaved ? (
                               <Check size={13} />
                             ) : (
                               <Target size={13} />
                             )}
-                            {card.saveSuccess ? 'Update Exemplar' : 'Save as Calibration Exemplar'}
+                            {card.saving ? 'Saving...' : isExemplarSaved ? '✓ Exemplar Saved' : 'Save as Calibration Exemplar'}
                           </button>
                         </div>
                       </div>
@@ -1217,13 +1320,39 @@ const Calibration = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn"
                       onClick={handleSaveAllCalibrationMarks}
                       disabled={savingAllCal}
-                      style={{ fontSize: '0.825rem', padding: '0.45rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                      style={{
+                        fontSize: '0.825rem',
+                        padding: '0.45rem 1.15rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        backgroundColor: isPaperFullySaved ? '#059669' : '#4f46e5',
+                        borderColor: isPaperFullySaved ? '#059669' : '#4f46e5',
+                        color: '#ffffff',
+                        fontWeight: 600,
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
                     >
-                      {savingAllCal ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
-                      Save Marks for this Student
+                      {savingAllCal ? (
+                        <>
+                          <Loader2 size={14} className="spin" />
+                          <span>Saving All Marks & Registering Exemplars...</span>
+                        </>
+                      ) : isPaperFullySaved ? (
+                        <>
+                          <CheckCircle2 size={14} />
+                          <span>✓ All Marks & Exemplars Saved ({Math.round(calculatedStudioTotal * 10) / 10}/{totalMaxScore} pts)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={14} />
+                          <span>Save All Marks & Register Exemplars</span>
+                        </>
+                      )}
                     </button>
 
                     {nextCalSample && (
@@ -1684,29 +1813,37 @@ const Calibration = () => {
 
 
       {/* ── STEP 3: READY TO GRADE WHOLE CLASS ── */}
-      <Card style={{ backgroundColor: isReady ? 'var(--primary-light)' : 'var(--surface)', borderColor: isReady ? 'var(--border)' : 'var(--border)' }}>
+      <Card style={{ backgroundColor: calibrated > 0 ? 'var(--primary-light)' : 'var(--surface)', borderColor: 'var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--secondary)' }}>
-              {isReady ? '🚀 Ready to grade the whole class' : '⏳ Grade when you\'re ready'}
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              {calibrated > 0 ? (
+                <>
+                  <CheckCircle2 size={18} color="#16A34A" />
+                  <span>🚀 AI Calibration Active ({calibrated} exemplar{calibrated !== 1 ? 's' : ''} saved)</span>
+                </>
+              ) : (
+                <>
+                  <Target size={18} color="var(--primary)" />
+                  <span>🎯 Ready to grade</span>
+                </>
+              )}
             </div>
-            <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-              {isReady
-                ? 'The AI will use your examples to grade every paper in the same style you would.'
-                : 'You can also grade now without calibration — the AI will follow the rubric as written.'}
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {calibrated > 0
+                ? `The AI will use your ${calibrated} calibration exemplar${calibrated !== 1 ? 's' : ''} to guide grading across all student submissions in your exact marking style.`
+                : 'Complete your calibration benchmarks above to calibrate AI grading to your standards, or proceed directly to grading.'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-            {!isReady && (
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => navigate('/submissions')}
-                style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
-              >
-                Go to Submissions
-              </button>
-            )}
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => navigate('/submissions')}
+              style={{ fontSize: '0.85rem', padding: '0.5rem 1rem' }}
+            >
+              View Submissions
+            </button>
             <button
               type="button"
               className="btn btn-primary"
@@ -1721,7 +1858,7 @@ const Calibration = () => {
               ) : (
                 <>
                   <Sparkles size={15} />
-                  {isReady ? 'Go to Submissions & Grade' : 'Grade Whole Class'}
+                  <span>{calibrated > 0 ? 'Go to Submissions & Grade with Calibration' : 'Grade Whole Class'}</span>
                 </>
               )}
             </button>

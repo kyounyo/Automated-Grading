@@ -15,10 +15,17 @@ import {
   Edit3,
   Award,
   ShieldAlert,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Scale,
+  Bot
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { fetchSubmissionDetail } from '../api/client';
+
+const EMPTY_ARRAY = Object.freeze([]);
+const EMPTY_OBJECT = Object.freeze({});
 
 const GradingReview = () => {
   const navigate = useNavigate();
@@ -35,6 +42,9 @@ const GradingReview = () => {
     loadSubmissions
   } = useAssignment();
 
+  // Ref to track last seen submission id to prevent wiping comments on re-renders
+  const lastSubIdRef = React.useRef(null);
+
   // Selected Highlight Popover State
   const [activeHighlightPop, setActiveHighlightPop] = useState(null);
 
@@ -46,33 +56,58 @@ const GradingReview = () => {
   const [overrideComment, setOverrideComment] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Expandable question feedback state
+  const [expandedFeedback, setExpandedFeedback] = useState({});
+  const [expandAllFeedback, setExpandAllFeedback] = useState(false);
+
   // Only review AI-graded student submissions (calibration sample papers belong exclusively in the Calibration page)
   // Review all student submissions for the assignment
   const reviewSubmissions = useMemo(() => {
-    return submissions && submissions.length > 0 ? submissions : [];
+    return Array.isArray(submissions) && submissions.length > 0 ? submissions : EMPTY_ARRAY;
   }, [submissions]);
 
   // Sync location.state submission into context and ensure activeSubmission is populated
   useEffect(() => {
-    if (location.state?.submission) {
-      setActiveSubmission(location.state.submission);
-    } else if (location.state?.submissionId) {
-      const match = reviewSubmissions.find(s => s.id === location.state.submissionId);
-      if (match) setActiveSubmission(match);
+    const routeSub = location.state?.submission;
+    const routeSubId = routeSub?.id || location.state?.submissionId;
+
+    if (routeSub) {
+      if (activeSubmission?.id !== routeSub.id) {
+        setActiveSubmission(routeSub);
+      }
+    } else if (routeSubId) {
+      if (activeSubmission?.id !== routeSubId) {
+        const match = reviewSubmissions.find(s => s.id === routeSubId);
+        if (match) setActiveSubmission(match);
+      }
     } else if (!activeSubmission && reviewSubmissions.length > 0) {
       setActiveSubmission(reviewSubmissions[0]);
     }
-  }, [location.state, reviewSubmissions]);
+  }, [location.state?.submission, location.state?.submissionId, reviewSubmissions, activeSubmission?.id, setActiveSubmission]);
 
   // targetSubId: Prioritize the submission passed from route navigation (the exact paper clicked!)
   const targetSubId = location.state?.submission?.id || location.state?.submissionId || activeSubmission?.id;
-  const liveSub = reviewSubmissions.find(s => s.id === targetSubId);
-  // Prioritize route submission or newly completed score data
-  const currentSub = (location.state?.submission && location.state.submission.id === targetSubId && location.state.submission.score != null)
-    ? (liveSub || location.state.submission)
-    : (activeSubmission?.id === targetSubId && activeSubmission?.score != null)
-      ? activeSubmission
-      : (liveSub || activeSubmission || (reviewSubmissions.length > 0 ? reviewSubmissions[0] : null));
+  const liveSub = useMemo(() => {
+    return reviewSubmissions.find(s => s.id === targetSubId);
+  }, [reviewSubmissions, targetSubId]);
+
+  // Prioritize activeSubmission with detailed data, merged with fresh status/score from liveSub
+  const currentSub = useMemo(() => {
+    if (activeSubmission && activeSubmission.id === targetSubId) {
+      if (liveSub) {
+        return {
+          ...activeSubmission,
+          status: liveSub.status,
+          score: liveSub.score ?? activeSubmission.score
+        };
+      }
+      return activeSubmission;
+    }
+    if (liveSub) return liveSub;
+    if (location.state?.submission && location.state.submission.id === targetSubId) return location.state.submission;
+    if (activeSubmission) return activeSubmission;
+    return reviewSubmissions.length > 0 ? reviewSubmissions[0] : null;
+  }, [activeSubmission, liveSub, targetSubId, location.state?.submission, reviewSubmissions]);
 
   const isSubmissionUnfinished = !currentSub || currentSub.score == null || ['pending', 'uploaded', 'processing', 'extracting_answers', 'retrieving_rubric', 'grading'].includes(currentSub?.status);
 
@@ -81,24 +116,58 @@ const GradingReview = () => {
     if (!targetSubId) return;
     if (!isSubmissionUnfinished) return;
 
-    const interval = setInterval(async () => {
+    let isMounted = true;
+
+    const checkStatus = async () => {
       try {
         const fresh = await fetchSubmissionDetail(targetSubId);
-        if (fresh && fresh.score != null) {
+        if (!isMounted || !fresh) return;
+
+        const isNowFinished = fresh.score != null || !['pending', 'uploaded', 'processing', 'extracting_answers', 'retrieving_rubric', 'grading'].includes(fresh.status);
+        if (isNowFinished) {
           setActiveSubmission(fresh);
           if (currentAssignmentId) loadSubmissions(currentAssignmentId, true);
+        } else if (fresh.status !== currentSub?.status) {
+          setActiveSubmission(prev => prev ? { ...prev, status: fresh.status } : fresh);
         }
       } catch (err) {
         // silent retry
       }
-    }, 2500);
+    };
 
-    return () => clearInterval(interval);
-  }, [targetSubId, isSubmissionUnfinished, currentAssignmentId, loadSubmissions, setActiveSubmission]);
+    const interval = setInterval(checkStatus, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [targetSubId, isSubmissionUnfinished, currentAssignmentId, currentSub?.status, loadSubmissions, setActiveSubmission]);
 
-  const activeSubmissionObj = currentSub;
-  const feedback = activeSubmissionObj?.feedback || {};
-  const breakdown = feedback.breakdown || [];
+  const activeSubmissionObj = currentSub || EMPTY_OBJECT;
+  const feedback = activeSubmissionObj?.feedback || EMPTY_OBJECT;
+  const breakdown = Array.isArray(feedback.breakdown) ? feedback.breakdown : EMPTY_ARRAY;
+  const multiAgentAudit = feedback.multi_agent_audit || EMPTY_OBJECT;
+  const auditorBreakdown = Array.isArray(multiAgentAudit.auditor_breakdown) ? multiAgentAudit.auditor_breakdown : EMPTY_ARRAY;
+  const primaryModelLabel = activeSubmissionObj?.model_used ? activeSubmissionObj.model_used.split('/').pop() : 'Gemini 3.1 Flash';
+  const auditorModelLabel = multiAgentAudit?.model_used ? multiAgentAudit.model_used.split('/').pop() : 'Nemotron 120B';
+  const primaryOverallScore = multiAgentAudit?.primary_score ?? (
+    breakdown && breakdown.length > 0
+      ? Math.round(breakdown.reduce((sum, b) => sum + (parseFloat(b.score_awarded) || 0), 0) * 10) / 10
+      : activeSubmissionObj?.score
+  );
+
+  // Helper to extract question-specific reasoning from auditor note if breakdown was generic
+  const extractQuestionAuditNote = (auditNote, qKey) => {
+    if (!auditNote) return '';
+    const cleanQ = String(qKey || '').replace(/[^A-Za-z0-9]/g, '');
+    const numMatch = cleanQ.match(/\d+/);
+    const numStr = numMatch ? numMatch[0] : cleanQ;
+    const regex = new RegExp(`(?:\\b(?:Q|Question)\\s*${numStr}\\b|\\b${cleanQ}\\b)[^:.]*?:?\\s*([^.]+(?:\\.[^A-Z0-9]+[^.]+){0,2}\\.?)`, 'i');
+    const match = auditNote.match(regex);
+    if (match && match[0]) {
+      return match[0].trim();
+    }
+    return '';
+  };
 
   // Active assignment object
   const activeAssignment = assignments?.find(a => String(a.id) === String(currentAssignmentId)) || currentAssignment;
@@ -133,7 +202,7 @@ const GradingReview = () => {
   const stepIncrement = allowsHalfMarks ? 0.5 : 1.0;
 
   // Extract Question List reliably from rubric_data or breakdown, aggregating subquestions into main questions
-  const rubricQuestions = activeAssignment?.rubric_data || [];
+  const rubricQuestions = Array.isArray(activeAssignment?.rubric_data) ? activeAssignment.rubric_data : EMPTY_ARRAY;
   const effectiveQuestions = useMemo(() => {
     if (rubricQuestions && rubricQuestions.length > 0) {
       return rubricQuestions.map((rq, idx) => {
@@ -186,7 +255,7 @@ const GradingReview = () => {
           model_answer: rq.model_answer || '',
           max_score: maxSc,
           score_awarded: resolvedScore != null ? resolvedScore : (isSubmissionUnfinished ? null : 0),
-          reasoning: resolvedReasoning || (isSubmissionUnfinished ? 'AI evaluation in progress...' : 'Evaluated against rubric criteria.'),
+          reasoning: resolvedReasoning || (isSubmissionUnfinished ? 'Evaluating answer against rubric...' : 'Evaluated against rubric criteria.'),
           is_ai_graded: resolvedScore != null
         };
       });
@@ -221,29 +290,45 @@ const GradingReview = () => {
         is_ai_graded: true
       }));
     }
-    return [];
+    return EMPTY_ARRAY;
   }, [rubricQuestions, breakdown, allowsHalfMarks, isSubmissionUnfinished]);
 
   // Sync questionScores when currentSub or effectiveQuestions changes
   useEffect(() => {
-    if (currentSub) {
-      setOverrideScore(currentSub.score != null ? currentSub.score.toString() : '');
+    if (!currentSub) return;
+
+    if (lastSubIdRef.current !== currentSub.id) {
+      lastSubIdRef.current = currentSub.id;
       setOverrideComment('');
       setActiveHighlightPop(null);
-
-      const initialScores = {};
-      effectiveQuestions.forEach((q, idx) => {
-        const qKey = q.question_number || `Q${idx + 1}`;
-        initialScores[qKey] = q.score_awarded != null ? q.score_awarded : 0;
-      });
-      setQuestionScores(initialScores);
     }
+
+    const targetScoreStr = currentSub.score != null ? currentSub.score.toString() : '';
+    setOverrideScore(prev => (prev === targetScoreStr ? prev : targetScoreStr));
+
+    const initialScores = {};
+    effectiveQuestions.forEach((q, idx) => {
+      const qKey = q.question_number || `Q${idx + 1}`;
+      initialScores[qKey] = q.score_awarded != null ? q.score_awarded : 0;
+    });
+
+    setQuestionScores(prev => {
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(initialScores);
+      if (
+        prevKeys.length === nextKeys.length &&
+        nextKeys.every(k => prev[k] === initialScores[k])
+      ) {
+        return prev;
+      }
+      return initialScores;
+    });
   }, [currentSub?.id, currentSub?.status, currentSub?.score, effectiveQuestions]);
 
   // Submissions list navigation
   const currentIndex = reviewSubmissions.findIndex(s => s.id === currentSub?.id);
   const prevSubmission = currentIndex > 0 ? reviewSubmissions[currentIndex - 1] : null;
-  const nextSubmission = currentIndex < reviewSubmissions.length - 1 ? reviewSubmissions[currentIndex + 1] : null;
+  const nextSubmission = currentIndex >= 0 && currentIndex < reviewSubmissions.length - 1 ? reviewSubmissions[currentIndex + 1] : null;
 
   const navigateToSubmission = (sub) => {
     if (!sub) return;
@@ -252,60 +337,76 @@ const GradingReview = () => {
   };
 
   // Highlights synthesis & extraction
-  let highlights = feedback.highlights || activeSubmissionObj?.highlights || [];
-  if (highlights.length === 0 && effectiveQuestions.length > 0) {
-    effectiveQuestions.forEach((item, idx) => {
-      const qNum = item.question_number || `Q${idx + 1}`;
-      const scoreAwarded = item.score_awarded ?? 0;
-      const isPositive = scoreAwarded > 0;
+  const highlights = useMemo(() => {
+    const rawHighlights = feedback.highlights || activeSubmissionObj?.highlights;
+    if (Array.isArray(rawHighlights) && rawHighlights.length > 0) {
+      return rawHighlights;
+    }
 
-      const quoteMatches = (item.reasoning || '').match(/'([^']+)'|"([^"]+)"/g);
-      if (quoteMatches) {
-        quoteMatches.forEach(qm => {
-          const cleanQ = qm.replace(/['"]/g, '').trim();
-          if (cleanQ.length > 4) {
-            highlights.push({
-              text: cleanQ,
-              type: isPositive ? 'strength' : 'weakness',
-              score_awarded: isPositive ? scoreAwarded : 0,
-              question_number: qNum,
-              comment: item.reasoning
-            });
-          }
-        });
-      }
-    });
-  }
+    if (isSubmissionUnfinished) return EMPTY_ARRAY;
 
-  const isFlagged = activeSubmissionObj?.status === 'flagged';
-  let rawFlagReasons = isFlagged ? (feedback.flag_reasons || []) : [];
-  if (isFlagged && rawFlagReasons.length === 0) {
-    rawFlagReasons = ['⚠️ Flagged for Quality Audit: Score discrepancy or low AI confidence detected'];
-  }
-  rawFlagReasons = rawFlagReasons.filter(r => !r.toLowerCase().includes('override'));
+    const list = [];
+    if (effectiveQuestions.length > 0) {
+      effectiveQuestions.forEach((item, idx) => {
+        const qNum = item.question_number || `Q${idx + 1}`;
+        const scoreAwarded = item.score_awarded ?? 0;
+        const isPositive = scoreAwarded > 0;
 
-  const conflictedQuestions = new Set();
-  if (isFlagged) {
-    rawFlagReasons.forEach(reason => {
-      if (reason.toLowerCase().includes('discrepancy') || reason.toLowerCase().includes('conflict')) {
-        const matches = reason.match(/\bQ\d+(?:\([a-z0-9]+\))?/gi);
-        if (matches) {
-          matches.forEach(m => conflictedQuestions.add(extractMainQKey(m)));
-        }
-      } else {
-        const match = reason.match(/(?:on|question|in)\s+([A-Za-z0-9_(),\s]+?)(?::|\(|$)/i);
-        if (match && match[1]) {
-          const parts = match[1].split(/[,&]/);
-          parts.forEach(p => {
-            const clean = p.trim();
-            if (clean.length > 0 && (clean.toLowerCase().startsWith('q') || /\d+/.test(clean))) {
-              conflictedQuestions.add(extractMainQKey(clean));
+        const quoteMatches = (item.reasoning || '').match(/'([^']+)'|"([^"]+)"/g);
+        if (quoteMatches) {
+          quoteMatches.forEach(qm => {
+            const cleanQ = qm.replace(/['"]/g, '').trim();
+            if (cleanQ.length > 4) {
+              list.push({
+                text: cleanQ,
+                type: isPositive ? 'strength' : 'weakness',
+                score_awarded: isPositive ? scoreAwarded : 0,
+                question_number: qNum,
+                comment: item.reasoning
+              });
             }
           });
         }
-      }
-    });
-  }
+      });
+    }
+    return list;
+  }, [feedback.highlights, activeSubmissionObj?.highlights, effectiveQuestions, isSubmissionUnfinished]);
+
+  const isFlagged = activeSubmissionObj?.status === 'flagged';
+  const rawFlagReasons = useMemo(() => {
+    if (!isFlagged) return EMPTY_ARRAY;
+    let list = feedback.flag_reasons;
+    if (!Array.isArray(list) || list.length === 0) {
+      list = ['⚠️ Flagged for Quality Audit: Score discrepancy or low AI confidence detected'];
+    }
+    return list.filter(r => !r.toLowerCase().includes('override'));
+  }, [isFlagged, feedback.flag_reasons]);
+
+  const conflictedQuestions = useMemo(() => {
+    const conflicted = new Set();
+    if (isFlagged) {
+      rawFlagReasons.forEach(reason => {
+        if (reason.toLowerCase().includes('discrepancy') || reason.toLowerCase().includes('conflict')) {
+          const matches = reason.match(/\bQ\d+(?:\([a-z0-9]+\))?/gi);
+          if (matches) {
+            matches.forEach(m => conflicted.add(extractMainQKey(m)));
+          }
+        } else {
+          const match = reason.match(/(?:on|question|in)\s+([A-Za-z0-9_(),\s]+?)(?::|\(|$)/i);
+          if (match && match[1]) {
+            const parts = match[1].split(/[,&]/);
+            parts.forEach(p => {
+              const clean = p.trim();
+              if (clean.length > 0 && (clean.toLowerCase().startsWith('q') || /\d+/.test(clean))) {
+                conflicted.add(extractMainQKey(clean));
+              }
+            });
+          }
+        }
+      });
+    }
+    return conflicted;
+  }, [isFlagged, rawFlagReasons]);
 
   const totalMaxScore = useMemo(() => {
     if (activeAssignment?.rubric_data && activeAssignment.rubric_data.length > 0) {
@@ -467,8 +568,9 @@ const GradingReview = () => {
 
           if (before) newParts.push(before);
 
-          const isStrength = hl.type === 'strength' || (hl.score_awarded && hl.score_awarded > 0);
+          const isStrength = hl.type === 'strength' || (hl.score_awarded && hl.score_awarded > 0) || (hl.aligned_score && hl.aligned_score > 0);
           const isSelected = activeHighlightPop?.text === hl.text;
+          const displayMark = hl.aligned_score != null ? hl.aligned_score : hl.score_awarded;
 
           newParts.push(
             <mark
@@ -490,7 +592,7 @@ const GradingReview = () => {
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
-              title="Click to view AI grading evidence & reasoning"
+              title={displayMark != null ? `Point Awarded: +${displayMark}m` : 'Click to view AI grading evidence & reasoning'}
             >
               {matchedStr}
               <span style={{
@@ -503,7 +605,7 @@ const GradingReview = () => {
                 fontWeight: 700,
                 display: 'inline-block'
               }}>
-                {hl.score_awarded != null ? `+${hl.score_awarded}m` : (isStrength ? '✓ Key Point' : '⚠️ Issue')}
+                {displayMark != null ? (displayMark > 0 ? `+${displayMark}m` : '0m') : (isStrength ? '✓ Key Point' : '⚠️ Issue')}
               </span>
             </mark>
           );
@@ -521,6 +623,17 @@ const GradingReview = () => {
   const renderHighlightedRawText = (rawText, highlightsList) => {
     const isBlank = !rawText || rawText.trim() === '' || rawText.trim() === '-' || rawText.trim() === 'N/A';
     if (isBlank) {
+      if (isSubmissionUnfinished) {
+        return (
+          <div style={{ padding: '2.5rem 1.5rem', backgroundColor: 'rgba(59, 130, 246, 0.06)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', textAlign: 'center' }}>
+            <Loader2 size={32} className="spin" color="#2563eb" style={{ margin: '0 auto 0.75rem auto' }} />
+            <h4 style={{ margin: '0 0 0.35rem 0', color: '#1d4ed8' }}>Processing Student Submission</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Student response text is being extracted and prepared for AI grading...
+            </p>
+          </div>
+        );
+      }
       return (
         <div style={{ padding: '2rem 1.5rem', backgroundColor: 'var(--danger-bg)', borderRadius: '8px', border: '1px solid var(--danger)', textAlign: 'center' }}>
           <AlertTriangle size={28} color="var(--danger)" style={{ marginBottom: '0.5rem' }} />
@@ -546,6 +659,99 @@ const GradingReview = () => {
 
           const isQConflicted = conflictedQuestions.has(mainKey);
           const isBodyEmpty = !bodyContent || bodyContent === '-' || bodyContent === 'N/A';
+
+          const qKey = matchedQuestion?.question_number || mainKey;
+          const currentScoreVal = questionScores[qKey] != null ? questionScores[qKey] : (matchedQuestion?.score_awarded ?? 0);
+          const targetScore = parseFloat(currentScoreVal) || 0;
+
+          // 1. Filter highlights matching this question section or contained in bodyContent
+          let blockHighlights = (highlightsList || []).filter(h => {
+            if (!h || !h.text || h.text.trim().length < 3) return false;
+            const hText = h.text.trim().toLowerCase();
+            const inBody = bodyContent.toLowerCase().includes(hText);
+            const qMatches = h.question_number && extractMainQKey(h.question_number) === mainKey;
+            return inBody || (qMatches && bodyContent.toLowerCase().includes(hText.slice(0, 30)));
+          }).map(h => ({ ...h }));
+
+          // 2. Synthesize additional highlights from quotes in reasoning if targetScore > 0
+          if (matchedQuestion?.reasoning && targetScore > 0) {
+            const quoteMatches = matchedQuestion.reasoning.match(/'([^']+)'|"([^"]+)"/g) || [];
+            quoteMatches.forEach(qm => {
+              const cleanQ = qm.replace(/['"]/g, '').trim();
+              if (cleanQ.length > 5 && bodyContent.toLowerCase().includes(cleanQ.toLowerCase())) {
+                if (!blockHighlights.some(bh => bh.text.toLowerCase().includes(cleanQ.toLowerCase()) || cleanQ.toLowerCase().includes(bh.text.toLowerCase()))) {
+                  blockHighlights.push({
+                    text: cleanQ,
+                    type: 'strength',
+                    score_awarded: 1.0,
+                    question_number: qKey,
+                    comment: matchedQuestion.reasoning
+                  });
+                }
+              }
+            });
+          }
+
+          // 3. Fallback: if student has non-empty response and targetScore > 0 but NO highlights matched
+          if (blockHighlights.length === 0 && targetScore > 0 && !isBodyEmpty && bodyContent.trim().length > 5) {
+            const sentences = bodyContent.split(/(?<=[.?!])\s+/).filter(s => s.trim().length > 8);
+            if (sentences.length > 0) {
+              const numToTake = Math.min(sentences.length, Math.max(1, Math.min(3, Math.round(targetScore))));
+              for (let sIdx = 0; sIdx < numToTake; sIdx++) {
+                const sText = sentences[sIdx].trim();
+                if (sText.length > 5) {
+                  blockHighlights.push({
+                    text: sText,
+                    type: 'strength',
+                    score_awarded: 1.0,
+                    question_number: qKey,
+                    comment: matchedQuestion?.reasoning || `Key evidence response point.`
+                  });
+                }
+              }
+            }
+          }
+
+          // 4. STRICT MARK ALIGNMENT: Re-balance highlight marks into clean integer or half-mark units (no arbitrary tenths like 5.1m or 0.9m)
+          const strengthHls = blockHighlights.filter(h => h.type === 'strength' || (parseFloat(h.score_awarded) || 0) > 0);
+
+          if (targetScore === 0) {
+            blockHighlights.forEach(h => {
+              h.aligned_score = 0;
+              h.type = 'weakness';
+            });
+          } else if (strengthHls.length > 0) {
+            if (strengthHls.length === 1) {
+              strengthHls[0].aligned_score = targetScore;
+            } else {
+              // Standard academic grading step: whole integer (1.0) unless targetScore is fractional or rubric allows 0.5
+              const isFractional = (targetScore % 1) !== 0;
+              const step = (isFractional || allowsHalfMarks) ? 0.5 : 1.0;
+              const totalUnits = Math.round(targetScore / step);
+              const totalWeight = strengthHls.reduce((acc, h) => acc + (parseFloat(h.score_awarded) || 1.0), 0);
+
+              const items = strengthHls.map((h, i) => {
+                const w = parseFloat(h.score_awarded) || 1.0;
+                const exactUnits = (w / (totalWeight > 0 ? totalWeight : strengthHls.length)) * totalUnits;
+                const baseUnits = Math.floor(exactUnits);
+                return { h, origIdx: i, baseUnits, remainder: exactUnits - baseUnits };
+              });
+
+              let allocatedUnits = items.reduce((acc, it) => acc + it.baseUnits, 0);
+              let remainingUnits = totalUnits - allocatedUnits;
+
+              // Distribute remaining units by largest fractional remainder
+              const sorted = [...items].sort((a, b) => b.remainder - a.remainder);
+              for (let r = 0; r < remainingUnits && r < sorted.length; r++) {
+                sorted[r].baseUnits += 1;
+              }
+
+              items.forEach(it => {
+                const finalSc = it.baseUnits * step;
+                it.h.aligned_score = Number.isInteger(finalSc) ? finalSc : Math.round(finalSc * 10) / 10;
+              });
+            }
+          }
 
           return (
             <div
@@ -585,29 +791,29 @@ const GradingReview = () => {
                   matchedQuestion.score_awarded == null ? (
                     <span style={{
                       fontSize: '0.75rem',
-                      fontWeight: 700,
-                      backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                      color: '#1d4ed8',
-                      padding: '0.15rem 0.55rem',
+                      fontWeight: 600,
+                      backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                      color: '#2563eb',
+                      padding: '0.15rem 0.5rem',
                       borderRadius: '4px',
-                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      border: '1px solid rgba(59, 130, 246, 0.25)',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px'
+                      gap: '0.35rem'
                     }}>
-                      <Loader2 size={12} className="spin" /> Evaluating...
+                      <Loader2 size={11} className="spin" style={{ color: '#2563eb' }} /> Grading
                     </span>
                   ) : (
                     <span style={{
                       fontSize: '0.75rem',
                       fontWeight: 700,
-                      backgroundColor: matchedQuestion.score_awarded > 0 ? 'var(--success-bg)' : 'var(--danger-bg)',
-                      color: matchedQuestion.score_awarded > 0 ? 'var(--success)' : 'var(--danger)',
+                      backgroundColor: currentScoreVal > 0 ? 'var(--success-bg)' : 'var(--danger-bg)',
+                      color: currentScoreVal > 0 ? 'var(--success)' : 'var(--danger)',
                       padding: '0.15rem 0.5rem',
                       borderRadius: '4px',
-                      border: `1px solid ${matchedQuestion.score_awarded > 0 ? 'var(--success-border)' : 'var(--danger-border)'}`
+                      border: `1px solid ${currentScoreVal > 0 ? 'var(--success-border)' : 'var(--danger-border)'}`
                     }}>
-                      Awarded: {matchedQuestion.score_awarded} / {matchedQuestion.max_score || 10} pts
+                      Awarded: {currentScoreVal} / {matchedQuestion.max_score || 10} pts
                     </span>
                   )
                 )}
@@ -620,7 +826,7 @@ const GradingReview = () => {
                     <AlertTriangle size={14} color="var(--danger)" /> No response submitted for this question (-). 0 marks awarded.
                   </span>
                 ) : (
-                  renderHighlightedSnippet(bodyContent, highlightsList)
+                  renderHighlightedSnippet(bodyContent, blockHighlights)
                 )}
               </div>
             </div>
@@ -702,7 +908,7 @@ const GradingReview = () => {
               <button className="btn btn-primary" onClick={handleGradeWithAI} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}>
                 {saving ? (
                   <>
-                    <Loader2 size={15} className="spin" /> AI Grading in progress...
+                    <Loader2 size={14} className="spin" /> Grading...
                   </>
                 ) : (
                   <>
@@ -738,19 +944,19 @@ const GradingReview = () => {
               <span
                 className="status-badge"
                 style={{
-                  backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                  color: '#1d4ed8',
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
-                  padding: '0.35rem 0.75rem',
-                  fontSize: '0.8rem',
-                  fontWeight: 700,
-                  borderRadius: '6px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                  color: '#2563eb',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                  padding: '0.2rem 0.55rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.45rem'
+                  gap: '0.35rem'
                 }}
               >
-                <Loader2 size={13} className="spin" /> AI Grading in Progress
+                <Loader2 size={12} className="spin" style={{ color: '#2563eb' }} /> Grading
               </span>
             ) : (
               <span
@@ -803,16 +1009,10 @@ const GradingReview = () => {
             <span style={{ fontSize: '0.775rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Total Score
             </span>
-            {isSubmissionUnfinished ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#2563eb', fontSize: '0.95rem', fontWeight: 600 }}>
-                <Loader2 size={15} className="spin" /> Evaluating...
-              </span>
-            ) : (
-              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--primary)', lineHeight: 1 }}>
-                {activeSubmissionObj.score != null ? activeSubmissionObj.score : '—'}
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{totalMaxScore ? ` / ${totalMaxScore}` : ''}</span>
-              </span>
-            )}
+            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: isSubmissionUnfinished ? 'var(--text-dim)' : 'var(--primary)', lineHeight: 1 }}>
+              {(!isSubmissionUnfinished && activeSubmissionObj.score != null) ? activeSubmissionObj.score : '—'}
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', fontWeight: 600 }}>{totalMaxScore ? ` / ${totalMaxScore}` : ''}</span>
+            </span>
           </div>
         </div>
 
@@ -919,48 +1119,52 @@ const GradingReview = () => {
           </div>
 
           {/* Evidence Popover at Bottom of Left Column */}
-          {activeHighlightPop && (
-            <div
-              style={{
-                flexShrink: 0,
-                padding: '0.75rem 1.15rem',
-                backgroundColor: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? '#EDFBF3' : '#FDF2F2',
-                borderTop: `2px solid ${activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? '#16A34A' : '#DC2626'}`,
-                position: 'relative'
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setActiveHighlightPop(null)}
-                style={{ position: 'absolute', top: '0.4rem', right: '0.65rem', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}
+          {activeHighlightPop && (() => {
+            const popMark = activeHighlightPop.aligned_score != null ? activeHighlightPop.aligned_score : activeHighlightPop.score_awarded;
+            const isPopPositive = (popMark != null && popMark > 0) || activeHighlightPop.type === 'strength';
+            return (
+              <div
+                style={{
+                  flexShrink: 0,
+                  padding: '0.75rem 1.15rem',
+                  backgroundColor: isPopPositive ? '#EDFBF3' : '#FDF2F2',
+                  borderTop: `2px solid ${isPopPositive ? '#16A34A' : '#DC2626'}`,
+                  position: 'relative'
+                }}
               >
-                ✕
-              </button>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', paddingRight: '1.25rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <Layers size={14} color="var(--primary)" /> {activeHighlightPop.question_number ? (activeHighlightPop.question_number.startsWith('Q') ? `Question ${activeHighlightPop.question_number}` : `Question Q${activeHighlightPop.question_number}`) : 'Evidence Quote'}
-                </span>
-                <span style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  padding: '0.1rem 0.4rem',
-                  borderRadius: '4px',
-                  backgroundColor: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? 'var(--success-bg)' : 'var(--danger-bg)',
-                  color: activeHighlightPop.type === 'strength' || (activeHighlightPop.score_awarded > 0) ? 'var(--success)' : 'var(--danger)'
-                }}>
-                  {activeHighlightPop.score_awarded != null ? `+${activeHighlightPop.score_awarded} Marks` : (activeHighlightPop.type === 'strength' ? 'Strength' : 'Weakness')}
-                </span>
-              </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveHighlightPop(null)}
+                  style={{ position: 'absolute', top: '0.4rem', right: '0.65rem', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 700 }}
+                >
+                  ✕
+                </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem', paddingRight: '1.25rem' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <Layers size={14} color="var(--primary)" /> {activeHighlightPop.question_number ? (activeHighlightPop.question_number.startsWith('Q') ? `Question ${activeHighlightPop.question_number}` : `Question Q${activeHighlightPop.question_number}`) : 'Evidence Quote'}
+                  </span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px',
+                    backgroundColor: isPopPositive ? 'var(--success-bg)' : 'var(--danger-bg)',
+                    color: isPopPositive ? 'var(--success)' : 'var(--danger)'
+                  }}>
+                    {popMark != null ? `+${popMark} Marks` : (isPopPositive ? 'Strength' : 'Weakness')}
+                  </span>
+                </div>
 
-              <div style={{ fontStyle: 'italic', fontSize: '0.775rem', color: 'var(--text-main)', marginBottom: '0.25rem', padding: '0.25rem 0.45rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid var(--border)' }}>
-                📄 "{activeHighlightPop.text}"
-              </div>
+                <div style={{ fontStyle: 'italic', fontSize: '0.775rem', color: 'var(--text-main)', marginBottom: '0.25rem', padding: '0.25rem 0.45rem', backgroundColor: '#fff', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                  📄 "{activeHighlightPop.text}"
+                </div>
 
-              <div style={{ fontSize: '0.775rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
-                💡 <strong>AI Rubric Reasoning:</strong> {activeHighlightPop.comment}
+                <div style={{ fontSize: '0.775rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
+                  💡 <strong>AI Rubric Reasoning:</strong> {activeHighlightPop.comment}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* RIGHT COLUMN: Grading Overrides & AI Evaluation Summary */}
@@ -985,30 +1189,35 @@ const GradingReview = () => {
               backgroundColor: 'var(--surface)'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.925rem', fontWeight: 700 }}>
                 <Edit3 size={16} color="var(--primary)" /> Per-Question Score Override
               </h3>
-              <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
-                {isSubmissionUnfinished ? 'Evaluating...' : `Sum: ${calculatedTotalFromQuestions} / ${totalMaxScore}`}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setExpandAllFeedback(!expandAllFeedback)}
+                  className="btn btn-outline"
+                  style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  {expandAllFeedback ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                  {expandAllFeedback ? 'Collapse All' : 'Expand All Feedback'}
+                </button>
+                <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                  {isSubmissionUnfinished ? `Sum: — / ${totalMaxScore}` : `Sum: ${calculatedTotalFromQuestions} / ${totalMaxScore}`}
+                </span>
+              </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              {isSubmissionUnfinished ? (
-                <div style={{ padding: '1.25rem', backgroundColor: 'rgba(59, 130, 246, 0.08)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.25)', textAlign: 'center' }}>
-                  <Loader2 size={24} className="spin" color="#2563eb" style={{ margin: '0 auto 0.5rem auto' }} />
-                  <p style={{ margin: '0 0 0.25rem 0', fontWeight: 600, color: '#1d4ed8', fontSize: '0.9rem' }}>
-                    AI Grading In Progress
-                  </p>
-                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    Evaluation is actively underway in the background. Scores and rubric reasoning will populate here automatically.
-                  </p>
-                </div>
-              ) : effectiveQuestions.length === 0 ? (
+              {effectiveQuestions.length === 0 ? (
                 <div style={{ padding: '1.25rem', backgroundColor: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border)', textAlign: 'center' }}>
                   <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.825rem' }}>
-                    {activeSubmissionObj.status === 'pending'
+                    {isSubmissionUnfinished ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <Loader2 size={14} className="spin" style={{ color: '#2563eb' }} /> Grading submission against rubric...
+                      </span>
+                    ) : activeSubmissionObj.status === 'pending'
                       ? '⌛ Submission pending AI grading. Click "Run AI Grading" above.'
                       : 'No rubric breakdown available for this assignment.'}
                   </p>
@@ -1021,6 +1230,37 @@ const GradingReview = () => {
                   const maxSc = parseFloat(item.max_score || 10.0);
                   const isItemConflicted = conflictedQuestions.has(mainKey);
 
+                  const auditorMatch = auditorBreakdown.find(ab => extractMainQKey(ab.question_number) === mainKey) || null;
+                  const auditorScore = auditorMatch ? (auditorMatch.score_awarded ?? auditorMatch.auditor_score) : null;
+                  const pScore = parseFloat(item.score_awarded ?? currentScoreVal);
+                  const isAuditorDiscrepancy = auditorScore != null && Math.abs(pScore - parseFloat(auditorScore)) > 0.01;
+                  const hasConflict = isItemConflicted || isAuditorDiscrepancy;
+
+                  // Active expanded state: defaults to true on conflict or if expandAllFeedback is toggled
+                  const isExpanded = expandedFeedback[qKey] !== undefined ? expandedFeedback[qKey] : (hasConflict || expandAllFeedback);
+
+                  // Extract Auditor reasoning: if generic placeholder, extract from audit_note
+                  let auditorReasoningText = (auditorMatch?.reasoning || '').trim();
+                  if (!auditorReasoningText || auditorReasoningText.toLowerCase().includes('evaluated against')) {
+                    const extracted = extractQuestionAuditNote(multiAgentAudit.audit_note || multiAgentAudit.reconciliation_reason, qKey);
+                    if (extracted) {
+                      auditorReasoningText = extracted;
+                    }
+                  }
+
+                  // Determine best feedback text for this question
+                  let effectiveFeedbackText = (item.reasoning || '').trim();
+                  const isPlaceholder = !effectiveFeedbackText || 
+                    effectiveFeedbackText.toLowerCase().includes('evaluated against') || 
+                    effectiveFeedbackText.toLowerCase() === 'no response evaluated';
+
+                  if (isPlaceholder && auditorReasoningText && !auditorReasoningText.toLowerCase().includes('evaluated against')) {
+                    effectiveFeedbackText = auditorReasoningText;
+                  }
+                  if (!effectiveFeedbackText) {
+                    effectiveFeedbackText = 'Evaluated against rubric criteria.';
+                  }
+
                   return (
                     <div
                       key={index}
@@ -1030,63 +1270,153 @@ const GradingReview = () => {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.45rem',
-                        border: isItemConflicted ? '1.5px solid #F59E0B' : '1px solid var(--border)',
-                        backgroundColor: isItemConflicted ? '#FEFDF9' : 'var(--surface)'
+                        border: hasConflict ? '1.5px solid #F59E0B' : '1px solid var(--border)',
+                        backgroundColor: hasConflict ? '#FEFDF9' : 'var(--surface)'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ backgroundColor: isItemConflicted ? '#F59E0B' : 'var(--primary)', color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                          <span style={{ backgroundColor: hasConflict ? '#F59E0B' : 'var(--primary)', color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                             {qKey}
                           </span>
                           <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                             Max: {maxSc} pts
                           </span>
-                          {isItemConflicted && (
+                          {hasConflict && (
                             <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
-                              ⚠️ Conflict
+                              ⚠️ Flagged
                             </span>
                           )}
                         </div>
 
-                        {/* Score Steppers */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => handleStepQuestionScore(qKey, maxSc, -stepIncrement)}
-                            style={{ padding: '0.15rem 0.35rem', minWidth: '22px', height: '26px', borderRadius: '4px' }}
-                            title={`Decrease ${stepIncrement}`}
+                        {/* Score Steppers or Minimalist Grading Pill */}
+                        {isSubmissionUnfinished ? (
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                              color: '#2563eb',
+                              border: '1px solid rgba(59, 130, 246, 0.25)',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
+                            }}
                           >
-                            <Minus size={12} />
-                          </button>
+                            <Loader2 size={11} className="spin" style={{ color: '#2563eb' }} /> Grading
+                          </span>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => handleStepQuestionScore(qKey, maxSc, -stepIncrement)}
+                              style={{ padding: '0.15rem 0.35rem', minWidth: '22px', height: '26px', borderRadius: '4px' }}
+                              title={`Decrease ${stepIncrement}`}
+                            >
+                              <Minus size={12} />
+                            </button>
 
-                          <input
-                            type="number"
-                            step={stepIncrement}
-                            min="0"
-                            max={maxSc}
-                            className="input-field"
-                            value={currentScoreVal}
-                            onChange={(e) => handlePerQuestionScoreChange(qKey, maxSc, e.target.value)}
-                            style={{ width: '55px', height: '26px', padding: '0.15rem', textAlign: 'center', fontWeight: 700, fontSize: '0.85rem', borderRadius: '4px', border: `1px solid ${isItemConflicted ? '#F59E0B' : 'var(--primary)'}` }}
-                          />
+                            <input
+                              type="number"
+                              step={stepIncrement}
+                              min="0"
+                              max={maxSc}
+                              className="input-field"
+                              value={currentScoreVal}
+                              onChange={(e) => handlePerQuestionScoreChange(qKey, maxSc, e.target.value)}
+                              style={{ width: '55px', height: '26px', padding: '0.15rem', textAlign: 'center', fontWeight: 700, fontSize: '0.85rem', borderRadius: '4px', border: `1px solid ${hasConflict ? '#F59E0B' : 'var(--primary)'}` }}
+                            />
 
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => handleStepQuestionScore(qKey, maxSc, stepIncrement)}
-                            style={{ padding: '0.15rem 0.35rem', minWidth: '22px', height: '26px', borderRadius: '4px' }}
-                            title={`Increase ${stepIncrement}`}
-                          >
-                            <Plus size={12} />
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              className="btn btn-outline"
+                              onClick={() => handleStepQuestionScore(qKey, maxSc, stepIncrement)}
+                              style={{ padding: '0.15rem 0.35rem', minWidth: '22px', height: '26px', borderRadius: '4px' }}
+                              title={`Increase ${stepIncrement}`}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-main)', lineHeight: '1.45', backgroundColor: isItemConflicted ? '#FFFBEB' : 'var(--surface)', padding: '0.45rem 0.65rem', borderRadius: '4px', border: `1px solid ${isItemConflicted ? '#FCD34D' : 'var(--border)'}` }}>
-                        💡 <strong>AI Reasoning:</strong> {item.reasoning}
-                      </p>
+                      {/* Expandable Feedback Toggle Button */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedFeedback(prev => ({ ...prev, [qKey]: !isExpanded }))}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          padding: '0.35rem 0.55rem',
+                          borderRadius: '5px',
+                          border: `1px solid ${hasConflict ? '#FCD34D' : '#E2E8F0'}`,
+                          backgroundColor: hasConflict ? '#FEF3C7' : '#F8FAFC',
+                          color: hasConflict ? '#92400E' : 'var(--text-main)',
+                          cursor: 'pointer',
+                          fontSize: '0.74rem',
+                          fontWeight: 600,
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Sparkles size={13} color="var(--primary)" />
+                          <span style={{ color: 'var(--secondary)' }}>
+                            {isSubmissionUnfinished ? 'AI Feedback' : `AI Feedback (${currentScoreVal}/${maxSc} pts)`}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: hasConflict ? '#B45309' : 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600 }}>
+                          <span>{isExpanded ? 'Collapse' : 'Expand Feedback'}</span>
+                          {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        </div>
+                      </button>
+
+                      {/* Collapsed One-Line Preview */}
+                      {!isExpanded && (
+                        <p style={{ margin: '0.1rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: '1.4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {isSubmissionUnfinished ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#2563eb' }}>
+                              <Loader2 size={11} className="spin" /> Evaluating answer against rubric...
+                            </span>
+                          ) : (
+                            `💡 ${effectiveFeedbackText}`
+                          )}
+                        </p>
+                      )}
+
+                      {/* Expanded Unified AI Feedback Box */}
+                      {isExpanded && (
+                        <div style={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid var(--border)',
+                          borderRadius: '6px',
+                          padding: '0.55rem 0.75rem',
+                          fontSize: '0.785rem',
+                          marginTop: '0.1rem'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                            <span style={{ fontWeight: 700, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Sparkles size={13} color="var(--primary)" /> AI Feedback
+                            </span>
+                            <span style={{ fontWeight: 700, color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.1rem 0.45rem', borderRadius: '4px', fontSize: '0.72rem' }}>
+                              {isSubmissionUnfinished ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  <Loader2 size={10} className="spin" /> Grading
+                                </span>
+                              ) : (
+                                `Awarded: ${currentScoreVal} / ${maxSc} pts`
+                              )}
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--text-main)', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
+                            {effectiveFeedbackText}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })

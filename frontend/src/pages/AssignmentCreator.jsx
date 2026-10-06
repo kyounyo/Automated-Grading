@@ -6,12 +6,7 @@ import { createAssignment, parseRubricFile } from '../api/client';
 
 const AssignmentCreator = () => {
   const navigate = useNavigate();
-  const { loadAssignments, setCurrentAssignmentId, setIsAssignmentCreationPending } = useAssignment();
-
-  // Track that lecturer has entered Create Assignment flow (pending until saved)
-  useEffect(() => {
-    setIsAssignmentCreationPending(true);
-  }, [setIsAssignmentCreationPending]);
+  const { loadAssignments, setCurrentAssignmentId } = useAssignment();
 
   // Form State initialized clean/empty for user input
   const [assignmentTitle, setAssignmentTitle] = useState('');
@@ -167,7 +162,6 @@ const AssignmentCreator = () => {
 
       await loadAssignments();
       setCurrentAssignmentId(created.id);
-      setIsAssignmentCreationPending(false);
 
       alert(`Assignment '${created.title}' created in PostgreSQL and indexed into ChromaDB!`);
       navigate('/bulk-upload');
@@ -196,10 +190,7 @@ const AssignmentCreator = () => {
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => {
-              setIsAssignmentCreationPending(false);
-              navigate('/');
-            }}
+            onClick={() => navigate('/')}
             style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
           >
             Cancel

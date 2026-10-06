@@ -10,9 +10,7 @@ import './Layout.css';
 const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentAssignmentId, setCurrentAssignmentId, assignments = [], submissions = [], isGradingActive, currentAssignment, isAssignmentCreationPending } = useAssignment();
-
-  const isStep1Incomplete = Boolean(isAssignmentCreationPending || !currentAssignmentId || assignments.length === 0);
+  const { currentAssignmentId, setCurrentAssignmentId, assignments = [], submissions = [], isGradingActive, currentAssignment } = useAssignment();
 
   const availableAssignments = assignments.length > 0 ? assignments : [
     { id: '', title: 'No Active Assignments' }
@@ -47,35 +45,9 @@ const Layout = () => {
             <NavLink
               to="/create-assignment"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              style={({ isActive }) => (isStep1Incomplete && !isActive) ? {
-                backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                color: '#DC2626'
-              } : {}}
             >
-              <div
-                className="step-badge"
-                style={isStep1Incomplete && location.pathname !== '/create-assignment' ? {
-                  backgroundColor: '#DC2626',
-                  color: '#fff',
-                  fontWeight: 800
-                } : {}}
-              >
-                {isStep1Incomplete && location.pathname !== '/create-assignment' ? '!' : '1'}
-              </div>
+              <div className="step-badge">1</div>
               <span>Create Assignment</span>
-              {isStep1Incomplete && location.pathname !== '/create-assignment' && (
-                <span style={{
-                  fontSize: '0.68rem',
-                  backgroundColor: '#FEE2E2',
-                  color: '#DC2626',
-                  padding: '0.1rem 0.4rem',
-                  borderRadius: '4px',
-                  marginLeft: 'auto',
-                  fontWeight: 700
-                }}>
-                  Incomplete
-                </span>
-              )}
             </NavLink>
             <NavLink to="/bulk-upload" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <div className="step-badge">2</div> Submissions Upload

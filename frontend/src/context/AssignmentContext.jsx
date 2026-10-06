@@ -6,7 +6,14 @@ export const ACTIVE_GRADING_STATUSES = new Set(['processing', 'extracting_answer
 export const AssignmentContext = createContext();
 
 export const AssignmentProvider = ({ children }) => {
-  const [assignments, setAssignments] = useState([]);
+  const [assignments, setAssignments] = useState(() => {
+    try {
+      const cached = localStorage.getItem('autograde_cached_assignments');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [currentAssignmentId, setCurrentAssignmentIdState] = useState(() => {
     try {
       return localStorage.getItem('autograde_active_assignment_id') || '';
@@ -40,21 +47,27 @@ export const AssignmentProvider = ({ children }) => {
   const loadAssignments = useCallback(async () => {
     try {
       const data = await fetchAssignments();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         setAssignments(data);
-        if (data.length > 0) {
-          let saved = '';
-          try { saved = localStorage.getItem('autograde_active_assignment_id') || ''; } catch {}
-          setCurrentAssignmentIdState(prev => {
-            if (prev && data.some(a => a.id === prev)) return prev;
-            if (saved && data.some(a => a.id === saved)) return saved;
-            // Default to the latest active assignment in the list
-            return data[data.length - 1].id;
-          });
-        }
+        try {
+          localStorage.setItem('autograde_cached_assignments', JSON.stringify(data));
+        } catch {}
+
+        let saved = '';
+        try { saved = localStorage.getItem('autograde_active_assignment_id') || ''; } catch {}
+        setCurrentAssignmentIdState(prev => {
+          const chosen = (prev && data.some(a => a.id === prev)) ? prev :
+                         (saved && data.some(a => a.id === saved)) ? saved :
+                         data[data.length - 1].id;
+          try {
+            if (chosen) localStorage.setItem('autograde_active_assignment_id', chosen);
+          } catch {}
+          return chosen;
+        });
       }
     } catch (err) {
-      console.warn('[AssignmentContext] Failed to fetch from backend API:', err);
+      console.warn('[AssignmentContext] Backend briefly unavailable during reload:', err);
+      // Keep previously cached assignments to prevent UI flashing "No Active Assignment"
     }
   }, []);
 
@@ -77,7 +90,16 @@ export const AssignmentProvider = ({ children }) => {
         fetchSubmissions(idToUse),
         fetchGradingStatus(idToUse).catch(() => ({ is_grading: false }))
       ]);
-      setSubmissions(subsData);
+      setSubmissions(prev => {
+        if (prev && prev.length === subsData.length) {
+          const isIdentical = prev.every((p, i) => {
+            const n = subsData[i];
+            return p && n && p.id === n.id && p.status === n.status && p.score === n.score && p.confidence_score === n.confidence_score;
+          });
+          if (isIdentical) return prev;
+        }
+        return subsData;
+      });
       const isActuallyGrading = statusData.is_grading || subsData.some(s => ACTIVE_GRADING_STATUSES.has(s.status));
       if (isActuallyGrading) {
         setActiveGradingAssignments(prev => new Set(prev).add(idToUse));
@@ -121,7 +143,16 @@ export const AssignmentProvider = ({ children }) => {
           fetchGradingStatus(currentAssignmentId).catch(() => ({ is_grading: false }))
         ]);
         if (!isMounted) return;
-        setSubmissions(subsData);
+        setSubmissions(prev => {
+          if (prev && prev.length === subsData.length) {
+            const isIdentical = prev.every((p, i) => {
+              const n = subsData[i];
+              return p && n && p.id === n.id && p.status === n.status && p.score === n.score && p.confidence_score === n.confidence_score;
+            });
+            if (isIdentical) return prev;
+          }
+          return subsData;
+        });
 
         const isStillGrading = Boolean(statusData.is_grading || subsData.some(s => ACTIVE_GRADING_STATUSES.has(s.status)));
 
@@ -162,6 +193,7 @@ export const AssignmentProvider = ({ children }) => {
       setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, status: 'processing' } : s));
       const updated = await apiGradeSubmission(submissionId);
       setSubmissions(prev => prev.map(s => s.id === submissionId ? updated : s));
+      setActiveSubmission(updated);
       await loadAssignments();
       return updated;
     } catch (err) {
