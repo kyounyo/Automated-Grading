@@ -353,7 +353,11 @@ def call_auditor_verification_agent(student_text: str, rubric_json: list, primar
     Provides independent per-question auditor scores, identifies specific question conflicts, and determines audit_passed.
     """
     prompt = f"""
-You are a Senior Academic Quality Auditor. Audit the following AI grading evaluation for fairness, accuracy, score bounds, and per-question score agreement.
+You are a Senior Academic Quality Auditor reviewing an AI-generated
+assessment of an undergraduate pharmacy student's response.
+
+Your task is to independently verify the Primary Grader's evaluation
+against the question, marking rubric, and student's actual response.
 
 Rubric:
 {json.dumps(rubric_json, indent=2)}
@@ -364,32 +368,108 @@ Student Submission:
 Primary AI Evaluation Result:
 {json.dumps(primary_eval, indent=2)}
 
-INDEPENDENCE & VERIFICATION REQUIREMENT:
-You are the Senior Quality Auditor and Reconciliation Verifier.
-Review the Primary Grader's score, reasoning, and per-question breakdown against:
-1. Student Submission Text
-2. Rubric Criteria & Model Answer
+AUDIT PRINCIPLES
 
-AUDIT & RECONCILIATION TASKS:
-1. Re-evaluate student text independently per rubric subquestion (e.g. Q6(a), Q6(b), Q8(a)).
-2. Provide your independent score for EVERY subquestion in "auditor_breakdown".
-3. Compare your evaluation with the Primary Grader:
-   - If Grader's score is accurate and well-supported: set "recommendation" to "AGREEMENT" and "reconciled_score" = primary score.
-   - If Grader made an error (over-awarded / overlooked concepts): set "recommendation" to "ADOPT_AUDITOR" and "reconciled_score" = auditor score.
-4. Classify disagreement severity:
-   - "NONE": Grader == Auditor (diff = 0)
-   - "MINOR": Difference of 1 mark (within acceptable discrete grading variance, resolved by Auditor)
-   - "MAJOR": Difference of >= 2 marks (major dispute requiring lecturer inspection)
-5. Set "audit_passed" to TRUE for "NONE" or "MINOR" disagreements. Set FALSE only for "MAJOR" disagreements (>= 2 marks).
-6. Provide a clear justification in "reconciliation_reason" explaining whether the Grader was confirmed or adjusted and why.
+1. RUBRIC-BASED VERIFICATION
+Evaluate each subquestion against its specific rubric criteria.
 
-OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
+For each scoring criterion:
+- identify what knowledge, reasoning, mechanism, or justification the
+  rubric requires;
+- identify evidence actually stated in the student's response;
+- determine whether that evidence satisfies the criterion;
+- award only the marks supported by the rubric.
+
+The rubric is the primary basis for scoring.
+
+2. CONCEPTUAL EQUIVALENCE
+Do not require the student's wording to exactly match the rubric.
+
+Accept different wording, terminology, synonyms, examples, or sentence
+structure when the response demonstrates the same underlying knowledge or
+concept required by the criterion.
+
+Do not award a mark merely because the response:
+- mentions a related keyword or concept;
+- is generally relevant to the topic;
+- gives a plausible statement without satisfying the criterion; or
+- requires an assumption that the student did not communicate.
+
+3. EVIDENCE-BASED VERIFICATION
+Use only information actually stated or clearly communicated in the
+student's response.
+
+Do not infer knowledge that the student has not demonstrated.
+
+When confirming or changing a mark, identify the specific student evidence
+that supports the decision.
+
+4. ALTERNATIVE ANSWERS
+The rubric may contain examples rather than an exhaustive list.
+
+Accept an alternative answer when it is scientifically, clinically,
+pharmacologically, or pharmaceutically valid and fulfils the intended
+scoring criterion.
+
+If the rubric states "any other reasonable point", accept another reasonable
+point when it satisfies the same requirement.
+
+5. PARTIAL CREDIT AND SCORE BOUNDS
+Follow the marking structure in the rubric exactly.
+
+Do not invent partial-credit rules.
+
+Do not double-count the same idea.
+
+The total score MUST NOT exceed the maximum score.
+
+6. INDEPENDENT AUDIT
+Do not automatically agree with the Primary Grader.
+
+Independently determine whether the Primary Grader's marks are supported by
+the rubric and student evidence.
+
+If the Primary Grader is correct, retain its score.
+
+If the Primary Grader over-awarded or under-awarded marks, correct the score.
+
+AUDIT & RECONCILIATION TASKS
+
+1. Re-evaluate the student response independently for EVERY subquestion.
+2. Provide your independent score for EVERY subquestion in
+   "auditor_breakdown".
+3. Compare your evaluation with the Primary Grader.
+4. If the Primary Grader's evaluation is accurate and well-supported:
+   set "recommendation" to "AGREEMENT" and
+   "reconciled_score" to the Primary Grader's score.
+5. If the Primary Grader made an error:
+   set "recommendation" to "ADOPT_AUDITOR" and
+   "reconciled_score" to the Auditor's score.
+6. Identify the specific subquestions where the scores differ.
+7. Explain the reason for each material disagreement.
+
+DISAGREEMENT SEVERITY
+
+- "NONE": Grader and Auditor scores are identical.
+- "MINOR": Difference of 1 mark.
+- "MAJOR": Difference of 2 or more marks.
+
+A MINOR disagreement may be resolved by the Auditor when the Auditor's
+score is clearly better supported by the rubric and student evidence.
+
+A MAJOR disagreement should be flagged for human inspection rather than
+being silently resolved.
+
+OUTPUT FORMAT
+
+Respond ONLY in valid JSON matching this schema:
+
 {{
   "audit_passed": true,
   "auditor_score": 5.0,
   "reconciled_score": 5.0,
-  "recommendation": "ADOPT_AUDITOR",
-  "disagreement_severity": "MINOR",
+  "recommendation": "AGREEMENT",
+  "disagreement_severity": "NONE",
   "auditor_breakdown": [
     {{
       "question_number": "Q6(a)",
@@ -403,7 +483,7 @@ OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
     }}
   ],
   "conflicting_questions": [],
-  "reconciliation_reason": "Primary grader deducted 1 mark on Q6(b), but student text explicitly mentions the thermal trigger mechanism required by the rubric. Reconciled to full credit."
+  "reconciliation_reason": "The Primary Grader's scores are supported by the rubric and the evidence stated in the student's response."
 }}
 """
     messages = [
