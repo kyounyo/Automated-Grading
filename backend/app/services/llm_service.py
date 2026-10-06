@@ -927,64 +927,144 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         if not hl.get("question_number") or hl.get("question_number") in ["Rubric Evidence", "Rubric", "N/A"]:
             hl["question_number"] = "General Rubric Evidence"
 
-    # Ensure EVERY question in breakdown has at least one highlight entry
-    existing_q_nums = set(h.get("question_number") for h in highlights if isinstance(h, dict) and h.get("question_number"))
-    
+    # 1. Normalize question numbers and remove invalid tags like [ADDRESS]
+    for hl in highlights:
+        if not isinstance(hl, dict):
+            continue
+        q_raw = str(hl.get("question_number", "")).strip()
+        if not q_raw or "[" in q_raw or "Rubric" in q_raw or "General" in q_raw or "N/A" in q_raw:
+            hl_quote = hl.get("text", "")
+            pos = student_text.find(hl_quote) if hl_quote else -1
+            if pos != -1:
+                prefix = student_text[max(0, pos - 400):pos]
+                m_det = re.findall(r'(?:Question|Q)\s*([Q0-9A-Za-z\(\)]+)', prefix, re.IGNORECASE)
+                if m_det:
+                    clean_det = f"Q{m_det[-1]}" if not m_det[-1].startswith("Q") else m_det[-1]
+                    hl["question_number"] = clean_det
+
+    # 2. Deduplicate existing highlights (remove duplicate quotes)
+    unique_hls = []
+    for h in highlights:
+        if not isinstance(h, dict) or not h.get("text"):
+            continue
+        h_text = h["text"].strip().lower()
+        is_dup = any(h_text in ex["text"].strip().lower() or ex["text"].strip().lower() in h_text for ex in unique_hls)
+        if not is_dup:
+            unique_hls.append(h)
+    highlights = unique_hls
+
+    from .confidence import extract_main_question_number
+
+    # 3. Process each breakdown item with sub-part awareness
     for b in breakdown:
         if not isinstance(b, dict):
             continue
         b_q = b.get("question_number", "")
-        if not b_q or b_q in existing_q_nums:
+        if not b_q:
             continue
-
-        score_aw = b.get("score_awarded", 0.0)
-        max_sc = b.get("max_score", 10.0)
+        main_bq = extract_main_question_number(b_q)
+        score_aw = float(b.get("score_awarded", 0.0) or 0.0)
+        max_sc = float(b.get("max_score", 10.0) or 10.0)
         reasoning = b.get("reasoning", "Rubric criterion evaluation completed.")
 
-        # Find matching section text snippet in raw student text
-        clean_bq = re.sub(r'[^a-zA-Z0-9]', '', b_q).lower()
-        q_pos = -1
-        if clean_bq:
-            q_pos = text_lower.find(clean_bq)
+        q_matches = [h for h in highlights if extract_main_question_number(h.get("question_number", "")) == main_bq]
+
+        # Check for sub-parts in reasoning: e.g. (a) [3/5]: ... (b) [2/5]: ...
+        subpart_matches = list(re.finditer(r'\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)/([0-9\.]+)\]:\s*([^|(]+)', reasoning))
+
+        # Find question chunk in student_text
+        clean_bq_str = re.sub(r'[^a-zA-Z0-9]', '', b_q).lower()
+        q_pos = text_lower.find(clean_bq_str)
         if q_pos == -1 and len(b_q) > 1:
             m_q = re.search(r'(?:Question|Q)?\s*' + re.escape(b_q), student_text, re.IGNORECASE)
             if m_q:
                 q_pos = m_q.start()
 
-        extracted_sentences = []
+        body_chunk = ""
         if q_pos != -1:
-            # Look ahead up to 500 characters for the answer body
-            section_chunk = student_text[q_pos:q_pos + 600]
-            # Strip off the question header (e.g. "Question 6: ")
-            body_match = re.search(r'(?:Question|Q|Problem)\s*[A-Za-z0-9_()]+:?\s*([\s\S]*)', section_chunk, re.IGNORECASE)
-            raw_body = body_match.group(1) if body_match else section_chunk
-            # Split into sentences
-            all_s = [s.strip() for s in re.split(r'(?<=[.?!])\s+', raw_body) if len(s.strip()) > 8]
-            # Next question boundary check
-            cleaned_s = []
-            for s in all_s:
-                if re.match(r'^(?:Question|Q|Problem)\s+[A-Za-z0-9_()]+', s, re.IGNORECASE):
-                    break
-                cleaned_s.append(s)
-            extracted_sentences = cleaned_s
+            chunk_after = student_text[q_pos:q_pos + 1500]
+            body_match = re.search(r'(?:Question|Q|Problem)\s*[A-Za-z0-9_()]+:?\s*([\s\S]*)', chunk_after, re.IGNORECASE)
+            raw_chunk = body_match.group(1) if body_match else chunk_after
+            next_q = re.search(r'(?:^|\n\n)(?:Question|Q|Problem)\s+[A-Za-z0-9_()]+', raw_chunk, re.IGNORECASE)
+            body_chunk = raw_chunk[:next_q.start()].strip() if next_q else raw_chunk.strip()
 
-        if not extracted_sentences:
-            extracted_sentences = [f"Response section for {b_q}"]
+        if subpart_matches and body_chunk:
+            subpart_keys = [sp.group(1) for sp in subpart_matches]
+            positions = []
+            for sp in subpart_matches:
+                k = sp.group(1)
+                esc_k = re.escape(k)
+                pat = rf'(?:^|\n|\s)(?:\({esc_k}\)|{esc_k}\)|{esc_k}\.)'
+                m = re.search(pat, body_chunk, re.IGNORECASE)
+                if m:
+                    positions.append({
+                        "start": m.start() + (len(m.group(0)) - len(m.group(0).lstrip())),
+                        "key": k.lower(),
+                        "sp": sp
+                    })
+            positions.sort(key=lambda x: x["start"])
 
-        num_to_take = min(len(extracted_sentences), max(1, min(3, int(round(score_aw)))))
-        for s_idx in range(num_to_take):
-            snippet = extracted_sentences[s_idx]
-            new_hl = {
-                "text": snippet,
-                "question_number": b_q,
-                "score_awarded": 1.0 if score_aw > 0 else 0.0,
-                "max_score": max_sc,
-                "type": "strength" if score_aw > 0 else "weakness",
-                "comment": f"Evaluated for {b_q}. Reasoning: {reasoning}",
-                "location_in_raw_text": f"Question {b_q} Section"
-            }
-            highlights.append(new_hl)
-    # Ensure highlight scores strictly align with each question's score_awarded
+            first_k = subpart_keys[0].lower()
+            if not any(p["key"] == first_k for p in positions) and positions:
+                first_sp = next(sp for sp in subpart_matches if sp.group(1).lower() == first_k)
+                positions.insert(0, {"start": 0, "key": first_k, "sp": first_sp})
+
+            if len(positions) >= max(1, len(subpart_matches) - 1):
+                # Replace existing coarse highlights for this question with sub-part highlights
+                highlights = [h for h in highlights if extract_main_question_number(h.get("question_number", "")) != main_bq]
+                for i in range(len(positions)):
+                    p = positions[i]
+                    nxt = positions[i + 1]["start"] if i + 1 < len(positions) else len(body_chunk)
+                    s_text = body_chunk[p["start"]:nxt].strip()
+                    sp = p["sp"]
+                    p_key = sp.group(1)
+                    p_sc = float(sp.group(2))
+                    p_mx = float(sp.group(3))
+                    p_rs = sp.group(4).strip()
+
+                    is_short = len(s_text) <= 60
+                    if is_short:
+                        highlights.append({
+                            "text": s_text,
+                            "question_number": f"{b_q}({p_key})",
+                            "score_awarded": int(p_sc) if p_sc.is_integer() else p_sc,
+                            "max_score": p_mx,
+                            "type": "strength" if p_sc > 0 else "weakness",
+                            "comment": f"({p_key}) [{p_sc}/{p_mx}]: {p_rs}",
+                            "location_in_raw_text": f"Question {b_q} Section"
+                        })
+                    else:
+                        sentences = [s.strip().lstrip('*- ') for s in re.split(r'(?<=[.?!])\s+|\n+', s_text) if len(s.strip()) > 10 and not re.match(r'^\(?[a-zA-Z0-9][\)\.]', s.strip())]
+                        pick = sentences[0] if sentences else s_text[:120]
+                        highlights.append({
+                            "text": pick,
+                            "question_number": f"{b_q}({p_key})",
+                            "score_awarded": int(p_sc) if p_sc.is_integer() else p_sc,
+                            "max_score": p_mx,
+                            "type": "strength" if p_sc > 0 else "weakness",
+                            "comment": f"({p_key}) [{p_sc}/{p_mx}]: {p_rs}",
+                            "location_in_raw_text": f"Question {b_q} Section"
+                        })
+                continue
+
+        # If question has no highlights at all and score_aw > 0
+        if not q_matches and body_chunk and score_aw > 0:
+            sentences = [s.strip() for s in re.split(r'(?<=[.?!])\s+', body_chunk) if len(s.strip()) > 8]
+            if sentences:
+                num_to_take = min(len(sentences), max(1, int(round(score_aw))))
+                step = score_aw / num_to_take
+                for s_idx in range(num_to_take):
+                    highlights.append({
+                        "text": sentences[s_idx],
+                        "question_number": b_q,
+                        "score_awarded": round(step, 1),
+                        "max_score": max_sc,
+                        "type": "strength",
+                        "comment": f"Evaluated for {b_q}. Reasoning: {reasoning}",
+                        "location_in_raw_text": f"Question {b_q} Section"
+                    })
+
+    # 4. Strict final alignment: Ensure sum of strength highlights strictly equals score_awarded
     for b in breakdown:
         if not isinstance(b, dict):
             continue
@@ -992,13 +1072,12 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         if not b_q:
             continue
         target_score = float(b.get("score_awarded", 0.0) or 0.0)
+        main_bq = extract_main_question_number(b_q)
 
-        clean_bq = re.sub(r'[^a-zA-Z0-9]', '', b_q).upper()
         q_hls = [
             h for h in highlights
-            if isinstance(h, dict) and re.sub(r'[^a-zA-Z0-9]', '', str(h.get("question_number", ""))).upper() == clean_bq
+            if isinstance(h, dict) and extract_main_question_number(h.get("question_number", "")) == main_bq
         ]
-
         if not q_hls:
             continue
 
@@ -1012,36 +1091,24 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
             for h in q_hls:
                 h["score_awarded"] = 0.0
                 h["type"] = "weakness"
-        elif abs(current_sum - target_score) > 0.05:
-            # Rebalance scores cleanly into integer or standard half-mark increments
+        elif abs(current_sum - target_score) > 0.05 and positive_hls:
             if len(positive_hls) == 1:
                 clean_target = int(target_score) if target_score.is_integer() else target_score
                 positive_hls[0]["score_awarded"] = clean_target
                 positive_hls[0]["type"] = "strength"
             else:
-                is_fractional = (target_score % 1) != 0
-                step = 0.5 if is_fractional else 1.0
-                total_units = int(round(target_score / step))
                 total_weight = sum(float(h.get("score_awarded", 0.0) or 1.0) for h in positive_hls)
-
-                allocated_units = []
-                remainders = []
                 for h in positive_hls:
                     w = float(h.get("score_awarded", 0.0) or 1.0)
-                    exact = (w / (total_weight if total_weight > 0 else len(positive_hls))) * total_units
-                    base = int(exact)
-                    allocated_units.append(base)
-                    remainders.append(exact - base)
+                    scaled = (w / (total_weight if total_weight > 0 else len(positive_hls))) * target_score
+                    h["score_awarded"] = int(round(scaled)) if (target_score.is_integer() and round(scaled).is_integer()) else round(scaled, 1)
+                    h["type"] = "strength" if h["score_awarded"] > 0 else "weakness"
 
-                remaining_units = total_units - sum(allocated_units)
-                sorted_indices = sorted(range(len(positive_hls)), key=lambda i: remainders[i], reverse=True)
-                for i in range(min(remaining_units, len(positive_hls))):
-                    allocated_units[sorted_indices[i]] += 1
-
-                for idx, h in enumerate(positive_hls):
-                    final_score = allocated_units[idx] * step
-                    h["score_awarded"] = int(final_score) if (isinstance(final_score, float) and final_score.is_integer()) else final_score
-                    h["type"] = "strength" if final_score > 0 else "weakness"
+        if target_score > 0:
+            highlights = [
+                h for h in highlights
+                if not (extract_main_question_number(h.get("question_number", "")) == main_bq and h.get("type") == "strength" and float(h.get("score_awarded", 0.0) or 0.0) == 0)
+            ]
 
     primary_res["highlights"] = highlights
 
