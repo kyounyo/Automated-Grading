@@ -249,6 +249,19 @@ const GradingReview = () => {
 
         const maxSc = parseFloat(rq.max_score || 10.0);
 
+        // MATHEMATICAL TRUTH ALIGNMENT:
+        // If AI reasoning contains explicit sub-part mark assignments like (a) [3/5] (b) [2/5],
+        // the true awarded score is the sum of those sub-parts (capped at max_score).
+        // This eliminates LLM addition discrepancies where subparts add to 6 but score_awarded was written as 5.
+        if (resolvedReasoning) {
+          const subPartMatches = Array.from(resolvedReasoning.matchAll(/\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]/g));
+          if (subPartMatches.length > 0) {
+            const subPartSum = subPartMatches.reduce((acc, m) => acc + (parseFloat(m[2]) || 0), 0);
+            const clamped = Math.min(maxSc, subPartSum);
+            resolvedScore = allowsHalfMarks ? Math.round(clamped * 10) / 10 : Math.round(clamped);
+          }
+        }
+
         return {
           question_number: qNum,
           prompt: rq.prompt || `Question ${qNum}`,
@@ -280,15 +293,28 @@ const GradingReview = () => {
         if (bd.reasoning) grouped[mainQ].reasoning_parts.push(bd.reasoning);
       });
 
-      return Object.values(grouped).map(g => ({
-        question_number: g.question_number,
-        prompt: g.prompt,
-        model_answer: g.model_answer,
-        max_score: g.max_score,
-        score_awarded: allowsHalfMarks ? Math.round(g.score_awarded * 10) / 10 : Math.round(g.score_awarded),
-        reasoning: g.reasoning_parts.join(' | '),
-        is_ai_graded: true
-      }));
+      return Object.values(grouped).map(g => {
+        const reasoningCombined = g.reasoning_parts.join(' | ');
+        const maxSc = g.max_score || 10.0;
+        let finalSc = allowsHalfMarks ? Math.round(g.score_awarded * 10) / 10 : Math.round(g.score_awarded);
+
+        // Align score_awarded to the sum of subparts if present
+        const subPartMatches = Array.from(reasoningCombined.matchAll(/\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]/g));
+        if (subPartMatches.length > 0) {
+          const subPartSum = subPartMatches.reduce((acc, m) => acc + (parseFloat(m[2]) || 0), 0);
+          finalSc = Math.min(maxSc, allowsHalfMarks ? Math.round(subPartSum * 10) / 10 : Math.round(subPartSum));
+        }
+
+        return {
+          question_number: g.question_number,
+          prompt: g.prompt,
+          model_answer: g.model_answer,
+          max_score: maxSc,
+          score_awarded: finalSc,
+          reasoning: reasoningCombined,
+          is_ai_graded: true
+        };
+      });
     }
     return EMPTY_ARRAY;
   }, [rubricQuestions, breakdown, allowsHalfMarks, isSubmissionUnfinished]);
@@ -531,6 +557,102 @@ const GradingReview = () => {
       setSaving(false);
     }
   };
+  // Helper to resolve and merge overlapping highlights into clean, non-overlapping spans
+  // guaranteeing that every highlight matches verbatim without collisions or dropped points.
+  const resolveNonOverlappingHighlights = (sectionText, rawCandidates, sectionScore, allowHalf) => {
+    if (!sectionText || !rawCandidates || rawCandidates.length === 0 || sectionScore <= 0) {
+      return [];
+    }
+
+    const lowerSec = sectionText.toLowerCase();
+    const spans = [];
+
+    rawCandidates.forEach(cand => {
+      if (!cand || !cand.text) return;
+      const cleanText = cand.text.trim();
+      if (cleanText.length < 3) return;
+
+      const idx = lowerSec.indexOf(cleanText.toLowerCase());
+      if (idx !== -1) {
+        spans.push({
+          start: idx,
+          end: idx + cleanText.length,
+          text: sectionText.slice(idx, idx + cleanText.length),
+          cand
+        });
+      }
+    });
+
+    if (spans.length === 0) return [];
+
+    // Sort by start position ascending, then length descending (prefer longer spans)
+    spans.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+    // Merge any overlapping or adjacent spans
+    const mergedSpans = [];
+    spans.forEach(sp => {
+      if (mergedSpans.length === 0) {
+        mergedSpans.push({ ...sp });
+        return;
+      }
+      const prev = mergedSpans[mergedSpans.length - 1];
+      if (sp.start <= prev.end) {
+        prev.end = Math.max(prev.end, sp.end);
+        prev.text = sectionText.slice(prev.start, prev.end);
+      } else {
+        mergedSpans.push({ ...sp });
+      }
+    });
+
+    if (mergedSpans.length === 1) {
+      const sc = Number.isInteger(sectionScore) ? sectionScore : Math.round(sectionScore * 10) / 10;
+      return [{
+        ...mergedSpans[0].cand,
+        text: mergedSpans[0].text,
+        aligned_score: sc,
+        score_awarded: sc,
+        type: 'strength'
+      }];
+    }
+
+    const step = allowHalf ? 0.5 : 1.0;
+    const totalUnits = Math.round(sectionScore / step);
+    const items = mergedSpans.map(m => ({
+      span: m,
+      weight: (m.cand && parseFloat(m.cand.score_awarded)) || 1.0
+    }));
+    const totalWeight = items.reduce((acc, it) => acc + it.weight, 0);
+
+    const allocated = items.map((it, idx) => {
+      const exact = (it.weight / (totalWeight > 0 ? totalWeight : items.length)) * totalUnits;
+      const base = Math.floor(exact);
+      return { it, base, rem: exact - base, origIdx: idx };
+    });
+
+    let curUnits = allocated.reduce((acc, a) => acc + a.base, 0);
+    let remUnits = totalUnits - curUnits;
+    const sorted = [...allocated].sort((a, b) => b.rem - a.rem);
+    for (let r = 0; r < remUnits && r < sorted.length; r++) {
+      sorted[r].base += 1;
+    }
+
+    const result = [];
+    allocated.forEach(a => {
+      const finalSc = a.base * step;
+      if (finalSc > 0) {
+        const sc = Number.isInteger(finalSc) ? finalSc : Math.round(finalSc * 10) / 10;
+        result.push({
+          ...a.it.span.cand,
+          text: a.it.span.text,
+          aligned_score: sc,
+          score_awarded: sc,
+          type: 'strength'
+        });
+      }
+    });
+
+    return result;
+  };
 
   const renderHighlightedSnippet = (textSnippet, highlightsList) => {
     if (!highlightsList || highlightsList.length === 0) {
@@ -673,7 +795,8 @@ const GradingReview = () => {
           // 1. Check if AI reasoning contains explicit sub-question marks: e.g. (a) [3/5]: ... (b) [2/5]: ...
           let blockHighlights = [];
           const reasoningText = matchedQuestion?.reasoning || '';
-          const subPartMatches = Array.from(reasoningText.matchAll(/\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]:\s*([^|(]+)/g));
+          const subPartRegex = /\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]:?\s*/g;
+          const subPartMatches = Array.from(reasoningText.matchAll(subPartRegex));
 
           let subPartsProcessed = false;
           if (subPartMatches.length > 0 && bodyContent && bodyContent.trim().length > 3) {
@@ -709,13 +832,17 @@ const GradingReview = () => {
               const p = positions[i];
               const nextStart = i + 1 < positions.length ? positions[i + 1].start : bodyContent.length;
               const sectionText = bodyContent.slice(p.start, nextStart).trim();
-              const spInfo = subPartMatches.find(m => m[1].toLowerCase() === p.key);
-              if (spInfo && sectionText.length > 0) {
+              const mIdx = subPartMatches.findIndex(m => m[1].toLowerCase() === p.key);
+              if (mIdx !== -1 && sectionText.length > 0) {
+                const m = subPartMatches[mIdx];
+                const startReason = m.index + m[0].length;
+                const endReason = mIdx + 1 < subPartMatches.length ? subPartMatches[mIdx + 1].index : reasoningText.length;
+                const reasonText = reasoningText.slice(startReason, endReason).replace(/\|\s*$/, '').trim();
                 sections.push({
                   key: p.key,
-                  score: parseFloat(spInfo[2]) || 0,
-                  max: parseFloat(spInfo[3]) || 0,
-                  reason: spInfo[4].trim(),
+                  score: parseFloat(m[2]) || 0,
+                  max: parseFloat(m[3]) || 0,
+                  reason: reasonText,
                   text: sectionText
                 });
               }
@@ -731,102 +858,55 @@ const GradingReview = () => {
                 const pReason = sec.reason;
                 const sText = sec.text;
 
-                const isShortAnswer = sText.trim().length <= 60;
+                if (pScore <= 0) return;
 
-                if (isShortAnswer) {
-                  generatedHighlights.push({
-                    text: sText,
-                    question_number: `${qKey}(${pKey})`,
-                    score_awarded: pScore,
-                    aligned_score: Number.isInteger(pScore) ? pScore : Math.round(pScore * 10) / 10,
-                    max_score: pMax,
-                    type: pScore > 0 ? 'strength' : 'weakness',
-                    comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
-                  });
-                } else {
-                  // Long-form answer (e.g. Q6 essay)
-                  const secMatches = (highlightsList || []).filter(h => {
-                    if (!h || !h.text || h.text.trim().length < 4) return false;
-                    return sText.toLowerCase().includes(h.text.trim().toLowerCase());
-                  }).map(h => ({ ...h }));
+                const rawSecCands = [];
 
-                  const quoteMatches = pReason.match(/'([^']+)'|"([^"]+)"/g) || [];
-                  quoteMatches.forEach(qm => {
-                    const cleanQ = qm.replace(/['"]/g, '').trim();
-                    if (cleanQ.length > 4 && sText.toLowerCase().includes(cleanQ.toLowerCase())) {
-                      if (!secMatches.some(sm => sm.text.toLowerCase().includes(cleanQ.toLowerCase()))) {
-                        secMatches.push({
-                          text: cleanQ,
-                          score_awarded: pScore,
-                          type: pScore > 0 ? 'strength' : 'weakness',
-                          comment: pReason
-                        });
-                      }
-                    }
-                  });
-
-                  // Deduplicate inside this section
-                  const uniqueSecHls = [];
-                  secMatches.forEach(cand => {
-                    const candText = cand.text.trim().toLowerCase();
-                    const isDup = uniqueSecHls.some(ex => {
-                      const exText = ex.text.trim().toLowerCase();
-                      return exText.includes(candText) || candText.includes(exText);
-                    });
-                    if (!isDup) uniqueSecHls.push(cand);
-                  });
-
-                  if (uniqueSecHls.length > 0 && pScore > 0) {
-                    if (uniqueSecHls.length === 1) {
-                      uniqueSecHls[0].aligned_score = Number.isInteger(pScore) ? pScore : Math.round(pScore * 10) / 10;
-                      uniqueSecHls[0].score_awarded = pScore;
-                      uniqueSecHls[0].question_number = `${qKey}(${pKey})`;
-                      uniqueSecHls[0].comment = `(${pKey}) [${pScore}/${pMax}]: ${pReason}`;
-                      uniqueSecHls[0].type = 'strength';
-                      generatedHighlights.push(uniqueSecHls[0]);
-                    } else {
-                      const step = allowsHalfMarks ? 0.5 : 1.0;
-                      const totalUnits = Math.round(pScore / step);
-                      const totalWeight = uniqueSecHls.reduce((acc, h) => acc + (parseFloat(h.score_awarded) || 1.0), 0);
-                      const items = uniqueSecHls.map((h, idx) => {
-                        const w = parseFloat(h.score_awarded) || 1.0;
-                        const exactUnits = (w / (totalWeight > 0 ? totalWeight : uniqueSecHls.length)) * totalUnits;
-                        const baseUnits = Math.floor(exactUnits);
-                        return { h, baseUnits, remainder: exactUnits - baseUnits };
-                      });
-                      let allocatedUnits = items.reduce((acc, it) => acc + it.baseUnits, 0);
-                      let remainingUnits = totalUnits - allocatedUnits;
-                      const sorted = [...items].sort((a, b) => b.remainder - a.remainder);
-                      for (let r = 0; r < remainingUnits && r < sorted.length; r++) {
-                        sorted[r].baseUnits += 1;
-                      }
-                      items.forEach(it => {
-                        const finalSc = it.baseUnits * step;
-                        if (finalSc > 0) {
-                          it.h.aligned_score = Number.isInteger(finalSc) ? finalSc : Math.round(finalSc * 10) / 10;
-                          it.h.score_awarded = it.h.aligned_score;
-                          it.h.question_number = `${qKey}(${pKey})`;
-                          it.h.comment = `(${pKey}) [${pScore}/${pMax}]: ${pReason}`;
-                          it.h.type = 'strength';
-                          generatedHighlights.push(it.h);
-                        }
-                      });
-                    }
-                  } else if (pScore > 0) {
-                    // Fallback: pick key sentence from this section so this sub-part is never missed!
-                    const rawSentences = sText.split(/(?<=[.?!])\s+|\n+/).map(s => s.trim().replace(/^[\*\-\s]+/, '')).filter(s => s.length > 10 && !/^\(?[a-zA-Z0-9][\)\.]/.test(s));
-                    const pick = rawSentences.length > 0 ? rawSentences[0] : sText;
-                    generatedHighlights.push({
-                      text: pick,
-                      question_number: `${qKey}(${pKey})`,
-                      score_awarded: pScore,
-                      aligned_score: Number.isInteger(pScore) ? pScore : Math.round(pScore * 10) / 10,
-                      max_score: pMax,
+                // 1. Existing highlights from highlightsList inside sText
+                (highlightsList || []).forEach(h => {
+                  if (h && h.text && h.text.trim().length >= 4 && sText.toLowerCase().includes(h.text.trim().toLowerCase())) {
+                    rawSecCands.push({
+                      text: h.text.trim(),
+                      score_awarded: h.score_awarded || 1.0,
                       type: 'strength',
                       comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
                     });
                   }
+                });
+
+                // 2. Quotes from reasoning
+                const quoteMatches = pReason.match(/'([^']+)'|"([^"]+)"/g) || [];
+                quoteMatches.forEach(qm => {
+                  const cleanQ = qm.replace(/['"]/g, '').trim();
+                  if (cleanQ.length > 4 && sText.toLowerCase().includes(cleanQ.toLowerCase())) {
+                    rawSecCands.push({
+                      text: cleanQ,
+                      score_awarded: pScore,
+                      type: 'strength',
+                      comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
+                    });
+                  }
+                });
+
+                // 3. Fallback: if no candidates found or if short answer / single sentence
+                if (rawSecCands.length === 0) {
+                  const rawSentences = sText.split(/(?<=[.?!])\s+|\n+/).map(s => s.trim().replace(/^[\*\-\s]+/, '')).filter(s => s.length > 8 && !/^\(?[a-zA-Z0-9][\)\.]/.test(s));
+                  const pick = rawSentences.length > 0 ? rawSentences[0] : sText;
+                  rawSecCands.push({
+                    text: pick,
+                    score_awarded: pScore,
+                    type: 'strength',
+                    comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
+                  });
                 }
+
+                // Resolve non-overlapping highlights for this subpart
+                const resolved = resolveNonOverlappingHighlights(sText, rawSecCands, pScore, allowsHalfMarks);
+                resolved.forEach(r => {
+                  r.question_number = `${qKey}(${pKey})`;
+                  r.comment = `(${pKey}) [${pScore}/${pMax}]: ${pReason}`;
+                  generatedHighlights.push(r);
+                });
               });
 
               if (generatedHighlights.length > 0) {
@@ -837,117 +917,54 @@ const GradingReview = () => {
           }
 
           if (!subPartsProcessed) {
-            // 2. Filter highlights matching this question section or contained in bodyContent
-            let rawMatches = (highlightsList || []).filter(h => {
-              if (!h || !h.text || h.text.trim().length < 3) return false;
-              const hText = h.text.trim().toLowerCase();
-              const inBody = bodyContent.toLowerCase().includes(hText);
-              const qMatches = h.question_number && extractMainQKey(h.question_number) === mainKey;
-              return inBody || (qMatches && bodyContent.toLowerCase().includes(hText.slice(0, 30)));
-            }).map(h => ({ ...h }));
-
-            // DEDUPLICATION: Remove duplicate highlights that overlap or cover the same text
-            const uniqueHls = [];
-            rawMatches.forEach(cand => {
-              const candText = cand.text.trim().toLowerCase();
-              const isDuplicate = uniqueHls.some(exist => {
-                const existText = exist.text.trim().toLowerCase();
-                return existText.includes(candText) || candText.includes(existText);
-              });
-              if (!isDuplicate) {
-                uniqueHls.push(cand);
+            const rawCands = [];
+            (highlightsList || []).forEach(h => {
+              if (h && h.text && h.text.trim().length >= 4 && bodyContent.toLowerCase().includes(h.text.trim().toLowerCase())) {
+                rawCands.push({
+                  text: h.text.trim(),
+                  score_awarded: h.score_awarded || 1.0,
+                  type: 'strength',
+                  comment: matchedQuestion?.reasoning || 'Key evidence response point.'
+                });
               }
             });
-            blockHighlights = uniqueHls;
 
-            // 3. Synthesize additional highlights from quotes in reasoning if targetScore > 0
             if (matchedQuestion?.reasoning && targetScore > 0) {
               const quoteMatches = matchedQuestion.reasoning.match(/'([^']+)'|"([^"]+)"/g) || [];
               quoteMatches.forEach(qm => {
                 const cleanQ = qm.replace(/['"]/g, '').trim();
                 if (cleanQ.length > 5 && bodyContent.toLowerCase().includes(cleanQ.toLowerCase())) {
-                  if (!blockHighlights.some(bh => bh.text.toLowerCase().includes(cleanQ.toLowerCase()) || cleanQ.toLowerCase().includes(bh.text.toLowerCase()))) {
-                    blockHighlights.push({
-                      text: cleanQ,
-                      type: 'strength',
-                      score_awarded: 1.0,
-                      question_number: qKey,
-                      comment: matchedQuestion.reasoning
-                    });
-                  }
+                  rawCands.push({
+                    text: cleanQ,
+                    type: 'strength',
+                    score_awarded: 1.0,
+                    question_number: qKey,
+                    comment: matchedQuestion.reasoning
+                  });
                 }
               });
             }
 
-            // 4. Fallback: if student has non-empty response and targetScore > 0 but NO highlights matched
-            if (blockHighlights.length === 0 && targetScore > 0 && !isBodyEmpty && bodyContent.trim().length > 5) {
+            if (rawCands.length === 0 && targetScore > 0 && !isBodyEmpty && bodyContent.trim().length > 5) {
               const sentences = bodyContent.split(/(?<=[.?!])\s+/).filter(s => s.trim().length > 8);
               if (sentences.length > 0) {
                 const numToTake = Math.min(sentences.length, Math.max(1, Math.round(targetScore)));
                 for (let sIdx = 0; sIdx < numToTake; sIdx++) {
                   const sText = sentences[sIdx].trim();
                   if (sText.length > 5) {
-                    blockHighlights.push({
+                    rawCands.push({
                       text: sText,
                       type: 'strength',
                       score_awarded: 1.0,
                       question_number: qKey,
-                      comment: matchedQuestion?.reasoning || `Key evidence response point.`
+                      comment: matchedQuestion?.reasoning || 'Key evidence response point.'
                     });
                   }
                 }
               }
             }
 
-            // 5. STRICT MARK ALIGNMENT: Re-balance highlight marks into clean units so sum === targetScore
-            const strengthHls = blockHighlights.filter(h => h.type === 'strength' || (parseFloat(h.score_awarded) || 0) > 0);
-
-            if (targetScore === 0) {
-              blockHighlights.forEach(h => {
-                h.aligned_score = 0;
-                h.type = 'weakness';
-              });
-            } else if (strengthHls.length > 0) {
-              if (strengthHls.length === 1) {
-                strengthHls[0].aligned_score = Number.isInteger(targetScore) ? targetScore : Math.round(targetScore * 10) / 10;
-              } else {
-                const isFractional = (targetScore % 1) !== 0;
-                const step = (isFractional || allowsHalfMarks) ? 0.5 : 1.0;
-                const totalUnits = Math.round(targetScore / step);
-                const totalWeight = strengthHls.reduce((acc, h) => acc + (parseFloat(h.score_awarded) || 1.0), 0);
-
-                const items = strengthHls.map((h, i) => {
-                  const w = parseFloat(h.score_awarded) || 1.0;
-                  const exactUnits = (w / (totalWeight > 0 ? totalWeight : strengthHls.length)) * totalUnits;
-                  const baseUnits = Math.floor(exactUnits);
-                  return { h, origIdx: i, baseUnits, remainder: exactUnits - baseUnits };
-                });
-
-                let allocatedUnits = items.reduce((acc, it) => acc + it.baseUnits, 0);
-                let remainingUnits = totalUnits - allocatedUnits;
-
-                const sorted = [...items].sort((a, b) => b.remainder - a.remainder);
-                for (let r = 0; r < remainingUnits && r < sorted.length; r++) {
-                  sorted[r].baseUnits += 1;
-                }
-
-                items.forEach(it => {
-                  const finalSc = it.baseUnits * step;
-                  it.h.aligned_score = Number.isInteger(finalSc) ? finalSc : Math.round(finalSc * 10) / 10;
-                });
-              }
-            }
-
-            // Filter out any positive highlight candidate that ended up with 0 units (do not display confusing 0m highlights)
-            if (targetScore > 0) {
-              blockHighlights = blockHighlights.filter(h => {
-                const sc = h.aligned_score != null ? h.aligned_score : h.score_awarded;
-                if (h.type === 'strength' && (sc === 0 || parseFloat(sc) === 0)) {
-                  return false;
-                }
-                return true;
-              });
-            }
+            blockHighlights = resolveNonOverlappingHighlights(bodyContent, rawCands, targetScore, allowsHalfMarks);
           }
 
           return (

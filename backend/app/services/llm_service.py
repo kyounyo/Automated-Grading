@@ -971,6 +971,12 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
 
         # Check for sub-parts in reasoning: e.g. (a) [3/5]: ... (b) [2/5]: ...
         subpart_matches = list(re.finditer(r'\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)/([0-9\.]+)\]:\s*([^|(]+)', reasoning))
+        if subpart_matches:
+            subpart_sum = sum(float(sp.group(2)) for sp in subpart_matches)
+            clamped_sum = min(max_sc, subpart_sum)
+            if abs(clamped_sum - score_aw) > 0.01:
+                b["score_awarded"] = int(clamped_sum) if clamped_sum.is_integer() else clamped_sum
+                score_aw = float(b["score_awarded"])
 
         # Find question chunk in student_text
         clean_bq_str = re.sub(r'[^a-zA-Z0-9]', '', b_q).lower()
