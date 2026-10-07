@@ -11,8 +11,8 @@ if hasattr(sys.stderr, "reconfigure"):
 
 # Ensure backend .env is loaded regardless of execution working directory
 _env_path = Path(__file__).resolve().parent.parent / ".env"
-load_dotenv(dotenv_path=_env_path)
-load_dotenv()
+load_dotenv(dotenv_path=_env_path, override=True)
+load_dotenv(override=True)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

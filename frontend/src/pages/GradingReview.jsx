@@ -249,19 +249,6 @@ const GradingReview = () => {
 
         const maxSc = parseFloat(rq.max_score || 10.0);
 
-        // MATHEMATICAL TRUTH ALIGNMENT:
-        // If AI reasoning contains explicit sub-part mark assignments like (a) [3/5] (b) [2/5],
-        // the true awarded score is the sum of those sub-parts (capped at max_score).
-        // This eliminates LLM addition discrepancies where subparts add to 6 but score_awarded was written as 5.
-        if (resolvedReasoning) {
-          const subPartMatches = Array.from(resolvedReasoning.matchAll(/\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]/g));
-          if (subPartMatches.length > 0) {
-            const subPartSum = subPartMatches.reduce((acc, m) => acc + (parseFloat(m[2]) || 0), 0);
-            const clamped = Math.min(maxSc, subPartSum);
-            resolvedScore = allowsHalfMarks ? Math.round(clamped * 10) / 10 : Math.round(clamped);
-          }
-        }
-
         return {
           question_number: qNum,
           prompt: rq.prompt || `Question ${qNum}`,
@@ -298,13 +285,6 @@ const GradingReview = () => {
         const maxSc = g.max_score || 10.0;
         let finalSc = allowsHalfMarks ? Math.round(g.score_awarded * 10) / 10 : Math.round(g.score_awarded);
 
-        // Align score_awarded to the sum of subparts if present
-        const subPartMatches = Array.from(reasoningCombined.matchAll(/\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]/g));
-        if (subPartMatches.length > 0) {
-          const subPartSum = subPartMatches.reduce((acc, m) => acc + (parseFloat(m[2]) || 0), 0);
-          finalSc = Math.min(maxSc, allowsHalfMarks ? Math.round(subPartSum * 10) / 10 : Math.round(subPartSum));
-        }
-
         return {
           question_number: g.question_number,
           prompt: g.prompt,
@@ -329,14 +309,20 @@ const GradingReview = () => {
       setActiveHighlightPop(null);
     }
 
-    const targetScoreStr = currentSub.score != null ? currentSub.score.toString() : '';
-    setOverrideScore(prev => (prev === targetScoreStr ? prev : targetScoreStr));
-
     const initialScores = {};
+    let initialSum = 0;
     effectiveQuestions.forEach((q, idx) => {
       const qKey = q.question_number || `Q${idx + 1}`;
-      initialScores[qKey] = q.score_awarded != null ? q.score_awarded : 0;
+      const sc = q.score_awarded != null ? q.score_awarded : 0;
+      initialScores[qKey] = sc;
+      initialSum += (parseFloat(sc) || 0);
     });
+
+    const targetTotal = effectiveQuestions.length > 0
+      ? (allowsHalfMarks ? Math.round(initialSum * 10) / 10 : Math.round(initialSum))
+      : (currentSub.score != null ? currentSub.score : null);
+    const targetScoreStr = targetTotal != null ? targetTotal.toString() : '';
+    setOverrideScore(prev => (prev === targetScoreStr ? prev : targetScoreStr));
 
     setQuestionScores(prev => {
       const prevKeys = Object.keys(prev);
@@ -446,7 +432,17 @@ const GradingReview = () => {
     return 20;
   }, [activeAssignment, effectiveQuestions]);
 
-  const calculatedTotalFromQuestions = Object.values(questionScores).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+  const calculatedTotalFromQuestions = useMemo(() => {
+    const scoresObj = Object.keys(questionScores).length > 0
+      ? questionScores
+      : effectiveQuestions.reduce((acc, q, idx) => {
+          const qKey = q.question_number || `Q${idx + 1}`;
+          acc[qKey] = q.score_awarded != null ? q.score_awarded : 0;
+          return acc;
+        }, {});
+    const sum = Object.values(scoresObj).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+    return allowsHalfMarks ? Math.round(sum * 10) / 10 : Math.round(sum);
+  }, [questionScores, effectiveQuestions, allowsHalfMarks]);
 
   // Per-question score steppers
   const handleStepQuestionScore = (qKey, maxScore, delta) => {
@@ -515,7 +511,9 @@ const GradingReview = () => {
   const handleApproveGrade = async () => {
     try {
       setSaving(true);
-      const currentScore = activeSubmissionObj.score != null ? activeSubmissionObj.score : 0.0;
+      const finalScoreToApprove = (overrideScore !== '' && !isNaN(parseFloat(overrideScore)))
+        ? parseFloat(overrideScore)
+        : (effectiveQuestions.length > 0 ? calculatedTotalFromQuestions : (activeSubmissionObj.score != null ? activeSubmissionObj.score : 0.0));
       const updatedBreakdown = effectiveQuestions.map((q, idx) => {
         const qKey = q.question_number || `Q${idx + 1}`;
         return {
@@ -529,13 +527,13 @@ const GradingReview = () => {
 
       const updated = await handleScoreOverride(
         activeSubmissionObj.id,
-        currentScore,
+        finalScoreToApprove,
         overrideComment || 'Audited and approved by lecturer',
         updatedBreakdown
       );
       if (updated) {
         setActiveSubmission(updated);
-        setOverrideScore(updated.score != null ? updated.score.toString() : currentScore.toString());
+        setOverrideScore(updated.score != null ? updated.score.toString() : finalScoreToApprove.toString());
       }
       alert('Grade approved successfully! Audit flag resolved and submission status updated to Graded & Approved.');
       setOverrideComment('');
@@ -1224,7 +1222,12 @@ const GradingReview = () => {
               Total Score
             </span>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: isSubmissionUnfinished ? 'var(--text-dim)' : 'var(--primary)', lineHeight: 1 }}>
-              {(!isSubmissionUnfinished && activeSubmissionObj.score != null) ? activeSubmissionObj.score : '—'}
+              {isSubmissionUnfinished
+                ? '—'
+                : (effectiveQuestions.length > 0
+                    ? calculatedTotalFromQuestions
+                    : (activeSubmissionObj.score != null ? activeSubmissionObj.score : '—')
+                  )}
               <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', fontWeight: 600 }}>{totalMaxScore ? ` / ${totalMaxScore}` : ''}</span>
             </span>
           </div>
@@ -1447,9 +1450,10 @@ const GradingReview = () => {
 
                   const auditorMatch = auditorBreakdown.find(ab => extractMainQKey(ab.question_number) === mainKey) || null;
                   const auditorScore = auditorMatch ? (auditorMatch.score_awarded ?? auditorMatch.auditor_score) : null;
+                  const auditorScoreVal = auditorScore != null ? parseFloat(auditorScore) : null;
                   const pScore = parseFloat(item.score_awarded ?? currentScoreVal);
-                  const isAuditorDiscrepancy = auditorScore != null && Math.abs(pScore - parseFloat(auditorScore)) > 0.01;
-                  const hasConflict = isItemConflicted || isAuditorDiscrepancy;
+                  const scoreDelta = auditorScoreVal != null ? Math.round(Math.abs(pScore - auditorScoreVal) * 10) / 10 : 0;
+                  const hasConflict = isItemConflicted;
 
                   // Active expanded state: defaults to true on conflict or if expandAllFeedback is toggled
                   const isExpanded = expandedFeedback[qKey] !== undefined ? expandedFeedback[qKey] : (hasConflict || expandAllFeedback);
@@ -1465,8 +1469,8 @@ const GradingReview = () => {
 
                   // Determine best feedback text for this question
                   let effectiveFeedbackText = (item.reasoning || '').trim();
-                  const isPlaceholder = !effectiveFeedbackText || 
-                    effectiveFeedbackText.toLowerCase().includes('evaluated against') || 
+                  const isPlaceholder = !effectiveFeedbackText ||
+                    effectiveFeedbackText.toLowerCase().includes('evaluated against') ||
                     effectiveFeedbackText.toLowerCase() === 'no response evaluated';
 
                   if (isPlaceholder && auditorReasoningText && !auditorReasoningText.toLowerCase().includes('evaluated against')) {
@@ -1498,8 +1502,11 @@ const GradingReview = () => {
                             Max: {maxSc} pts
                           </span>
                           {hasConflict && (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
-                              ⚠️ Flagged
+                            <span
+                              title={`Auditor Discrepancy: Primary gave ${pScore} pts vs Auditor evaluated ${auditorScoreVal} pts (Δ${scoreDelta} pts)`}
+                              style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}
+                            >
+                              ⚠️ Flagged ({scoreDelta > 0 ? `Δ${scoreDelta} pts` : 'Conflict'})
                             </span>
                           )}
                         </div>

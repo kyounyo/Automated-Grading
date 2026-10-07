@@ -10,8 +10,8 @@ from .confidence import evaluate_confidence_and_status
 
 # Ensure backend .env is loaded regardless of execution working directory
 _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-load_dotenv(dotenv_path=_env_path)
-load_dotenv()
+load_dotenv(dotenv_path=_env_path, override=True)
+load_dotenv(override=True)
 
 def get_openrouter_api_key() -> str:
     return os.getenv("OPENROUTER_API_KEY", "").strip()
@@ -779,6 +779,11 @@ def call_llm_for_grading(
         
         # Re-synchronize highlight scores with reconciled breakdown scores
         _enrich_highlights_with_question_info(primary_res, student_text)
+
+    # Final mathematical guarantee: overall_score must strictly equal the sum of breakdown items
+    if isinstance(feedback.get("breakdown"), list) and feedback["breakdown"]:
+        final_bd_sum = sum(float(item.get("score_awarded", 0.0)) for item in feedback["breakdown"] if isinstance(item, dict))
+        primary_res["overall_score"] = round(final_bd_sum, 1)
 
     print(f" │   └─ [Reconciliation Complete] Final Status: {primary_res['status'].upper()} | Final Score: {primary_res['overall_score']}/{total_max_score} | Confidence: {primary_res['confidence_score']*100:.1f}%", flush=True)
 
