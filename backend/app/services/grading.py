@@ -7,7 +7,8 @@ from ..models import Submission, Assignment, EvaluationLog, CalibrationExample, 
 from .document_parser import extract_text_from_file
 from .rag import retrieve_rubric_context
 from .llm_service import call_llm_for_grading
-from .confidence import evaluate_confidence_and_status
+from .confidence import evaluate_confidence_and_status, normalize_question_number
+from typing import Any, Dict, Optional
 
 PROMPT_VERSION = os.getenv("PROMPT_VERSION", "v1.2-rubric-cot")
 LLM_MODEL = os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite")
@@ -37,8 +38,11 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     2. Extract document text from PDF / DOCX / raw_text
     3. Calculate total assignment max score (sum of question max_score)
     4. If submission is blank, award 0.0 marks directly
-    5. Query ChromaDB for top-k relevant rubric context
-    6. Call Multi-Agent LLM for structured scoring & feedback
+    5. Query Question-Matched Calibration Examples
+    6. Call Multi-Agent LLM for structured scoring & feedback -- per question, this
+       queries ChromaDB for that question's own rubric context (cached alongside its
+       Grading Specification after the first lookup, see _get_rag_context below) and
+       feeds it into both classification and grading
     7. Evaluate confidence score & determine status
     8. Save score, duration, model, & prompt_version into PostgreSQL
     9. Log evaluation metrics into EvaluationLog table
@@ -55,7 +59,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
 
     # Step 1: Extract Document Text from raw_text or file_path
     print(f"\n[Submission {submission.student_id}] ({submission.student_name})", flush=True)
-    print(f" ├─ [1/4] Extracting student submission text...", flush=True)
+    print(f" ├─ [1/3] Extracting student submission text...", flush=True)
     submission.status = "extracting_answers"
     if not assignment.grading_started_at:
         assignment.grading_started_at = datetime.datetime.utcnow()
@@ -127,13 +131,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
 
         return submission
 
-    # Step 3: Query ChromaDB for RAG context
-    print(f" ├─ [2/4] Retrieving ChromaDB rubric & question vector context...", flush=True)
-    submission.status = "retrieving_rubric"
-    db.commit()
-    rag_context = retrieve_rubric_context(assignment.id, extracted_text)
-
-    # Step 3.5: Query Question-Matched Calibration Examples for Assignment
+    # Step 3: Query Question-Matched Calibration Examples for Assignment
     cal_examples = db.query(CalibrationExample).filter(
         CalibrationExample.assignment_id == assignment.id
     ).all()
@@ -160,15 +158,39 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     max_cal_version = max((ex.version for ex in cal_examples), default=1) if cal_examples else None
 
     # Step 4: Execute Multi-Agent LLM Grading Prompt
-    print(f" ├─ [3/4] Running Multi-Agent LLM ({grading_mode.upper()} mode, {total_cal_count} exemplars via {LLM_MODEL})...", flush=True)
+    print(f" ├─ [2/3] Running Multi-Agent LLM ({grading_mode.upper()} mode, {total_cal_count} exemplars via {LLM_MODEL})...", flush=True)
     submission.status = "grading"
     db.commit()
+
+    def _get_cached_spec(question_number: str) -> Optional[Dict[str, Any]]:
+        key = normalize_question_number(question_number)
+        return (assignment.interpreted_specs or {}).get(key)
+
+    def _save_spec(question_number: str, spec: Dict[str, Any]) -> None:
+        key = normalize_question_number(question_number)
+        # Reassign the whole attribute rather than mutating the dict in place --
+        # SQLAlchemy's JSON column does not track in-place mutation, so an
+        # in-place update here would silently never persist.
+        assignment.interpreted_specs = {**(assignment.interpreted_specs or {}), key: spec}
+        db.commit()
+
+    def _get_rag_context(question_text: str) -> str:
+        # Queried by the QUESTION's own prompt text, not the student's answer --
+        # the ChromaDB document indexed for this question (embedding.py) literally
+        # contains that same prompt text verbatim, so querying with it reliably
+        # retrieves this question's own chunk rather than risking a similarity
+        # match against some other question's rubric. Called at most once per
+        # question per assignment: grade_submission_dynamic caches the result
+        # inside the same interpreted_specs entry as the Grading Specification.
+        return retrieve_rubric_context(assignment.id, question_text)
+
     llm_result = call_llm_for_grading(
         student_text=extracted_text,
         rubric_json=rubric_data,
-        model_answer=assignment.model_answer or "",
-        rag_context=rag_context,
         total_max_score=total_max_score,
+        get_cached_spec=_get_cached_spec,
+        save_spec=_save_spec,
+        get_rag_context=_get_rag_context,
         question_few_shots=question_few_shots if total_cal_count > 0 else None,
         tolerance_rate=getattr(assignment, "tolerance_rate", 0.10)
     )
@@ -181,7 +203,7 @@ def run_grading_pipeline(db: Session, submission_id: str) -> Submission:
     submission.confidence_score = float(llm_result.get("confidence_score", 0.85))
     submission.status = str(llm_result.get("status", "graded"))
 
-    print(f" ├─ [4/4] Confidence check ({submission.confidence_score * 100:.1f}%) & Multi-Agent Reconciliation...", flush=True)
+    print(f" ├─ [3/3] Confidence check ({submission.confidence_score * 100:.1f}%) & Multi-Agent Reconciliation...", flush=True)
 
     feedback_dict = llm_result.get("feedback", {})
     if not isinstance(feedback_dict, dict):
