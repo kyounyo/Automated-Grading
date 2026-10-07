@@ -21,7 +21,7 @@ def get_llm_model() -> str:
     return os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite").strip()
 
 def get_auditor_model() -> str:
-    return os.getenv("AUDITOR_MODEL", "nvidia/nemotron-3-super-120b-a12b").strip()
+    return os.getenv("AUDITOR_MODEL", "google/gemini-3.1-flash-lite").strip()
 
 
 
@@ -248,7 +248,8 @@ def call_auditor_verification_agent(
 ) -> Optional[Dict[str, Any]]:
     """
     Agent 3 (Auditor & Verification Agent):
-    Uses nvidia/nemotron-3-super-120b-a12b to audit Agent 2's evaluation.
+    Uses get_auditor_model() (default google/gemini-3.1-flash-lite, overridable via
+    the AUDITOR_MODEL env var) to audit the primary grader's evaluation.
     Provides independent per-question auditor scores, identifies specific question conflicts, and determines audit_passed.
     """
     few_shots_block = format_question_few_shots(question_few_shots)
@@ -1603,6 +1604,18 @@ def interpret_rubric_spec(
     spec = call_rubric_interpreter_agent(question_text, rubric_text, max_score, target_model, rag_context=rag_context)
     if not spec:
         return None
+
+    # The top-level max_score is a value WE already know (the caller provided it
+    # as an input), not something the interpreter needs to be trusted to echo back
+    # correctly -- and for BRANCHED OPEN_ENDED specs it isn't even used for scoring
+    # (each branch carries its own cap, see _score_dynamic_open_ended). Observed in
+    # practice: adding rag_context to this prompt can make the model omit this
+    # field entirely for some rubrics (it duplicates "Maximum Marks" text already
+    # present in the authoritative rubric_text, which can distract the model into
+    # dropping its own top-level echo) -- always overwrite with the known-correct
+    # value rather than hard-rejecting an otherwise-valid classification over a
+    # field that was never going to carry new information anyway.
+    spec["max_score"] = max_score
 
     is_valid, issues, review_flags = _validate_grading_spec(spec)
     if not is_valid:
