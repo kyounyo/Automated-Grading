@@ -859,51 +859,97 @@ const GradingReview = () => {
       {/* =========================================================================
           1. PERMANENTLY FROZEN TOP HEADER & STUDENT METADATA
           ========================================================================= */}
-      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--bg-main, #f8fafc)' }}>
 
-        {/* Row 1: Back Button | Quick Student Switcher | Action Status */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+        {/* Row 1: Back Button | Quick Student Switcher (Locked Center Position) | Action Status */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(180px, 1fr) auto minmax(180px, 1fr)',
+          alignItems: 'center',
+          gap: '0.75rem',
+          minHeight: '40px'
+        }}>
 
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => navigate('/submissions')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 600, fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}
-          >
-            <ArrowLeft size={16} /> Submissions List
-          </button>
-
-          {/* Quick Student Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--surface)', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() => navigateToSubmission(prevSubmission)}
-              disabled={!prevSubmission}
-              style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !prevSubmission ? 0.4 : 1 }}
-              title={prevSubmission ? `Previous: ${formatStudentName(prevSubmission.student_name, prevSubmission.student_id, prevSubmission.student_email)}` : 'First student'}
+              onClick={() => navigate('/submissions')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 600, fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}
             >
-              <ChevronLeft size={15} /> Prev
-            </button>
-
-            <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--secondary)', padding: '0 0.65rem', minWidth: '110px', textAlign: 'center' }}>
-              Student {currentIndex >= 0 ? `${currentIndex + 1} of ${reviewSubmissions.length}` : '—'}
-            </span>
-
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => navigateToSubmission(nextSubmission)}
-              disabled={!nextSubmission}
-              style={{ padding: '0.3rem 0.6rem', fontSize: '0.775rem', display: 'flex', alignItems: 'center', gap: '0.25rem', opacity: !nextSubmission ? 0.4 : 1 }}
-              title={nextSubmission ? `Next: ${formatStudentName(nextSubmission.student_name, nextSubmission.student_id, nextSubmission.student_email)}` : 'Last student'}
-            >
-              Next <ChevronRight size={15} />
+              <ArrowLeft size={16} /> Submissions List
             </button>
           </div>
 
+          {/* Quick Student Switcher - Permanently locked in dead-center position */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              backgroundColor: 'var(--surface)',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+              flexShrink: 0
+            }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => navigateToSubmission(prevSubmission)}
+                disabled={!prevSubmission}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.775rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.25rem',
+                  minWidth: '65px',
+                  opacity: !prevSubmission ? 0.4 : 1
+                }}
+                title={prevSubmission ? `Previous: ${formatStudentName(prevSubmission.student_name, prevSubmission.student_id, prevSubmission.student_email)}` : 'First student'}
+              >
+                <ChevronLeft size={15} /> Prev
+              </button>
+
+              <span style={{
+                fontSize: '0.825rem',
+                fontWeight: 700,
+                color: 'var(--secondary)',
+                padding: '0 0.5rem',
+                minWidth: '120px',
+                textAlign: 'center',
+                userSelect: 'none'
+              }}>
+                Student {currentIndex >= 0 ? `${currentIndex + 1} of ${reviewSubmissions.length}` : '—'}
+              </span>
+
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => navigateToSubmission(nextSubmission)}
+                disabled={!nextSubmission}
+                style={{
+                  padding: '0.3rem 0.65rem',
+                  fontSize: '0.775rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.25rem',
+                  minWidth: '65px',
+                  opacity: !nextSubmission ? 0.4 : 1
+                }}
+                title={nextSubmission ? `Next: ${formatStudentName(nextSubmission.student_name, nextSubmission.student_id, nextSubmission.student_email)}` : 'Last student'}
+              >
+                Next <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+
           {/* Right Status & Actions */}
-          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', justifyContent: 'flex-end' }}>
             {activeSubmissionObj.status === 'pending' && (
               <button className="btn btn-primary" onClick={handleGradeWithAI} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}>
                 {saving ? (

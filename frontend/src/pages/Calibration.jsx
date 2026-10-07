@@ -78,8 +78,22 @@ const Calibration = () => {
   const [startingGrading, setStartingGrading] = useState(false);
 
   const calSamples = useMemo(() => {
-    return (submissions || []).filter(s => s.is_calibration_sample);
-  }, [submissions]);
+    const all = submissions || [];
+    if (all.length === 0) return [];
+
+    // Submissions explicitly flagged as calibration sample
+    const tagged = all.filter(s => s.is_calibration_sample);
+
+    // If we have enough or more tagged than targetSamples, show the first targetSamples
+    if (tagged.length >= targetSamples) {
+      return tagged.slice(0, targetSamples);
+    }
+
+    // Otherwise, seamlessly supplement with student submissions to fulfill targetSamples
+    const taggedIds = new Set(tagged.map(s => s.id));
+    const extra = all.filter(s => !taggedIds.has(s.id)).slice(0, targetSamples - tagged.length);
+    return [...tagged, ...extra];
+  }, [submissions, targetSamples]);
 
   const gradedCalSamples = useMemo(() => {
     return calSamples.filter(s =>
@@ -87,10 +101,12 @@ const Calibration = () => {
     );
   }, [calSamples]);
 
-  // Auto-select paper #1 if none selected
+  // Auto-select paper #1 if none selected or if selected sample is out of range
   useEffect(() => {
-    if (!selectedSampleId && calSamples.length > 0) {
-      setSelectedSampleId(calSamples[0].id);
+    if (calSamples.length > 0) {
+      if (!selectedSampleId || !calSamples.some(s => s.id === selectedSampleId)) {
+        setSelectedSampleId(calSamples[0].id);
+      }
     }
   }, [calSamples, selectedSampleId]);
 
@@ -432,7 +448,16 @@ const Calibration = () => {
     setTargetSamples(size);
     try {
       setSavingSampleSize(true);
-      await updateCalibrationSettings(currentAssignmentId, { calibration_sample_size: size });
+      await updateCalibrationSettings(currentAssignmentId, {
+        calibration_sample_size: size,
+        calibration_enabled: true
+      });
+      if (handleUpdateAssignment) {
+        await handleUpdateAssignment(currentAssignmentId, {
+          calibration_sample_size: size,
+          calibration_enabled: true
+        }).catch(() => {});
+      }
       await loadStatus();
       if (loadSubmissions) {
         await loadSubmissions(currentAssignmentId, true);

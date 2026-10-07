@@ -58,6 +58,26 @@ def get_assignment_detail(assignment_id: str, db: Session = Depends(get_db)):
     return assign
 
 
+def sync_assignment_calibration_samples(db: Session, assignment_id: str, new_size: int):
+    """Synchronize submission is_calibration_sample flags with the target sample size."""
+    all_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).order_by(Submission.created_at.asc()).all()
+    if not all_subs:
+        return
+    current_cals = [s for s in all_subs if s.is_calibration_sample]
+    if len(current_cals) < new_size:
+        needed = new_size - len(current_cals)
+        candidates = [s for s in all_subs if not s.is_calibration_sample]
+        for s in candidates[:needed]:
+            s.is_calibration_sample = True
+    elif len(current_cals) > new_size:
+        excess = len(current_cals) - new_size
+        removable = [s for s in current_cals if s.status != "graded" and s.score is None]
+        if len(removable) < excess:
+            removable = current_cals[::-1]
+        for s in removable[:excess]:
+            s.is_calibration_sample = False
+
+
 @router.patch("/{assignment_id}", response_model=AssignmentResponse)
 def update_assignment(assignment_id: str, payload: AssignmentUpdate, db: Session = Depends(get_db)):
     """Renames or updates an assignment's title, course_code, due_date, or calibration settings."""
@@ -74,7 +94,9 @@ def update_assignment(assignment_id: str, payload: AssignmentUpdate, db: Session
     if payload.calibration_enabled is not None:
         assign.calibration_enabled = payload.calibration_enabled
     if payload.calibration_sample_size is not None:
-        assign.calibration_sample_size = payload.calibration_sample_size
+        new_size = max(1, min(50, int(payload.calibration_sample_size)))
+        assign.calibration_sample_size = new_size
+        sync_assignment_calibration_samples(db, assignment_id, new_size)
     if payload.calibration_settings is not None:
         assign.calibration_settings = payload.calibration_settings
     if payload.tolerance_rate is not None:
@@ -345,24 +367,8 @@ def update_assignment_calibration_settings(assignment_id: str, payload: dict, db
     if "calibration_sample_size" in payload:
         new_size = max(1, min(50, int(payload["calibration_sample_size"])))
         assign.calibration_sample_size = new_size
-
-        # Synchronize submission calibration sample flags
-        all_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).order_by(Submission.created_at.asc()).all()
-        if all_subs:
-            current_cals = [s for s in all_subs if s.is_calibration_sample]
-            if len(current_cals) < new_size:
-                needed = new_size - len(current_cals)
-                candidates = [s for s in all_subs if not s.is_calibration_sample]
-                for s in candidates[:needed]:
-                    s.is_calibration_sample = True
-            elif len(current_cals) > new_size:
-                excess = len(current_cals) - new_size
-                # Prefer unflagging un-graded calibration samples first
-                removable = [s for s in current_cals if s.status != "graded" and s.score is None]
-                if len(removable) < excess:
-                    removable = current_cals[::-1]
-                for s in removable[:excess]:
-                    s.is_calibration_sample = False
+        assign.calibration_enabled = True
+        sync_assignment_calibration_samples(db, assignment_id, new_size)
 
     if "calibration_settings" in payload:
         assign.calibration_settings = payload["calibration_settings"]

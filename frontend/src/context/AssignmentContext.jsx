@@ -94,7 +94,12 @@ export const AssignmentProvider = ({ children }) => {
         if (prev && prev.length === subsData.length) {
           const isIdentical = prev.every((p, i) => {
             const n = subsData[i];
-            return p && n && p.id === n.id && p.status === n.status && p.score === n.score && p.confidence_score === n.confidence_score;
+            return p && n &&
+              p.id === n.id &&
+              p.status === n.status &&
+              p.score === n.score &&
+              p.confidence_score === n.confidence_score &&
+              Boolean(p.is_calibration_sample) === Boolean(n.is_calibration_sample);
           });
           if (isIdentical) return prev;
         }
@@ -147,7 +152,12 @@ export const AssignmentProvider = ({ children }) => {
           if (prev && prev.length === subsData.length) {
             const isIdentical = prev.every((p, i) => {
               const n = subsData[i];
-              return p && n && p.id === n.id && p.status === n.status && p.score === n.score && p.confidence_score === n.confidence_score;
+              return p && n &&
+                p.id === n.id &&
+                p.status === n.status &&
+                p.score === n.score &&
+                p.confidence_score === n.confidence_score &&
+                Boolean(p.is_calibration_sample) === Boolean(n.is_calibration_sample);
             });
             if (isIdentical) return prev;
           }
