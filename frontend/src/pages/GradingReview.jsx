@@ -280,15 +280,21 @@ const GradingReview = () => {
         if (bd.reasoning) grouped[mainQ].reasoning_parts.push(bd.reasoning);
       });
 
-      return Object.values(grouped).map(g => ({
-        question_number: g.question_number,
-        prompt: g.prompt,
-        model_answer: g.model_answer,
-        max_score: g.max_score,
-        score_awarded: allowsHalfMarks ? Math.round(g.score_awarded * 10) / 10 : Math.round(g.score_awarded),
-        reasoning: g.reasoning_parts.join(' | '),
-        is_ai_graded: true
-      }));
+      return Object.values(grouped).map(g => {
+        const reasoningCombined = g.reasoning_parts.join(' | ');
+        const maxSc = g.max_score || 10.0;
+        let finalSc = allowsHalfMarks ? Math.round(g.score_awarded * 10) / 10 : Math.round(g.score_awarded);
+
+        return {
+          question_number: g.question_number,
+          prompt: g.prompt,
+          model_answer: g.model_answer,
+          max_score: maxSc,
+          score_awarded: finalSc,
+          reasoning: reasoningCombined,
+          is_ai_graded: true
+        };
+      });
     }
     return EMPTY_ARRAY;
   }, [rubricQuestions, breakdown, allowsHalfMarks, isSubmissionUnfinished]);
@@ -303,14 +309,20 @@ const GradingReview = () => {
       setActiveHighlightPop(null);
     }
 
-    const targetScoreStr = currentSub.score != null ? currentSub.score.toString() : '';
-    setOverrideScore(prev => (prev === targetScoreStr ? prev : targetScoreStr));
-
     const initialScores = {};
+    let initialSum = 0;
     effectiveQuestions.forEach((q, idx) => {
       const qKey = q.question_number || `Q${idx + 1}`;
-      initialScores[qKey] = q.score_awarded != null ? q.score_awarded : 0;
+      const sc = q.score_awarded != null ? q.score_awarded : 0;
+      initialScores[qKey] = sc;
+      initialSum += (parseFloat(sc) || 0);
     });
+
+    const targetTotal = effectiveQuestions.length > 0
+      ? (allowsHalfMarks ? Math.round(initialSum * 10) / 10 : Math.round(initialSum))
+      : (currentSub.score != null ? currentSub.score : null);
+    const targetScoreStr = targetTotal != null ? targetTotal.toString() : '';
+    setOverrideScore(prev => (prev === targetScoreStr ? prev : targetScoreStr));
 
     setQuestionScores(prev => {
       const prevKeys = Object.keys(prev);
@@ -420,7 +432,17 @@ const GradingReview = () => {
     return 20;
   }, [activeAssignment, effectiveQuestions]);
 
-  const calculatedTotalFromQuestions = Object.values(questionScores).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+  const calculatedTotalFromQuestions = useMemo(() => {
+    const scoresObj = Object.keys(questionScores).length > 0
+      ? questionScores
+      : effectiveQuestions.reduce((acc, q, idx) => {
+          const qKey = q.question_number || `Q${idx + 1}`;
+          acc[qKey] = q.score_awarded != null ? q.score_awarded : 0;
+          return acc;
+        }, {});
+    const sum = Object.values(scoresObj).reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+    return allowsHalfMarks ? Math.round(sum * 10) / 10 : Math.round(sum);
+  }, [questionScores, effectiveQuestions, allowsHalfMarks]);
 
   // Per-question score steppers
   const handleStepQuestionScore = (qKey, maxScore, delta) => {
@@ -489,7 +511,9 @@ const GradingReview = () => {
   const handleApproveGrade = async () => {
     try {
       setSaving(true);
-      const currentScore = activeSubmissionObj.score != null ? activeSubmissionObj.score : 0.0;
+      const finalScoreToApprove = (overrideScore !== '' && !isNaN(parseFloat(overrideScore)))
+        ? parseFloat(overrideScore)
+        : (effectiveQuestions.length > 0 ? calculatedTotalFromQuestions : (activeSubmissionObj.score != null ? activeSubmissionObj.score : 0.0));
       const updatedBreakdown = effectiveQuestions.map((q, idx) => {
         const qKey = q.question_number || `Q${idx + 1}`;
         return {
@@ -503,13 +527,13 @@ const GradingReview = () => {
 
       const updated = await handleScoreOverride(
         activeSubmissionObj.id,
-        currentScore,
+        finalScoreToApprove,
         overrideComment || 'Audited and approved by lecturer',
         updatedBreakdown
       );
       if (updated) {
         setActiveSubmission(updated);
-        setOverrideScore(updated.score != null ? updated.score.toString() : currentScore.toString());
+        setOverrideScore(updated.score != null ? updated.score.toString() : finalScoreToApprove.toString());
       }
       alert('Grade approved successfully! Audit flag resolved and submission status updated to Graded & Approved.');
       setOverrideComment('');
@@ -530,6 +554,102 @@ const GradingReview = () => {
     } finally {
       setSaving(false);
     }
+  };
+  // Helper to resolve and merge overlapping highlights into clean, non-overlapping spans
+  // guaranteeing that every highlight matches verbatim without collisions or dropped points.
+  const resolveNonOverlappingHighlights = (sectionText, rawCandidates, sectionScore, allowHalf) => {
+    if (!sectionText || !rawCandidates || rawCandidates.length === 0 || sectionScore <= 0) {
+      return [];
+    }
+
+    const lowerSec = sectionText.toLowerCase();
+    const spans = [];
+
+    rawCandidates.forEach(cand => {
+      if (!cand || !cand.text) return;
+      const cleanText = cand.text.trim();
+      if (cleanText.length < 3) return;
+
+      const idx = lowerSec.indexOf(cleanText.toLowerCase());
+      if (idx !== -1) {
+        spans.push({
+          start: idx,
+          end: idx + cleanText.length,
+          text: sectionText.slice(idx, idx + cleanText.length),
+          cand
+        });
+      }
+    });
+
+    if (spans.length === 0) return [];
+
+    // Sort by start position ascending, then length descending (prefer longer spans)
+    spans.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+    // Merge any overlapping or adjacent spans
+    const mergedSpans = [];
+    spans.forEach(sp => {
+      if (mergedSpans.length === 0) {
+        mergedSpans.push({ ...sp });
+        return;
+      }
+      const prev = mergedSpans[mergedSpans.length - 1];
+      if (sp.start <= prev.end) {
+        prev.end = Math.max(prev.end, sp.end);
+        prev.text = sectionText.slice(prev.start, prev.end);
+      } else {
+        mergedSpans.push({ ...sp });
+      }
+    });
+
+    if (mergedSpans.length === 1) {
+      const sc = Number.isInteger(sectionScore) ? sectionScore : Math.round(sectionScore * 10) / 10;
+      return [{
+        ...mergedSpans[0].cand,
+        text: mergedSpans[0].text,
+        aligned_score: sc,
+        score_awarded: sc,
+        type: 'strength'
+      }];
+    }
+
+    const step = allowHalf ? 0.5 : 1.0;
+    const totalUnits = Math.round(sectionScore / step);
+    const items = mergedSpans.map(m => ({
+      span: m,
+      weight: (m.cand && parseFloat(m.cand.score_awarded)) || 1.0
+    }));
+    const totalWeight = items.reduce((acc, it) => acc + it.weight, 0);
+
+    const allocated = items.map((it, idx) => {
+      const exact = (it.weight / (totalWeight > 0 ? totalWeight : items.length)) * totalUnits;
+      const base = Math.floor(exact);
+      return { it, base, rem: exact - base, origIdx: idx };
+    });
+
+    let curUnits = allocated.reduce((acc, a) => acc + a.base, 0);
+    let remUnits = totalUnits - curUnits;
+    const sorted = [...allocated].sort((a, b) => b.rem - a.rem);
+    for (let r = 0; r < remUnits && r < sorted.length; r++) {
+      sorted[r].base += 1;
+    }
+
+    const result = [];
+    allocated.forEach(a => {
+      const finalSc = a.base * step;
+      if (finalSc > 0) {
+        const sc = Number.isInteger(finalSc) ? finalSc : Math.round(finalSc * 10) / 10;
+        result.push({
+          ...a.it.span.cand,
+          text: a.it.span.text,
+          aligned_score: sc,
+          score_awarded: sc,
+          type: 'strength'
+        });
+      }
+    });
+
+    return result;
   };
 
   const renderHighlightedSnippet = (textSnippet, highlightsList) => {
@@ -568,9 +688,15 @@ const GradingReview = () => {
 
           if (before) newParts.push(before);
 
-          const isStrength = hl.type === 'strength' || (hl.score_awarded && hl.score_awarded > 0) || (hl.aligned_score && hl.aligned_score > 0);
+          const rawDisplayMark = hl.aligned_score != null ? hl.aligned_score : hl.score_awarded;
+          const displayMark = rawDisplayMark != null ? parseFloat(rawDisplayMark) : null;
+          // Strictly only highlights that awarded positive marks (> 0) are green strengths
+          const isStrength = displayMark != null ? displayMark > 0 : hl.type === 'strength';
           const isSelected = activeHighlightPop?.text === hl.text;
-          const displayMark = hl.aligned_score != null ? hl.aligned_score : hl.score_awarded;
+
+          const tooltipTitle = displayMark != null
+            ? (displayMark > 0 ? `Point Awarded: +${displayMark}m` : `0 marks awarded: ${hl.comment || 'Incorrect / Insufficient answer'}`)
+            : (isStrength ? 'Key Evidence Point' : 'Critique / Issue');
 
           newParts.push(
             <mark
@@ -592,7 +718,7 @@ const GradingReview = () => {
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
-              title={displayMark != null ? `Point Awarded: +${displayMark}m` : 'Click to view AI grading evidence & reasoning'}
+              title={tooltipTitle}
             >
               {matchedStr}
               <span style={{
@@ -664,23 +790,149 @@ const GradingReview = () => {
           const currentScoreVal = questionScores[qKey] != null ? questionScores[qKey] : (matchedQuestion?.score_awarded ?? 0);
           const targetScore = parseFloat(currentScoreVal) || 0;
 
-          // 1. Filter highlights matching this question section or contained in bodyContent
-          let blockHighlights = (highlightsList || []).filter(h => {
-            if (!h || !h.text || h.text.trim().length < 3) return false;
-            const hText = h.text.trim().toLowerCase();
-            const inBody = bodyContent.toLowerCase().includes(hText);
-            const qMatches = h.question_number && extractMainQKey(h.question_number) === mainKey;
-            return inBody || (qMatches && bodyContent.toLowerCase().includes(hText.slice(0, 30)));
-          }).map(h => ({ ...h }));
+          // 1. Check if AI reasoning contains explicit sub-question marks: e.g. (a) [3/5]: ... (b) [2/5]: ...
+          let blockHighlights = [];
+          const reasoningText = matchedQuestion?.reasoning || '';
+          const subPartRegex = /\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]:?\s*/g;
+          const subPartMatches = Array.from(reasoningText.matchAll(subPartRegex));
 
-          // 2. Synthesize additional highlights from quotes in reasoning if targetScore > 0
-          if (matchedQuestion?.reasoning && targetScore > 0) {
-            const quoteMatches = matchedQuestion.reasoning.match(/'([^']+)'|"([^"]+)"/g) || [];
-            quoteMatches.forEach(qm => {
-              const cleanQ = qm.replace(/['"]/g, '').trim();
-              if (cleanQ.length > 5 && bodyContent.toLowerCase().includes(cleanQ.toLowerCase())) {
-                if (!blockHighlights.some(bh => bh.text.toLowerCase().includes(cleanQ.toLowerCase()) || cleanQ.toLowerCase().includes(bh.text.toLowerCase()))) {
-                  blockHighlights.push({
+          let subPartsProcessed = false;
+          if (subPartMatches.length > 0 && bodyContent && bodyContent.trim().length > 3) {
+            const subPartKeys = subPartMatches.map(m => m[1]);
+            const positions = [];
+            subPartKeys.forEach(k => {
+              const escapedK = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const regex = new RegExp(`(?:^|\\n|\\s)(?:\\(${escapedK}\\)|${escapedK}\\)|${escapedK}\\.)`, 'i');
+              const match = bodyContent.match(regex);
+              if (match) {
+                positions.push({
+                  start: match.index + (match[0].length - match[0].trimStart().length),
+                  key: k.toLowerCase(),
+                  end: match.index + match[0].length
+                });
+              }
+            });
+
+            positions.sort((a, b) => a.start - b.start);
+
+            // If first subpart wasn't explicitly prefixed (e.g. started with 'Advantages:' instead of 'a)'), but subsequent subpart was found:
+            const firstKey = subPartKeys[0].toLowerCase();
+            if (!positions.some(p => p.key === firstKey) && positions.length > 0) {
+              positions.unshift({
+                start: 0,
+                key: firstKey,
+                end: 0
+              });
+            }
+
+            const sections = [];
+            for (let i = 0; i < positions.length; i++) {
+              const p = positions[i];
+              const nextStart = i + 1 < positions.length ? positions[i + 1].start : bodyContent.length;
+              const sectionText = bodyContent.slice(p.start, nextStart).trim();
+              const mIdx = subPartMatches.findIndex(m => m[1].toLowerCase() === p.key);
+              if (mIdx !== -1 && sectionText.length > 0) {
+                const m = subPartMatches[mIdx];
+                const startReason = m.index + m[0].length;
+                const endReason = mIdx + 1 < subPartMatches.length ? subPartMatches[mIdx + 1].index : reasoningText.length;
+                const reasonText = reasoningText.slice(startReason, endReason).replace(/\|\s*$/, '').trim();
+                sections.push({
+                  key: p.key,
+                  score: parseFloat(m[2]) || 0,
+                  max: parseFloat(m[3]) || 0,
+                  reason: reasonText,
+                  text: sectionText
+                });
+              }
+            }
+
+            if (sections.length > 0) {
+              const generatedHighlights = [];
+
+              sections.forEach(sec => {
+                const pKey = sec.key;
+                const pScore = sec.score;
+                const pMax = sec.max;
+                const pReason = sec.reason;
+                const sText = sec.text;
+
+                if (pScore <= 0) return;
+
+                const rawSecCands = [];
+
+                // 1. Existing highlights from highlightsList inside sText
+                (highlightsList || []).forEach(h => {
+                  if (h && h.text && h.text.trim().length >= 4 && sText.toLowerCase().includes(h.text.trim().toLowerCase())) {
+                    rawSecCands.push({
+                      text: h.text.trim(),
+                      score_awarded: h.score_awarded || 1.0,
+                      type: 'strength',
+                      comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
+                    });
+                  }
+                });
+
+                // 2. Quotes from reasoning
+                const quoteMatches = pReason.match(/'([^']+)'|"([^"]+)"/g) || [];
+                quoteMatches.forEach(qm => {
+                  const cleanQ = qm.replace(/['"]/g, '').trim();
+                  if (cleanQ.length > 4 && sText.toLowerCase().includes(cleanQ.toLowerCase())) {
+                    rawSecCands.push({
+                      text: cleanQ,
+                      score_awarded: pScore,
+                      type: 'strength',
+                      comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
+                    });
+                  }
+                });
+
+                // 3. Fallback: if no candidates found or if short answer / single sentence
+                if (rawSecCands.length === 0) {
+                  const rawSentences = sText.split(/(?<=[.?!])\s+|\n+/).map(s => s.trim().replace(/^[\*\-\s]+/, '')).filter(s => s.length > 8 && !/^\(?[a-zA-Z0-9][\)\.]/.test(s));
+                  const pick = rawSentences.length > 0 ? rawSentences[0] : sText;
+                  rawSecCands.push({
+                    text: pick,
+                    score_awarded: pScore,
+                    type: 'strength',
+                    comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
+                  });
+                }
+
+                // Resolve non-overlapping highlights for this subpart
+                const resolved = resolveNonOverlappingHighlights(sText, rawSecCands, pScore, allowsHalfMarks);
+                resolved.forEach(r => {
+                  r.question_number = `${qKey}(${pKey})`;
+                  r.comment = `(${pKey}) [${pScore}/${pMax}]: ${pReason}`;
+                  generatedHighlights.push(r);
+                });
+              });
+
+              if (generatedHighlights.length > 0) {
+                blockHighlights = generatedHighlights;
+                subPartsProcessed = true;
+              }
+            }
+          }
+
+          if (!subPartsProcessed) {
+            const rawCands = [];
+            (highlightsList || []).forEach(h => {
+              if (h && h.text && h.text.trim().length >= 4 && bodyContent.toLowerCase().includes(h.text.trim().toLowerCase())) {
+                rawCands.push({
+                  text: h.text.trim(),
+                  score_awarded: h.score_awarded || 1.0,
+                  type: 'strength',
+                  comment: matchedQuestion?.reasoning || 'Key evidence response point.'
+                });
+              }
+            });
+
+            if (matchedQuestion?.reasoning && targetScore > 0) {
+              const quoteMatches = matchedQuestion.reasoning.match(/'([^']+)'|"([^"]+)"/g) || [];
+              quoteMatches.forEach(qm => {
+                const cleanQ = qm.replace(/['"]/g, '').trim();
+                if (cleanQ.length > 5 && bodyContent.toLowerCase().includes(cleanQ.toLowerCase())) {
+                  rawCands.push({
                     text: cleanQ,
                     type: 'strength',
                     score_awarded: 1.0,
@@ -688,69 +940,29 @@ const GradingReview = () => {
                     comment: matchedQuestion.reasoning
                   });
                 }
-              }
-            });
-          }
+              });
+            }
 
-          // 3. Fallback: if student has non-empty response and targetScore > 0 but NO highlights matched
-          if (blockHighlights.length === 0 && targetScore > 0 && !isBodyEmpty && bodyContent.trim().length > 5) {
-            const sentences = bodyContent.split(/(?<=[.?!])\s+/).filter(s => s.trim().length > 8);
-            if (sentences.length > 0) {
-              const numToTake = Math.min(sentences.length, Math.max(1, Math.min(3, Math.round(targetScore))));
-              for (let sIdx = 0; sIdx < numToTake; sIdx++) {
-                const sText = sentences[sIdx].trim();
-                if (sText.length > 5) {
-                  blockHighlights.push({
-                    text: sText,
-                    type: 'strength',
-                    score_awarded: 1.0,
-                    question_number: qKey,
-                    comment: matchedQuestion?.reasoning || `Key evidence response point.`
-                  });
+            if (rawCands.length === 0 && targetScore > 0 && !isBodyEmpty && bodyContent.trim().length > 5) {
+              const sentences = bodyContent.split(/(?<=[.?!])\s+/).filter(s => s.trim().length > 8);
+              if (sentences.length > 0) {
+                const numToTake = Math.min(sentences.length, Math.max(1, Math.round(targetScore)));
+                for (let sIdx = 0; sIdx < numToTake; sIdx++) {
+                  const sText = sentences[sIdx].trim();
+                  if (sText.length > 5) {
+                    rawCands.push({
+                      text: sText,
+                      type: 'strength',
+                      score_awarded: 1.0,
+                      question_number: qKey,
+                      comment: matchedQuestion?.reasoning || 'Key evidence response point.'
+                    });
+                  }
                 }
               }
             }
-          }
 
-          // 4. STRICT MARK ALIGNMENT: Re-balance highlight marks into clean integer or half-mark units (no arbitrary tenths like 5.1m or 0.9m)
-          const strengthHls = blockHighlights.filter(h => h.type === 'strength' || (parseFloat(h.score_awarded) || 0) > 0);
-
-          if (targetScore === 0) {
-            blockHighlights.forEach(h => {
-              h.aligned_score = 0;
-              h.type = 'weakness';
-            });
-          } else if (strengthHls.length > 0) {
-            if (strengthHls.length === 1) {
-              strengthHls[0].aligned_score = targetScore;
-            } else {
-              // Standard academic grading step: whole integer (1.0) unless targetScore is fractional or rubric allows 0.5
-              const isFractional = (targetScore % 1) !== 0;
-              const step = (isFractional || allowsHalfMarks) ? 0.5 : 1.0;
-              const totalUnits = Math.round(targetScore / step);
-              const totalWeight = strengthHls.reduce((acc, h) => acc + (parseFloat(h.score_awarded) || 1.0), 0);
-
-              const items = strengthHls.map((h, i) => {
-                const w = parseFloat(h.score_awarded) || 1.0;
-                const exactUnits = (w / (totalWeight > 0 ? totalWeight : strengthHls.length)) * totalUnits;
-                const baseUnits = Math.floor(exactUnits);
-                return { h, origIdx: i, baseUnits, remainder: exactUnits - baseUnits };
-              });
-
-              let allocatedUnits = items.reduce((acc, it) => acc + it.baseUnits, 0);
-              let remainingUnits = totalUnits - allocatedUnits;
-
-              // Distribute remaining units by largest fractional remainder
-              const sorted = [...items].sort((a, b) => b.remainder - a.remainder);
-              for (let r = 0; r < remainingUnits && r < sorted.length; r++) {
-                sorted[r].baseUnits += 1;
-              }
-
-              items.forEach(it => {
-                const finalSc = it.baseUnits * step;
-                it.h.aligned_score = Number.isInteger(finalSc) ? finalSc : Math.round(finalSc * 10) / 10;
-              });
-            }
+            blockHighlights = resolveNonOverlappingHighlights(bodyContent, rawCands, targetScore, allowsHalfMarks);
           }
 
           return (
@@ -1056,7 +1268,12 @@ const GradingReview = () => {
               Total Score
             </span>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: isSubmissionUnfinished ? 'var(--text-dim)' : 'var(--primary)', lineHeight: 1 }}>
-              {(!isSubmissionUnfinished && activeSubmissionObj.score != null) ? activeSubmissionObj.score : '—'}
+              {isSubmissionUnfinished
+                ? '—'
+                : (effectiveQuestions.length > 0
+                    ? calculatedTotalFromQuestions
+                    : (activeSubmissionObj.score != null ? activeSubmissionObj.score : '—')
+                  )}
               <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', fontWeight: 600 }}>{totalMaxScore ? ` / ${totalMaxScore}` : ''}</span>
             </span>
           </div>
@@ -1166,8 +1383,9 @@ const GradingReview = () => {
 
           {/* Evidence Popover at Bottom of Left Column */}
           {activeHighlightPop && (() => {
-            const popMark = activeHighlightPop.aligned_score != null ? activeHighlightPop.aligned_score : activeHighlightPop.score_awarded;
-            const isPopPositive = (popMark != null && popMark > 0) || activeHighlightPop.type === 'strength';
+            const rawPopMark = activeHighlightPop.aligned_score != null ? activeHighlightPop.aligned_score : activeHighlightPop.score_awarded;
+            const popMark = rawPopMark != null ? parseFloat(rawPopMark) : null;
+            const isPopPositive = popMark != null ? popMark > 0 : activeHighlightPop.type === 'strength';
             return (
               <div
                 style={{
@@ -1197,7 +1415,7 @@ const GradingReview = () => {
                     backgroundColor: isPopPositive ? 'var(--success-bg)' : 'var(--danger-bg)',
                     color: isPopPositive ? 'var(--success)' : 'var(--danger)'
                   }}>
-                    {popMark != null ? `+${popMark} Marks` : (isPopPositive ? 'Strength' : 'Weakness')}
+                    {popMark != null ? (popMark > 0 ? `+${popMark} Marks` : '0 Marks (No credit)') : (isPopPositive ? 'Strength' : 'Weakness')}
                   </span>
                 </div>
 
@@ -1278,9 +1496,10 @@ const GradingReview = () => {
 
                   const auditorMatch = auditorBreakdown.find(ab => extractMainQKey(ab.question_number) === mainKey) || null;
                   const auditorScore = auditorMatch ? (auditorMatch.score_awarded ?? auditorMatch.auditor_score) : null;
+                  const auditorScoreVal = auditorScore != null ? parseFloat(auditorScore) : null;
                   const pScore = parseFloat(item.score_awarded ?? currentScoreVal);
-                  const isAuditorDiscrepancy = auditorScore != null && Math.abs(pScore - parseFloat(auditorScore)) > 0.01;
-                  const hasConflict = isItemConflicted || isAuditorDiscrepancy;
+                  const scoreDelta = auditorScoreVal != null ? Math.round(Math.abs(pScore - auditorScoreVal) * 10) / 10 : 0;
+                  const hasConflict = isItemConflicted;
 
                   // Active expanded state: defaults to true on conflict or if expandAllFeedback is toggled
                   const isExpanded = expandedFeedback[qKey] !== undefined ? expandedFeedback[qKey] : (hasConflict || expandAllFeedback);
@@ -1296,8 +1515,8 @@ const GradingReview = () => {
 
                   // Determine best feedback text for this question
                   let effectiveFeedbackText = (item.reasoning || '').trim();
-                  const isPlaceholder = !effectiveFeedbackText || 
-                    effectiveFeedbackText.toLowerCase().includes('evaluated against') || 
+                  const isPlaceholder = !effectiveFeedbackText ||
+                    effectiveFeedbackText.toLowerCase().includes('evaluated against') ||
                     effectiveFeedbackText.toLowerCase() === 'no response evaluated';
 
                   if (isPlaceholder && auditorReasoningText && !auditorReasoningText.toLowerCase().includes('evaluated against')) {
@@ -1329,8 +1548,11 @@ const GradingReview = () => {
                             Max: {maxSc} pts
                           </span>
                           {hasConflict && (
-                            <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
-                              ⚠️ Flagged
+                            <span
+                              title={`Auditor Discrepancy: Primary gave ${pScore} pts vs Auditor evaluated ${auditorScoreVal} pts (Δ${scoreDelta} pts)`}
+                              style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}
+                            >
+                              ⚠️ Flagged ({scoreDelta > 0 ? `Δ${scoreDelta} pts` : 'Conflict'})
                             </span>
                           )}
                         </div>
