@@ -64,6 +64,14 @@ export const AssignmentProvider = ({ children }) => {
           } catch {}
           return chosen;
         });
+      } else if (Array.isArray(data) && data.length === 0) {
+        setAssignments([]);
+        setCurrentAssignmentIdState('');
+        setSubmissions([]);
+        try {
+          localStorage.removeItem('autograde_cached_assignments');
+          localStorage.removeItem('autograde_active_assignment_id');
+        } catch {}
       }
     } catch (err) {
       console.warn('[AssignmentContext] Backend briefly unavailable during reload:', err);
