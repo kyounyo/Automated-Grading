@@ -20,6 +20,11 @@ class Assignment(Base):
     calibration_sample_size = Column(Integer, default=3)
     calibration_settings = Column(JSON, nullable=True)
     tolerance_rate = Column(Float, default=0.10, nullable=False)
+    interpreted_specs = Column(JSON, nullable=True)  # {question_number: Grading Specification}, cached lazily by
+    # the dynamic Rubric Interpreter the first time any submission is graded against this assignment, then reused
+    # for every subsequent submission -- see the get_cached_spec/save_spec closures in services/grading.py. NOTE: a
+    # plain dict mutation on this column is NOT tracked by SQLAlchemy; writers must reassign the whole attribute
+    # (assignment.interpreted_specs = {...}) before commit(), not just mutate the dict in place.
     grading_started_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
