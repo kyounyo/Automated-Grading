@@ -525,6 +525,11 @@ GRADING PROTOCOL:
    "feedback.breakdown" as exactly one entry per group ({group_names}), each with
    score_awarded (capped at that group's max_score) and max_score. overall_score
    MUST equal the sum of the group scores in "feedback.breakdown".
+9. QUESTION-MATCHED EXAMINER CALIBRATION: If Examiner Calibration Benchmarks are
+   provided above, you MUST align your matching strictness and partial-credit
+   thresholds strictly to match the examiner's demonstrated standard for this
+   question. If no calibration benchmarks are provided, evaluate directly from
+   the standard checklist rules above.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
@@ -1103,6 +1108,13 @@ For EACH labelled item, extract exactly two fields from the student's own text:
 Do not award marks, compute totals, apply any cap, or invent any additional
 category beyond these two fields -- scoring is handled separately.
 
+QUESTION-MATCHED EXAMINER CALIBRATION: "working_shown" is the one judgement call
+in this extraction (the final answer is matched exactly, with no leniency). If
+Examiner Calibration Benchmarks are provided above, align what counts as
+sufficient working shown with the examiner's demonstrated standard for this
+question. If none are provided, use the "acceptable working shown" examples
+given in the Reference above.
+
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
   "extractions": [
@@ -1390,6 +1402,14 @@ twice using different wording.
 NO NEGATIVE MARKING
 Incorrect or irrelevant information does not remove marks already earned
 unless the rubric explicitly specifies a penalty.
+
+QUESTION-MATCHED EXAMINER CALIBRATION
+If Examiner Calibration Benchmarks are provided above, you MUST align your
+judgement of what counts as MET -- how literally vs. loosely to read each
+criterion, and where the partial-credit line falls -- strictly to match the
+examiner's demonstrated standard for this question. If no calibration
+benchmarks are provided, evaluate directly from the standard rubric and
+calibration guidance above.
 
 MANDATORY FALSE-NEGATIVE RECHECK
 After your first pass, review ONLY the criteria you marked NOT MET. For each:
