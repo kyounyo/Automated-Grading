@@ -19,13 +19,180 @@ import {
   ChevronDown,
   ChevronUp,
   Scale,
-  Bot
+  Bot,
+  Info
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { fetchSubmissionDetail } from '../api/client';
 
 const EMPTY_ARRAY = Object.freeze([]);
 const EMPTY_OBJECT = Object.freeze({});
+
+const formatAuditReason = (rawReason) => {
+  if (!rawReason) return { type: 'Review Needed', badgeColor: '#b45309', badgeBg: '#fef3c7', detail: 'This submission requires manual review.' };
+  const r = rawReason.replace(/^[🤖⚠️📉\s]+/, '').trim();
+
+  if (r.toLowerCase().includes('multi-agent') || r.toLowerCase().includes('discrepancy') || r.toLowerCase().includes('conflict')) {
+    const qMatch = r.match(/(?:on\s+)([A-Za-z0-9_(),\s|Δ><\.\:]+?)(?::\s*Exceeds|$)/i);
+    let detail = qMatch ? qMatch[1].trim() : 'Primary and Auditor models evaluated different scores.';
+    detail = detail.replace(/:\s*Exceeds.*tolerance/i, '').trim();
+    return {
+      type: 'AI Conflict',
+      badgeColor: '#b45309',
+      badgeBg: '#fef3c7',
+      detail
+    };
+  }
+  if (r.toLowerCase().includes('low system confidence')) {
+    const pctMatch = r.match(/\((\d+%\s*<\s*\d+%)\)/);
+    return {
+      type: 'Low Confidence',
+      badgeColor: '#b45309',
+      badgeBg: '#fef3c7',
+      detail: pctMatch ? `Model confidence is below threshold (${pctMatch[1]}).` : 'Evaluation confidence is below verification threshold.'
+    };
+  }
+  if (r.toLowerCase().includes('terse')) {
+    const wordMatch = r.match(/\((\d+)\s*words\)/);
+    return {
+      type: 'Brief Response',
+      badgeColor: '#475569',
+      badgeBg: '#e2e8f0',
+      detail: wordMatch ? `Submission is very short (${wordMatch[1]} words). Check reasoning depth.` : 'Submission is very short. Check reasoning depth.'
+    };
+  }
+  return {
+    type: 'Audit Alert',
+    badgeColor: '#b45309',
+    badgeBg: '#fef3c7',
+    detail: r
+  };
+};
+
+const RenderStructuredFeedback = ({ text }) => {
+  if (!text || text.trim() === '') {
+    return <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.785rem' }}>No feedback available.</span>;
+  }
+
+  const clean = text.trim();
+
+  // Pattern 1: Demonstrated vs Missing / Incomplete
+  if (clean.includes('Demonstrated:') || clean.includes('Missing/incomplete:')) {
+    const parts = clean.split(/\s*\|\s*(?=Missing\/incomplete:)/i);
+    const demonstrated = parts[0]?.replace(/^Demonstrated:\s*/i, '').trim();
+    const missing = parts[1]?.replace(/^Missing\/incomplete:\s*/i, '').trim();
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        {demonstrated && (
+          <div style={{
+            backgroundColor: '#F0FDF4',
+            border: '1px solid #BBF7D0',
+            borderRadius: '5px',
+            padding: '0.45rem 0.65rem',
+            fontSize: '0.785rem'
+          }}>
+            <div style={{ fontWeight: 700, color: '#166534', fontSize: '0.72rem', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <CheckCircle2 size={12} color="#16A34A" /> Demonstrated Criteria:
+            </div>
+            <div style={{ color: '#14532D', lineHeight: '1.45', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              {demonstrated.split(';').map((pt, i) => {
+                const trimmed = pt.trim();
+                return trimmed ? <div key={i}>• {trimmed}</div> : null;
+              })}
+            </div>
+          </div>
+        )}
+
+        {missing && (
+          <div style={{
+            backgroundColor: '#F8FAFC',
+            border: '1px solid #E2E8F0',
+            borderRadius: '5px',
+            padding: '0.45rem 0.65rem',
+            fontSize: '0.785rem'
+          }}>
+            <div style={{ fontWeight: 700, color: '#475569', fontSize: '0.72rem', marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <Info size={12} color="#64748B" /> Missing / Incomplete:
+            </div>
+            <div style={{ color: '#334155', lineHeight: '1.45', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              {missing.split(';').map((pt, i) => {
+                const trimmed = pt.trim();
+                return trimmed ? <div key={i}>• {trimmed}</div> : null;
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Pattern 2: Bullet points like • (Name) [score/max]: reasoning
+  if (clean.includes('•')) {
+    const items = clean.split(/(?:\n|^)\s*•\s*/).filter(Boolean);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {items.map((item, idx) => {
+          const m = item.match(/^\(?([A-Za-z0-9_\s'’\[\]]+?)\)?\s*\[([0-9\.]+)\/([0-9\.]+)\]:?\s*([\s\S]*)$/);
+          if (m) {
+            const rawLabel = m[1].trim();
+            const label = rawLabel.replace(/\[PERSON_NAME\]/g, 'Item');
+            const score = parseFloat(m[2]) || 0;
+            const max = parseFloat(m[3]) || 0;
+            const note = m[4].trim();
+            const isFull = score >= max;
+            const isZero = score === 0;
+
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.45rem',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '5px',
+                  padding: '0.35rem 0.55rem',
+                  fontSize: '0.785rem'
+                }}
+              >
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  padding: '0.1rem 0.35rem',
+                  borderRadius: '3px',
+                  backgroundColor: isFull ? '#DCFCE7' : isZero ? '#FEE2E2' : '#FEF3C7',
+                  color: isFull ? '#166534' : isZero ? '#991B1B' : '#92400E',
+                  flexShrink: 0,
+                  marginTop: '0.1rem'
+                }}>
+                  {score}/{max}
+                </span>
+                <div style={{ flex: 1, minWidth: 0, lineHeight: '1.4' }}>
+                  <strong style={{ color: 'var(--secondary)', marginRight: '0.3rem' }}>{label}:</strong>
+                  <span style={{ color: '#334155' }}>{note}</span>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={idx} style={{ color: '#334155', lineHeight: '1.45', paddingLeft: '0.2rem', fontSize: '0.785rem' }}>
+              • {item.trim()}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Fallback: clean paragraph text
+  return (
+    <div style={{ color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap', fontSize: '0.785rem' }}>
+      {clean}
+    </div>
+  );
+};
 
 const GradingReview = () => {
   const navigate = useNavigate();
@@ -988,13 +1155,13 @@ const GradingReview = () => {
                   gap: '0.4rem'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span style={{ fontWeight: 800, fontSize: '0.85rem', color: isQConflicted ? '#92400E' : 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     📘 {headerTitle || `Question ${mainKey || bIdx + 1}`}
                   </span>
                   {isQConflicted && (
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
-                      ⚠️ Conflicted Question
+                    <span style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FCD34D', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <AlertTriangle size={11} color="#D97706" /> AI Conflict
                     </span>
                   )}
                 </div>
@@ -1031,8 +1198,22 @@ const GradingReview = () => {
                 )}
               </div>
 
-              {/* Student Response Content */}
-              <div style={{ padding: '0.9rem 1rem', fontSize: '0.875rem', lineHeight: '1.65', color: 'var(--text-main)', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-body)' }}>
+              {/* Student Response Content (Read-Only) */}
+              <div
+                style={{
+                  padding: '0.9rem 1rem',
+                  fontSize: '0.875rem',
+                  lineHeight: '1.65',
+                  color: '#334155',
+                  backgroundColor: '#f8fafc',
+                  borderTop: `1px solid ${isQConflicted ? '#FCD34D' : '#e2e8f0'}`,
+                  whiteSpace: 'pre-wrap',
+                  fontFamily: 'var(--font-body)',
+                  cursor: 'default',
+                  userSelect: 'text'
+                }}
+                title="Student response"
+              >
                 {isBodyEmpty ? (
                   <span style={{ color: 'var(--danger)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <AlertTriangle size={14} color="var(--danger)" /> No response submitted for this question (-). 0 marks awarded.
@@ -1174,10 +1355,10 @@ const GradingReview = () => {
               <span
                 className="status-badge"
                 style={{
-                  backgroundColor: isFlagged ? 'var(--warning-bg)' : 'var(--success-bg)',
-                  color: isFlagged ? 'var(--warning)' : 'var(--success)',
-                  border: `1px solid ${isFlagged ? 'var(--warning-border)' : 'var(--success-border)'}`,
-                  padding: '0.35rem 0.75rem',
+                  backgroundColor: isFlagged ? '#FEF3C7' : 'var(--success-bg)',
+                  color: isFlagged ? '#92400E' : 'var(--success)',
+                  border: `1px solid ${isFlagged ? '#FCD34D' : 'var(--success-border)'}`,
+                  padding: '0.3rem 0.65rem',
                   fontSize: '0.8rem',
                   fontWeight: 700,
                   borderRadius: '6px',
@@ -1186,7 +1367,15 @@ const GradingReview = () => {
                   gap: '0.35rem'
                 }}
               >
-                {isFlagged ? '⚠️ Flagged for Audit' : '✓ Graded & Approved'}
+                {isFlagged ? (
+                  <>
+                    <AlertTriangle size={13} color="#D97706" /> AI Conflict
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={13} color="var(--success)" /> Graded
+                  </>
+                )}
               </span>
             )}
           </div>
@@ -1233,55 +1422,63 @@ const GradingReview = () => {
           </div>
         </div>
 
-        {/* Row 3: SPECIFIC AUDIT & CONFLICT REASONS BANNER (If Flagged or Discrepancy Audit) */}
+        {/* Row 3: Clean, Concise Audit Notice */}
         {isFlagged && rawFlagReasons.length > 0 && (
           <div
             style={{
-              backgroundColor: '#FFFBEB',
-              border: '1.5px solid #F59E0B',
-              borderRadius: '8px',
-              padding: '0.65rem 1rem',
+              backgroundColor: '#FEFDF8',
+              border: '1px solid #FDE68A',
+              borderLeft: '4px solid #D97706',
+              borderRadius: '6px',
+              padding: '0.55rem 0.85rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.4rem'
+              gap: '0.35rem'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#92400E', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ShieldAlert size={17} color="#D97706" /> Quality Audit & Discrepancy Alerts ({rawFlagReasons.length})
-              </span>
-              <span style={{ fontSize: '0.725rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid #FDE68A' }}>
-                Human Lecturer Review Recommended
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ShieldAlert size={15} color="#D97706" />
+                <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#92400E' }}>
+                  AI Verification Notice
+                </span>
+              </div>
+              <span style={{ fontSize: '0.7rem', fontWeight: 600, color: '#B45309', backgroundColor: '#FEF3C7', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
+                Review Recommended
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              {rawFlagReasons.map((reason, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #FCD34D',
-                    borderRadius: '6px',
-                    padding: '0.4rem 0.75rem',
-                    fontSize: '0.8rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '0.5rem'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 700, fontSize: '0.725rem', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
-                      Audit Alert
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+              {rawFlagReasons.map((rawR, idx) => {
+                const info = formatAuditReason(rawR);
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: '0.45rem',
+                      fontSize: '0.775rem',
+                      lineHeight: '1.4'
+                    }}
+                  >
+                    <span style={{
+                      backgroundColor: info.badgeBg,
+                      color: info.badgeColor,
+                      fontWeight: 700,
+                      fontSize: '0.675rem',
+                      padding: '0.05rem 0.35rem',
+                      borderRadius: '3px',
+                      flexShrink: 0
+                    }}>
+                      {info.type}
                     </span>
-                    <span style={{ color: '#78350F', fontWeight: 600 }}>
-                      {reason}
+                    <span style={{ color: '#451A03' }}>
+                      {info.detail}
                     </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -1329,7 +1526,7 @@ const GradingReview = () => {
               flex: 1,
               overflowY: 'auto',
               padding: '1.15rem',
-              backgroundColor: 'var(--surface)'
+              backgroundColor: '#f1f5f9'
             }}
           >
             {renderHighlightedRawText(rawStudentText, highlights)}
@@ -1485,17 +1682,19 @@ const GradingReview = () => {
                       key={index}
                       className="card-secondary"
                       style={{
-                        padding: '0.75rem 0.85rem',
+                        padding: '0.7rem 0.85rem',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '0.45rem',
-                        border: hasConflict ? '1.5px solid #F59E0B' : '1px solid var(--border)',
-                        backgroundColor: hasConflict ? '#FEFDF9' : 'var(--surface)'
+                        border: hasConflict ? '1.5px solid #FCD34D' : '1px solid var(--border)',
+                        backgroundColor: hasConflict ? '#FEFDF8' : 'var(--surface)',
+                        borderRadius: '6px'
                       }}
                     >
+                      {/* Question Top Row: Label, Max, Conflict Tag & Score Stepper */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span style={{ backgroundColor: hasConflict ? '#F59E0B' : 'var(--primary)', color: '#fff', fontSize: '0.75rem', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span style={{ backgroundColor: hasConflict ? '#FEF3C7' : 'var(--primary)', color: hasConflict ? '#92400E' : '#fff', fontSize: '0.75rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '4px', border: hasConflict ? '1px solid #FCD34D' : 'none' }}>
                             {qKey}
                           </span>
                           <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -1504,9 +1703,9 @@ const GradingReview = () => {
                           {hasConflict && (
                             <span
                               title={`Auditor Discrepancy: Primary gave ${pScore} pts vs Auditor evaluated ${auditorScoreVal} pts (Δ${scoreDelta} pts)`}
-                              style={{ fontSize: '0.7rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#B45309', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FDE68A' }}
+                              style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FCD34D', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                             >
-                              ⚠️ Flagged ({scoreDelta > 0 ? `Δ${scoreDelta} pts` : 'Conflict'})
+                              <AlertTriangle size={11} color="#D97706" /> AI Conflict {scoreDelta > 0 ? `(Δ${scoreDelta} pts)` : ''}
                             </span>
                           )}
                         </div>
@@ -1565,7 +1764,47 @@ const GradingReview = () => {
                         )}
                       </div>
 
-                      {/* Expandable Feedback Toggle Button */}
+                      {/* Direct AI Conflict Resolution Strip */}
+                      {hasConflict && auditorScoreVal != null && (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          backgroundColor: '#FFFBEB',
+                          border: '1px solid #FDE68A',
+                          borderRadius: '5px',
+                          padding: '0.35rem 0.6rem',
+                          fontSize: '0.74rem',
+                          flexWrap: 'wrap',
+                          gap: '0.4rem'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#92400E' }}>
+                            <Scale size={12} color="#D97706" />
+                            <span>Primary: <strong>{pScore} pts</strong> vs Auditor: <strong>{auditorScoreVal} pts</strong></span>
+                          </div>
+                          {auditorScoreVal !== currentScoreVal && (
+                            <button
+                              type="button"
+                              onClick={() => handlePerQuestionScoreChange(qKey, maxSc, auditorScoreVal)}
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                color: '#1E40AF',
+                                backgroundColor: '#DBEAFE',
+                                border: '1px solid #BFDBFE',
+                                borderRadius: '4px',
+                                padding: '0.12rem 0.45rem',
+                                cursor: 'pointer'
+                              }}
+                              title={`Adopt Auditor score (${auditorScoreVal} pts)`}
+                            >
+                              Adopt Auditor ({auditorScoreVal} pts)
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Clean Expandable Feedback Toggle */}
                       <button
                         type="button"
                         onClick={() => setExpandedFeedback(prev => ({ ...prev, [qKey]: !isExpanded }))}
@@ -1574,69 +1813,56 @@ const GradingReview = () => {
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           width: '100%',
-                          padding: '0.35rem 0.55rem',
+                          padding: '0.32rem 0.55rem',
                           borderRadius: '5px',
-                          border: `1px solid ${hasConflict ? '#FCD34D' : '#E2E8F0'}`,
-                          backgroundColor: hasConflict ? '#FEF3C7' : '#F8FAFC',
-                          color: hasConflict ? '#92400E' : 'var(--text-main)',
+                          border: '1px solid #E2E8F0',
+                          backgroundColor: '#F8FAFC',
                           cursor: 'pointer',
                           fontSize: '0.74rem',
-                          fontWeight: 600,
-                          textAlign: 'left'
+                          fontWeight: 600
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <Sparkles size={13} color="var(--primary)" />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <Sparkles size={12} color="var(--primary)" />
                           <span style={{ color: 'var(--secondary)' }}>
                             {isSubmissionUnfinished ? 'AI Feedback' : `AI Feedback (${currentScoreVal}/${maxSc} pts)`}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: hasConflict ? '#B45309' : 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600 }}>
-                          <span>{isExpanded ? 'Collapse' : 'Expand Feedback'}</span>
-                          {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600 }}>
+                          <span>{isExpanded ? 'Collapse' : 'View Breakdown'}</span>
+                          {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                         </div>
                       </button>
 
-                      {/* Collapsed One-Line Preview */}
+                      {/* Collapsed One-Line Snippet */}
                       {!isExpanded && (
-                        <p style={{ margin: '0.1rem 0 0 0', fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: '1.4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <p style={{ margin: 0, fontSize: '0.735rem', color: 'var(--text-muted)', lineHeight: '1.4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {isSubmissionUnfinished ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: '#2563eb' }}>
                               <Loader2 size={11} className="spin" /> Evaluating answer against rubric...
                             </span>
                           ) : (
-                            `💡 ${effectiveFeedbackText}`
+                            effectiveFeedbackText.replace(/•/g, '').replace(/\s+/g, ' ').trim()
                           )}
                         </p>
                       )}
 
-                      {/* Expanded Unified AI Feedback Box */}
+                      {/* Expanded Structured Feedback (Clean & Calm) */}
                       {isExpanded && (
                         <div style={{
                           backgroundColor: '#FFFFFF',
-                          border: '1px solid var(--border)',
+                          border: '1px solid #E2E8F0',
                           borderRadius: '6px',
-                          padding: '0.55rem 0.75rem',
-                          fontSize: '0.785rem',
-                          marginTop: '0.1rem'
+                          padding: '0.55rem 0.65rem',
+                          fontSize: '0.785rem'
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                            <span style={{ fontWeight: 700, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Sparkles size={13} color="var(--primary)" /> AI Feedback
+                          {isSubmissionUnfinished ? (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#2563eb' }}>
+                              <Loader2 size={12} className="spin" /> Evaluating answer against rubric...
                             </span>
-                            <span style={{ fontWeight: 700, color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.1rem 0.45rem', borderRadius: '4px', fontSize: '0.72rem' }}>
-                              {isSubmissionUnfinished ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                  <Loader2 size={10} className="spin" /> Grading
-                                </span>
-                              ) : (
-                                `Awarded: ${currentScoreVal} / ${maxSc} pts`
-                              )}
-                            </span>
-                          </div>
-                          <div style={{ color: 'var(--text-main)', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                            {effectiveFeedbackText}
-                          </div>
+                          ) : (
+                            <RenderStructuredFeedback text={effectiveFeedbackText} />
+                          )}
                         </div>
                       )}
                     </div>
