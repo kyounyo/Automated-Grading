@@ -69,7 +69,8 @@ def evaluate_confidence_and_status(
     auditor_passed = bool(multi_audit.get("auditor_passed", True))
     auditor_score = float(multi_audit.get("auditor_score", primary_score))
     score_discrepancy = float(multi_audit.get("score_discrepancy", abs(primary_score - auditor_score)))
-    disagreement_severity = str(multi_audit.get("disagreement_severity", "NONE")).upper()
+    default_sev = "NONE" if score_discrepancy == 0.0 else ("MINOR" if score_discrepancy <= 1.0 else "MAJOR")
+    disagreement_severity = str(multi_audit.get("disagreement_severity", default_sev)).upper()
     raw_conflicting_qs = multi_audit.get("conflicting_questions", [])
     if not isinstance(raw_conflicting_qs, list):
         raw_conflicting_qs = []

@@ -722,6 +722,40 @@ const GradingReview = () => {
       setSaving(false);
     }
   };
+  // Helper for flexible matching across Unicode chars (x vs ×, hyphens, non-breaking spaces, quotes)
+  const findFuzzyMatchIndex = (targetText, queryText) => {
+    if (!targetText || !queryText) return { start: -1, length: 0 };
+    const cleanQ = queryText.trim();
+    if (cleanQ.length === 0) return { start: -1, length: 0 };
+
+    const directIdx = targetText.toLowerCase().indexOf(cleanQ.toLowerCase());
+    if (directIdx !== -1) {
+      return { start: directIdx, length: cleanQ.length };
+    }
+
+    // Word-by-word flexible regex matching for math symbols and quotes
+    const words = cleanQ.split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 0) {
+      const escapedWords = words.map(w => {
+        return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                .replace(/[xX\u00d7*]/g, '[xX\\u00d7*]')
+                .replace(/[-–—\u2212]/g, '[-–—\\u2212]')
+                .replace(/['’]/g, "['’]");
+      });
+      const flexPattern = escapedWords.join('[\\s\\u00a0]+');
+      try {
+        const regex = new RegExp(flexPattern, 'i');
+        const m = targetText.match(regex);
+        if (m && m.index !== undefined) {
+          return { start: m.index, length: m[0].length };
+        }
+      } catch (e) {
+        // Fall through
+      }
+    }
+    return { start: -1, length: 0 };
+  };
+
   // Helper to resolve and merge overlapping highlights into clean, non-overlapping spans
   // guaranteeing that every highlight matches verbatim without collisions or dropped points.
   const resolveNonOverlappingHighlights = (sectionText, rawCandidates, sectionScore, allowHalf) => {
@@ -729,7 +763,6 @@ const GradingReview = () => {
       return [];
     }
 
-    const lowerSec = sectionText.toLowerCase();
     const spans = [];
 
     rawCandidates.forEach(cand => {
@@ -737,12 +770,12 @@ const GradingReview = () => {
       const cleanText = cand.text.trim();
       if (cleanText.length < 3) return;
 
-      const idx = lowerSec.indexOf(cleanText.toLowerCase());
-      if (idx !== -1) {
+      const matchRes = findFuzzyMatchIndex(sectionText, cleanText);
+      if (matchRes.start !== -1) {
         spans.push({
-          start: idx,
-          end: idx + cleanText.length,
-          text: sectionText.slice(idx, idx + cleanText.length),
+          start: matchRes.start,
+          end: matchRes.start + matchRes.length,
+          text: sectionText.slice(matchRes.start, matchRes.start + matchRes.length),
           cand
         });
       }
@@ -826,7 +859,7 @@ const GradingReview = () => {
 
     const relevantHighlights = highlightsList.filter(h => {
       if (!h.text || h.text.trim().length < 3) return false;
-      return textSnippet.toLowerCase().includes(h.text.trim().toLowerCase());
+      return findFuzzyMatchIndex(textSnippet, h.text.trim()).start !== -1;
     });
 
     if (relevantHighlights.length === 0) {
@@ -845,13 +878,13 @@ const GradingReview = () => {
           return;
         }
 
-        const matchIdx = part.toLowerCase().indexOf(quote.toLowerCase());
-        if (matchIdx === -1) {
+        const matchRes = findFuzzyMatchIndex(part, quote);
+        if (matchRes.start === -1) {
           newParts.push(part);
         } else {
-          const before = part.slice(0, matchIdx);
-          const matchedStr = part.slice(matchIdx, matchIdx + quote.length);
-          const after = part.slice(matchIdx + quote.length);
+          const before = part.slice(0, matchRes.start);
+          const matchedStr = part.slice(matchRes.start, matchRes.start + matchRes.length);
+          const after = part.slice(matchRes.start + matchRes.length);
 
           if (before) newParts.push(before);
 
@@ -960,7 +993,7 @@ const GradingReview = () => {
           // 1. Check if AI reasoning contains explicit sub-question marks: e.g. (a) [3/5]: ... (b) [2/5]: ...
           let blockHighlights = [];
           const reasoningText = matchedQuestion?.reasoning || '';
-          const subPartRegex = /\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]:?\s*/g;
+          const subPartRegex = /\(([^)]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]:?\s*/g;
           const subPartMatches = Array.from(reasoningText.matchAll(subPartRegex));
 
           let subPartsProcessed = false;
@@ -968,8 +1001,9 @@ const GradingReview = () => {
             const subPartKeys = subPartMatches.map(m => m[1]);
             const positions = [];
             subPartKeys.forEach(k => {
-              const escapedK = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              const regex = new RegExp(`(?:^|\\n|\\s)(?:\\(${escapedK}\\)|${escapedK}\\)|${escapedK}\\.)`, 'i');
+              const cleanK = k.replace(/^\[|\]$/g, '').trim();
+              const escapedK = cleanK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const regex = new RegExp(`(?:^|[\\n\\s])(?:\\(${escapedK}\\)|${escapedK}\\)|${escapedK}[:=\\.\\-]|For\\s+${escapedK}\\b|\\b${escapedK}\\b)`, 'i');
               const match = bodyContent.match(regex);
               if (match) {
                 positions.push({
@@ -1029,13 +1063,16 @@ const GradingReview = () => {
 
                 // 1. Existing highlights from highlightsList inside sText
                 (highlightsList || []).forEach(h => {
-                  if (h && h.text && h.text.trim().length >= 4 && sText.toLowerCase().includes(h.text.trim().toLowerCase())) {
-                    rawSecCands.push({
-                      text: h.text.trim(),
-                      score_awarded: h.score_awarded || 1.0,
-                      type: 'strength',
-                      comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
-                    });
+                  if (h && h.text && h.text.trim().length >= 4) {
+                    const fz = findFuzzyMatchIndex(sText, h.text.trim());
+                    if (fz.start !== -1) {
+                      rawSecCands.push({
+                        text: sText.slice(fz.start, fz.start + fz.length),
+                        score_awarded: h.score_awarded != null ? h.score_awarded : pScore,
+                        type: 'strength',
+                        comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
+                      });
+                    }
                   }
                 });
 
@@ -1043,20 +1080,24 @@ const GradingReview = () => {
                 const quoteMatches = pReason.match(/'([^']+)'|"([^"]+)"/g) || [];
                 quoteMatches.forEach(qm => {
                   const cleanQ = qm.replace(/['"]/g, '').trim();
-                  if (cleanQ.length > 4 && sText.toLowerCase().includes(cleanQ.toLowerCase())) {
-                    rawSecCands.push({
-                      text: cleanQ,
-                      score_awarded: pScore,
-                      type: 'strength',
-                      comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
-                    });
+                  if (cleanQ.length > 4) {
+                    const fz = findFuzzyMatchIndex(sText, cleanQ);
+                    if (fz.start !== -1) {
+                      rawSecCands.push({
+                        text: sText.slice(fz.start, fz.start + fz.length),
+                        score_awarded: pScore,
+                        type: 'strength',
+                        comment: `(${pKey}) [${pScore}/${pMax}]: ${pReason}`
+                      });
+                    }
                   }
                 });
 
                 // 3. Fallback: if no candidates found or if short answer / single sentence
                 if (rawSecCands.length === 0) {
-                  const rawSentences = sText.split(/(?<=[.?!])\s+|\n+/).map(s => s.trim().replace(/^[\*\-\s]+/, '')).filter(s => s.length > 8 && !/^\(?[a-zA-Z0-9][\)\.]/.test(s));
-                  const pick = rawSentences.length > 0 ? rawSentences[0] : sText;
+                  const rawSentences = sText.split(/(?<=[.?!])\s+|\n+/).map(s => s.trim().replace(/^[\*\-\s]+/, '')).filter(s => s.length > 5 && !/^\(?[a-zA-Z0-9][\)\.]/.test(s));
+                  const mathSentence = rawSentences.find(s => /\d/.test(s));
+                  const pick = mathSentence || (rawSentences.length > 0 ? rawSentences[0] : sText);
                   rawSecCands.push({
                     text: pick,
                     score_awarded: pScore,
@@ -1084,13 +1125,16 @@ const GradingReview = () => {
           if (!subPartsProcessed) {
             const rawCands = [];
             (highlightsList || []).forEach(h => {
-              if (h && h.text && h.text.trim().length >= 4 && bodyContent.toLowerCase().includes(h.text.trim().toLowerCase())) {
-                rawCands.push({
-                  text: h.text.trim(),
-                  score_awarded: h.score_awarded || 1.0,
-                  type: 'strength',
-                  comment: matchedQuestion?.reasoning || 'Key evidence response point.'
-                });
+              if (h && h.text && h.text.trim().length >= 4) {
+                const fz = findFuzzyMatchIndex(bodyContent, h.text.trim());
+                if (fz.start !== -1) {
+                  rawCands.push({
+                    text: bodyContent.slice(fz.start, fz.start + fz.length),
+                    score_awarded: h.score_awarded || 1.0,
+                    type: 'strength',
+                    comment: matchedQuestion?.reasoning || 'Key evidence response point.'
+                  });
+                }
               }
             });
 
@@ -1098,14 +1142,17 @@ const GradingReview = () => {
               const quoteMatches = matchedQuestion.reasoning.match(/'([^']+)'|"([^"]+)"/g) || [];
               quoteMatches.forEach(qm => {
                 const cleanQ = qm.replace(/['"]/g, '').trim();
-                if (cleanQ.length > 5 && bodyContent.toLowerCase().includes(cleanQ.toLowerCase())) {
-                  rawCands.push({
-                    text: cleanQ,
-                    type: 'strength',
-                    score_awarded: 1.0,
-                    question_number: qKey,
-                    comment: matchedQuestion.reasoning
-                  });
+                if (cleanQ.length > 5) {
+                  const fz = findFuzzyMatchIndex(bodyContent, cleanQ);
+                  if (fz.start !== -1) {
+                    rawCands.push({
+                      text: bodyContent.slice(fz.start, fz.start + fz.length),
+                      type: 'strength',
+                      score_awarded: 1.0,
+                      question_number: qKey,
+                      comment: matchedQuestion.reasoning
+                    });
+                  }
                 }
               });
             }

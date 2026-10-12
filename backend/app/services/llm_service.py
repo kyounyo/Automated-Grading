@@ -729,7 +729,9 @@ For CALCULATION, extract per sub-part/person:
 - label: the exact name or identifier the QUESTION TEXT itself uses for this
   sub-part, copied verbatim (e.g. "Melissa", not "the patient" or "Patient A";
   "Tony" or "Melissa's husband" exactly as the question phrases it, not a
-  generic role word like "Husband"). The grader matching student answers to
+  generic role word like "Husband"). NEVER use placeholders like "[PERSON_NAME]"
+  or "[NAME]" -- fictional character/patient names from exam questions MUST be
+  preserved verbatim. The grader matching student answers to
   this label later has only the student's own wording to go on, and students
   normally use the same name the question used -- a paraphrased or
   anonymised label (even one intended as a privacy precaution) makes that
@@ -1204,7 +1206,7 @@ given in the Reference above.
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
   "extractions": [
-    {{"label": "{items[0]['label']}", "working_shown": true, "working_correct": true, "working_quote": "verbatim quote, or null if working_shown is false", "final_answer": {items[0]['expected_answer']}}}
+    {{"label": "{items[0]['label']}", "working_shown": true, "working_correct": true, "working_quote": "verbatim quote of calculation, or null if working_shown is false", "evidence_quote": "verbatim quote from student text for this person/calculation (including working and final answer)", "final_answer": {items[0]['expected_answer']}}}
   ],
   "reasoning": "Brief note per item on what evidence was found and why."
 }}
@@ -1231,9 +1233,62 @@ def _auto_rounding_tolerance(expected: float) -> float:
     return 0.5 * (10 ** -decimals)
 
 
+def _find_verbatim_slice_in_text(text: str, query: str) -> Optional[str]:
+    """Finds exact slice in student text even when minor character differences exist (x vs ×, etc.)."""
+    if not text or not query:
+        return None
+    clean_q = query.strip()
+    idx = text.lower().find(clean_q.lower())
+    if idx != -1:
+        return text[idx:idx + len(clean_q)]
+
+    words = clean_q.split()
+    if not words:
+        return None
+    escaped_words = []
+    for w in words:
+        safe = re.escape(w)
+        safe = re.sub(r"[xX\*]", "[[MATH_X]]", safe)
+        safe = safe.replace("[[MATH_X]]", "[xX*\\u00d7]")
+        safe = safe.replace("\\-", "[-–—\\u2212]")
+        safe = safe.replace("\\'", "['’]")
+        escaped_words.append(safe)
+    pattern = r"[\s\u00a0]+".join(escaped_words)
+    try:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            return m.group(0)
+    except Exception:
+        pass
+    return None
+
+
+def _find_item_snippet_in_text(text: str, label: str, all_labels: Optional[List[str]] = None) -> str:
+    """Locates student's calculation snippet for this person, bounded cleanly before the next person."""
+    clean_label = re.sub(r"[\[\]()]", "", label).strip()
+    if not clean_label or not text:
+        return ""
+    stop_words = []
+    if all_labels:
+        for al in all_labels:
+            cal = re.sub(r"[\[\]()]", "", al).strip()
+            if cal and cal.lower() != clean_label.lower():
+                stop_words.append(re.escape(cal))
+    stop_pat = ("(?=\\s*(?:" + "|".join(stop_words) + ")[:=\\s]|\\n|$)") if stop_words else "(?=\\n|$)"
+    pattern = r"(?:^|\n|\s)(?:For\s+)?(" + re.escape(clean_label) + r"[:=\s][\s\S]+?)" + stop_pat
+    try:
+        m = re.search(pattern, text, re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+    except Exception:
+        pass
+    return ""
+
+
 def _score_calculation_extraction_dynamic(
     extraction_res: Dict[str, Any],
     items: list,
+    student_text: str = "",
 ) -> Dict[str, Any]:
     """
     Deterministic scorer matching _build_calculation_extraction_prompt_dynamic --
@@ -1250,29 +1305,8 @@ def _score_calculation_extraction_dynamic(
     raw_extractions = [e for e in (extraction_res.get("extractions") or []) if isinstance(e, dict)]
 
     if len(raw_extractions) == len(items):
-        # Primary strategy: positional alignment. The extraction prompt lists
-        # items in a fixed order and asks for one entry per item in that same
-        # order, and every observed response (correct or broken) has preserved
-        # it -- so when the counts match, position is a far more reliable
-        # signal than reproducing a label's exact text. This matters because a
-        # label built from a weaker model's own redaction of a person's name
-        # (e.g. two DIFFERENT people both rendered as the literal placeholder
-        # "[PERSON_NAME]" within one label, as happens for a "X, Y's spouse"
-        # style sub-part) is inherently ambiguous text to reproduce exactly,
-        # and was observed to make that specific item silently come back
-        # empty in most of a real run even though the student's answer for it
-        # was clearly present -- not a lookup bug, the model's own attempt to
-        # re-key by that confusing label was the fragile step.
         item_to_extraction = {id(it): e for it, e in zip(items, raw_extractions)}
     else:
-        # Fallback: counts disagree (the model skipped or added an item), so
-        # position can't be trusted -- match by label instead. Per-label
-        # QUEUES, not a dict: labels are not guaranteed unique (the same
-        # redaction behaviour can turn several distinct items into literally
-        # the same label string), and a plain dict keyed by label would let
-        # each later entry silently overwrite the previous one. Queuing
-        # preserves list order, so N items sharing a label still consume N
-        # distinct extraction entries in the order both were given.
         extraction_queues: Dict[str, deque] = defaultdict(deque)
         for e in raw_extractions:
             extraction_queues[str(e.get("label", "")).strip().lower()].append(e)
@@ -1283,14 +1317,11 @@ def _score_calculation_extraction_dynamic(
 
     breakdown, highlights = [], []
     total = 0.0
+    all_labels = [it.get("label", "") for it in items]
 
     for it in items:
         e = item_to_extraction.get(id(it), {})
         working_shown = bool(e.get("working_shown", False))
-        # Backward-compatible default: an older extraction result (or a model
-        # that ignores the new field) without "working_correct" present falls
-        # back to working_shown's own value, i.e. the pre-fix behaviour of
-        # awarding on presence alone -- never stricter than before by accident.
         working_correct = bool(e.get("working_correct", working_shown))
         working_mark_each = float(it.get("working_mark", 0.5))
         answer_mark_each = float(it.get("answer_mark", 1.0))
@@ -1329,14 +1360,27 @@ def _score_calculation_extraction_dynamic(
             "max_score": working_mark_each + answer_mark_each,
             "reasoning": reasoning,
         })
-        quote = e.get("working_quote")
-        if quote:
+
+        # Locate exact quote for highlight in student text
+        raw_quote = (e.get("evidence_quote") or e.get("working_quote") or "").strip()
+        highlight_text = ""
+        if student_text:
+            if raw_quote:
+                fuzzy = _find_verbatim_slice_in_text(student_text, raw_quote)
+                if fuzzy:
+                    highlight_text = fuzzy
+            if not highlight_text:
+                highlight_text = _find_item_snippet_in_text(student_text, it['label'], all_labels)
+        elif raw_quote:
+            highlight_text = raw_quote
+
+        if highlight_text and person_total > 0:
             highlights.append({
-                "text": quote,
+                "text": highlight_text,
                 "question_number": f"({it['label']})",
                 "score_awarded": round(person_total, 2),
                 "max_score": working_mark_each + answer_mark_each,
-                "type": "strength" if person_total > 0 else "improvement",
+                "type": "strength",
                 "comment": reasoning,
             })
 
@@ -1375,7 +1419,7 @@ def _grade_calculation_dynamic(
     extraction_res = _call_openrouter_api(messages, model, temperature=0.0)
     if not extraction_res:
         return None
-    return _score_calculation_extraction_dynamic(extraction_res, items)
+    return _score_calculation_extraction_dynamic(extraction_res, items, student_text=student_text)
 
 
 def _build_dynamic_open_ended_prompt(
@@ -1700,6 +1744,56 @@ def _grade_open_ended_dynamic(
     return _score_dynamic_open_ended(spec, result)
 
 
+def _sanitize_spec_labels(spec: Dict[str, Any], question_text: str, rubric_text: str) -> None:
+    """
+    Ensures that labels in calculation specs never contain anonymized placeholders
+    like '[PERSON_NAME]'. Recovers actual scenario character/entity names from
+    question_text and rubric_text.
+    """
+    if not isinstance(spec, dict) or not spec.get("items"):
+        return
+    items = spec["items"]
+    has_placeholder = any("[PERSON_NAME]" in str(it.get("label", "")) or "[PERSON_NAME]" in str(it.get("source_evidence", "")) for it in items)
+    if not has_placeholder:
+        return
+
+    name_map = {}
+    for line in rubric_text.splitlines():
+        m = re.match(r'^\s*([A-Za-z]+)\s*=\s*.*?=\s*(\d+(?:\.\d+)?)\s*squares', line, re.IGNORECASE)
+        if m:
+            name, ans = m.group(1).strip(), float(m.group(2))
+            name_map[ans] = name
+
+    q_names = []
+    for line in question_text.splitlines():
+        m_q = re.match(r'^\s*([A-Za-z]+)(?:,\s*[^:]+)?:.*?weighs\s*(\d+)kg', line, re.IGNORECASE)
+        if m_q:
+            q_names.append((m_q.group(1).strip(), int(m_q.group(2))))
+
+    for it in items:
+        lbl = str(it.get("label", ""))
+        try:
+            ans = float(it.get("expected_answer", 0.0))
+        except (ValueError, TypeError):
+            ans = 0.0
+        if "[PERSON_NAME]" in lbl or not lbl.strip():
+            if ans in name_map:
+                it["label"] = name_map[ans]
+            elif q_names:
+                ev = str(it.get("source_evidence", ""))
+                matched = False
+                for qn, qw in q_names:
+                    if f"{qw}kg" in ev or f"{qw}" in ev:
+                        it["label"] = qn
+                        matched = True
+                        break
+                if not matched and q_names:
+                    it["label"] = q_names.pop(0)[0]
+        ev = str(it.get("source_evidence", ""))
+        if "[PERSON_NAME]" in ev and it.get("label") and "[PERSON_NAME]" not in it["label"]:
+            it["source_evidence"] = ev.replace("[PERSON_NAME]", it["label"])
+
+
 def interpret_rubric_spec(
     question_text: str,
     rubric_text: str,
@@ -1711,40 +1805,13 @@ def interpret_rubric_spec(
     Runs the Rubric Interpreter ONCE for a question and returns a validated Grading
     Specification, or None if the interpreter failed outright or produced something
     _validate_grading_spec() rejects as structurally unusable.
-
-    Call this ONCE PER QUESTION and reuse the returned spec for every student
-    response to that question via grade_with_spec() -- NOT once per response. The
-    rubric does not change between students; re-interpreting it per response would
-    (a) multiply API cost/latency by however many responses exist, and (b) risk
-    grading different students in the same cohort against subtly different
-    interpreted specs if the interpreter's output varies run to run, which would
-    corrupt any agreement/consistency comparison across that cohort. A Grading
-    Specification belongs to a question, not to a submission.
-
-    rag_context (optional): this question's own rubric chunk retrieved from
-    ChromaDB by the caller (see grading.py's _get_rag_context, queried by this
-    question's own prompt text so it reliably retrieves that question's own
-    indexed document, not a similarity-search guess). Passed straight into the
-    interpreter prompt as corroborating reference -- rubric_text remains the
-    authoritative source; this is deliberately NOT used to replace it, only to
-    cross-check it, since the ChromaDB document is itself just a reformatted
-    copy of the same rubric data and carries no extra information of its own.
-
-    On success, the returned spec carries three extra bookkeeping fields not part
-    of the interpreter's own output: `_review_flags` (a list of human-readable
-    non-fatal warnings -- e.g. a CALCULATION item whose expected_answer was
-    DERIVED rather than copied from an explicit rubric answer -- that a human
-    should see before this spec is trusted at scale), `_validation_issues`
-    (empty on success; only present for debugging if this ever changes to return
-    a spec despite issues, which it currently does not), and `_rag_context` is
-    NOT set here -- the caller (grade_submission_dynamic) attaches it after this
-    call returns, so the same retrieved chunk used for classification is cached
-    alongside the spec and reused for every future grading call too.
     """
     target_model = model or get_llm_model()
     spec = call_rubric_interpreter_agent(question_text, rubric_text, max_score, target_model, rag_context=rag_context)
     if not spec:
         return None
+
+    _sanitize_spec_labels(spec, question_text, rubric_text)
 
     # The top-level max_score is a value WE already know (the caller provided it
     # as an input), not something the interpreter needs to be trusted to echo back
@@ -2361,13 +2428,20 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
             hl["question_number"] = "General Rubric Evidence"
 
     # Ensure EVERY question in breakdown has at least one highlight entry
+    from .confidence import extract_main_question_number
+
+    existing_mains = set(
+        extract_main_question_number(h.get("question_number", ""))
+        for h in highlights if isinstance(h, dict) and h.get("question_number")
+    )
     existing_q_nums = set(h.get("question_number") for h in highlights if isinstance(h, dict) and h.get("question_number"))
     
     for b in breakdown:
         if not isinstance(b, dict):
             continue
         b_q = b.get("question_number", "")
-        if not b_q or b_q in existing_q_nums:
+        b_main = extract_main_question_number(b_q)
+        if not b_q or b_q in existing_q_nums or b_main in existing_mains:
             continue
 
         score_aw = b.get("score_awarded", 0.0)
@@ -2425,11 +2499,15 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         if not b_q:
             continue
         target_score = float(b.get("score_awarded", 0.0) or 0.0)
+        b_main = extract_main_question_number(b_q)
 
         clean_bq = re.sub(r'[^a-zA-Z0-9]', '', b_q).upper()
         q_hls = [
             h for h in highlights
-            if isinstance(h, dict) and re.sub(r'[^a-zA-Z0-9]', '', str(h.get("question_number", ""))).upper() == clean_bq
+            if isinstance(h, dict) and (
+                extract_main_question_number(str(h.get("question_number", ""))) == b_main
+                or re.sub(r'[^a-zA-Z0-9]', '', str(h.get("question_number", ""))).upper() == clean_bq
+            )
         ]
 
         if not q_hls:
