@@ -222,6 +222,22 @@ p {
   background-color: #FFFFFF;
 }
 
+.input-field:read-only,
+.input-field[readonly] {
+  background-color: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+  cursor: default;
+}
+
+.input-field:read-only:focus,
+.input-field[readonly]:focus {
+  outline: none;
+  border-color: #cbd5e1;
+  background-color: #f1f5f9;
+  box-shadow: none !important;
+}
+
 .label {
   display: block;
   font-family: var(--font-heading);

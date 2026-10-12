@@ -1151,10 +1151,11 @@ const Calibration = () => {
                             <span style={{
                               fontSize: '0.68rem',
                               fontWeight: 600,
-                              color: 'var(--text-muted)',
-                              backgroundColor: 'rgba(100, 116, 139, 0.12)',
-                              padding: '0.1rem 0.45rem',
-                              borderRadius: '4px'
+                              color: '#64748b',
+                              backgroundColor: '#e2e8f0',
+                              padding: '0.12rem 0.45rem',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1'
                             }}>
                               Submitted Answer (Read-only)
                             </span>
@@ -1169,11 +1170,11 @@ const Calibration = () => {
                               fontSize: '0.82rem',
                               padding: '0.55rem 0.65rem',
                               resize: 'vertical',
-                              backgroundColor: 'var(--surface)',
-                              color: 'var(--text-main)',
+                              backgroundColor: '#f1f5f9',
+                              color: '#475569',
                               cursor: 'default',
                               lineHeight: '1.5',
-                              border: '1px solid var(--border)',
+                              border: '1px solid #cbd5e1',
                               opacity: card.studentText ? 1 : 0.7
                             }}
                           />

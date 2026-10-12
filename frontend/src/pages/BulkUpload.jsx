@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, CheckCircle2, FileText, Trash2, ArrowRight, Loader2, Plus, Download, Users, UserCheck, ChevronDown, ChevronUp, FileSpreadsheet, Sparkles, Sliders, Info, AlertTriangle } from 'lucide-react';
+import { UploadCloud, CheckCircle2, FileText, Trash2, ArrowRight, Loader2, Plus, Download, Users, UserCheck, ChevronDown, ChevronUp, FileSpreadsheet, Sparkles, Sliders, Info, AlertTriangle, Lock } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { uploadBulkSubmissions, triggerGradeAll, previewSubmissions } from '../api/client';
 
@@ -562,20 +562,43 @@ const BulkUpload = () => {
                   </span>
                 </div>
 
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.15rem' }}>
+                  <span style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                    Extracted Response:
+                  </span>
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 600,
+                    color: '#64748b',
+                    backgroundColor: '#e2e8f0',
+                    padding: '0.12rem 0.45rem',
+                    borderRadius: '4px',
+                    border: '1px solid #cbd5e1',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}>
+                    <Lock size={10} /> Read-only
+                  </span>
+                </div>
+
                 <div
                   style={{
                     fontSize: '0.825rem',
-                    color: 'var(--text-main)',
+                    color: '#475569',
                     lineHeight: '1.5',
-                    backgroundColor: 'var(--surface)',
+                    backgroundColor: '#f1f5f9',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '6px',
-                    border: '1px solid var(--border)',
+                    border: '1px solid #cbd5e1',
                     maxHeight: '120px',
                     overflowY: 'auto',
                     whiteSpace: 'pre-wrap',
-                    fontFamily: 'var(--font-body)'
+                    fontFamily: 'var(--font-body)',
+                    cursor: 'default',
+                    userSelect: 'text'
                   }}
+                  title="Extracted student response (read-only)"
                 >
                   {student.text || '<Empty student response>'}
                 </div>
