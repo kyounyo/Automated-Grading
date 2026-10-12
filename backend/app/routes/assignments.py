@@ -59,17 +59,14 @@ def get_assignment_detail(assignment_id: str, db: Session = Depends(get_db)):
 
 
 def sync_assignment_calibration_samples(db: Session, assignment_id: str, new_size: int):
-    """Synchronize submission is_calibration_sample flags with the target sample size."""
+    """Synchronize submission is_calibration_sample flags with the target sample size.
+    Calibration samples must be explicitly imported or selected by the lecturer, not arbitrarily auto-tagged.
+    """
     all_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).order_by(Submission.created_at.asc()).all()
     if not all_subs:
         return
     current_cals = [s for s in all_subs if s.is_calibration_sample]
-    if len(current_cals) < new_size:
-        needed = new_size - len(current_cals)
-        candidates = [s for s in all_subs if not s.is_calibration_sample]
-        for s in candidates[:needed]:
-            s.is_calibration_sample = True
-    elif len(current_cals) > new_size:
+    if len(current_cals) > new_size:
         excess = len(current_cals) - new_size
         removable = [s for s in current_cals if s.status != "graded" and s.score is None]
         if len(removable) < excess:

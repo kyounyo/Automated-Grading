@@ -113,10 +113,10 @@ const Calibration = () => {
     }
   }, [calSamples, selectedSampleId]);
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (showSpinner = false) => {
     if (!currentAssignmentId) return;
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const data = await fetchCalibrationStatus(currentAssignmentId);
       setCalStatus(data);
       if (data?.calibration_sample_size != null) {
@@ -129,7 +129,7 @@ const Calibration = () => {
     }
   }, [currentAssignmentId]);
 
-  useEffect(() => { loadStatus(); }, [loadStatus]);
+  useEffect(() => { loadStatus(true); }, [loadStatus]);
 
   useEffect(() => {
     if (currentAssignment?.calibration_sample_size != null) {
@@ -487,6 +487,9 @@ const Calibration = () => {
       fd.append('file', file);
       const data = await previewCalibrationFile(currentAssignmentId, fd);
       setPreviewData(data);
+      setTimeout(() => {
+        document.getElementById('calibration-preview-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     } catch (err) {
       console.error('Spreadsheet preview error:', err);
       setPreviewError(err.message || 'Failed to inspect calibration spreadsheet.');
@@ -523,10 +526,16 @@ const Calibration = () => {
       setImportResult(result);
       // Keep preview data visible and mark as successfully imported
       setPreviewData(prev => prev ? { ...prev, isImported: true } : null);
-      await loadStatus();
+      await loadStatus(false);
       if (loadSubmissions) {
         await loadSubmissions(currentAssignmentId, true);
       }
+      setTimeout(() => {
+        const successEl = document.getElementById('calibration-import-success') || document.getElementById('calibration-preview-section');
+        if (successEl) {
+          successEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 120);
     } catch (e) {
       alert(`Import failed: ${e.message}`);
     } finally {
@@ -1513,7 +1522,7 @@ const Calibration = () => {
 
           {/* EXTRACTED EXAMPLES PREVIEW CARD */}
           {previewData && (
-            <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div id="calibration-preview-section" style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
 
               {/* Extracted / Imported Examples Table */}
@@ -1638,18 +1647,21 @@ const Calibration = () => {
               {/* Action Buttons */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.75rem' }}>
                 {previewData.isImported ? (
-                  <div style={{
-                    width: '100%',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: '0.75rem',
-                    backgroundColor: '#f0fdf4',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    border: '1px solid #bbf7d0'
-                  }}>
+                  <div
+                    id="calibration-import-success"
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem',
+                      backgroundColor: '#f0fdf4',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '8px',
+                      border: '1px solid #bbf7d0'
+                    }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#15803d', fontWeight: 700, fontSize: '0.85rem' }}>
                       <CheckCircle2 size={18} color="#16a34a" />
                       <span>All {previewData.total_rows} examples successfully imported and active in AI calibration!</span>

@@ -385,90 +385,6 @@ const AssignmentCreator = () => {
 
         </div>
 
-        {/* Examiner Calibration Preference */}
-        <div className="card-panel" style={{ padding: '1.25rem 1.6rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-              <Target size={18} color="var(--primary)" /> Examiner Calibration Option
-            </h3>
-            <span style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              color: calibrationEnabled ? '#4338ca' : '#475569',
-              backgroundColor: calibrationEnabled ? '#e0e7ff' : '#f1f5f9',
-              padding: '0.2rem 0.65rem',
-              borderRadius: '999px',
-              border: `1px solid ${calibrationEnabled ? '#c7d2fe' : '#cbd5e1'}`
-            }}>
-              {calibrationEnabled ? '🎯 Calibration Step Enabled' : '⚡ Calibration Step Skipped'}
-            </span>
-          </div>
-
-          <p style={{ margin: '0 0 1rem 0', fontSize: '0.825rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            Do you want to include an Examiner Calibration step where you can grade a few sample student papers so the AI adapts to your marking style?
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-            {/* Option A: Skip Calibration */}
-            <div
-              onClick={() => setCalibrationEnabled(false)}
-              style={{
-                border: `2px solid ${!calibrationEnabled ? 'var(--primary)' : 'var(--border)'}`,
-                backgroundColor: !calibrationEnabled ? 'var(--primary-light)' : '#fff',
-                borderRadius: '8px',
-                padding: '1rem 1.15rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: !calibrationEnabled ? 'var(--primary-dark)' : 'var(--secondary)' }}>
-                  ⚡ No, skip calibration (Direct Grading)
-                </span>
-                <input
-                  type="radio"
-                  name="calibrationPref"
-                  checked={!calibrationEnabled}
-                  onChange={() => setCalibrationEnabled(false)}
-                  style={{ accentColor: 'var(--primary)' }}
-                />
-              </div>
-              <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                Submissions will go straight to AI batch evaluation. Step 3 (Calibration) will not be shown in your workflow.
-              </p>
-            </div>
-
-            {/* Option B: Enable Calibration */}
-            <div
-              onClick={() => setCalibrationEnabled(true)}
-              style={{
-                border: `2px solid ${calibrationEnabled ? 'var(--primary)' : 'var(--border)'}`,
-                backgroundColor: calibrationEnabled ? 'var(--primary-light)' : '#fff',
-                borderRadius: '8px',
-                padding: '1rem 1.15rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: calibrationEnabled ? 'var(--primary-dark)' : 'var(--secondary)' }}>
-                  🎯 Yes, include calibration (Step 3)
-                </span>
-                <input
-                  type="radio"
-                  name="calibrationPref"
-                  checked={calibrationEnabled}
-                  onChange={() => setCalibrationEnabled(true)}
-                  style={{ accentColor: 'var(--primary)' }}
-                />
-              </div>
-              <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                Enables Step 3 (Calibration) to let you upload or mark baseline samples so the AI aligns with your exact strictness.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* 3. Section 3: Question Builder (Side-by-Side Question Prompt & Model Answer Columns) */}
         <div className="card-panel" style={{ padding: '1.35rem 1.6rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.15rem' }}>
@@ -568,6 +484,90 @@ const AssignmentCreator = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* 4. Examiner Calibration Preference */}
+        <div className="card-panel" style={{ padding: '1.25rem 1.6rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0, color: 'var(--secondary)', fontSize: '1.05rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <Target size={18} color="var(--primary)" /> 4. Examiner Calibration Option
+            </h3>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              color: calibrationEnabled ? '#4338ca' : '#475569',
+              backgroundColor: calibrationEnabled ? '#e0e7ff' : '#f1f5f9',
+              padding: '0.2rem 0.65rem',
+              borderRadius: '999px',
+              border: `1px solid ${calibrationEnabled ? '#c7d2fe' : '#cbd5e1'}`
+            }}>
+              {calibrationEnabled ? '🎯 Calibration Step Enabled' : '⚡ Calibration Step Skipped'}
+            </span>
+          </div>
+
+          <p style={{ margin: '0 0 1rem 0', fontSize: '0.825rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            Do you want to include an Examiner Calibration step where you can grade a few sample student papers so the AI adapts to your marking style?
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+            {/* Option A: Skip Calibration */}
+            <div
+              onClick={() => setCalibrationEnabled(false)}
+              style={{
+                border: `2px solid ${!calibrationEnabled ? 'var(--primary)' : 'var(--border)'}`,
+                backgroundColor: !calibrationEnabled ? 'var(--primary-light)' : '#fff',
+                borderRadius: '8px',
+                padding: '1rem 1.15rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: !calibrationEnabled ? 'var(--primary-dark)' : 'var(--secondary)' }}>
+                  ⚡ No, skip calibration (Direct Grading)
+                </span>
+                <input
+                  type="radio"
+                  name="calibrationPref"
+                  checked={!calibrationEnabled}
+                  onChange={() => setCalibrationEnabled(false)}
+                  style={{ accentColor: 'var(--primary)' }}
+                />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                Submissions will go straight to AI batch evaluation. Step 3 (Calibration) will not be shown in your workflow.
+              </p>
+            </div>
+
+            {/* Option B: Enable Calibration */}
+            <div
+              onClick={() => setCalibrationEnabled(true)}
+              style={{
+                border: `2px solid ${calibrationEnabled ? 'var(--primary)' : 'var(--border)'}`,
+                backgroundColor: calibrationEnabled ? 'var(--primary-light)' : '#fff',
+                borderRadius: '8px',
+                padding: '1rem 1.15rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: calibrationEnabled ? 'var(--primary-dark)' : 'var(--secondary)' }}>
+                  🎯 Yes, include calibration (Step 3)
+                </span>
+                <input
+                  type="radio"
+                  name="calibrationPref"
+                  checked={calibrationEnabled}
+                  onChange={() => setCalibrationEnabled(true)}
+                  style={{ accentColor: 'var(--primary)' }}
+                />
+              </div>
+              <p style={{ margin: 0, fontSize: '0.775rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                Enables Step 3 (Calibration) to let you upload or mark baseline samples so the AI aligns with your exact strictness.
+              </p>
+            </div>
           </div>
         </div>
 

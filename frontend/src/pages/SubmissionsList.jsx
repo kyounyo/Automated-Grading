@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, Download, ShieldAlert, Loader2, ArrowRight } from 'lucide-react';
+import { Search, Filter, ChevronRight, CheckCircle, Clock, AlertTriangle, Play, Sparkles, Download, ShieldAlert, Loader2, ArrowRight, Target } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 
 const SubmissionsList = () => {
@@ -172,6 +172,31 @@ const SubmissionsList = () => {
       );
     }
 
+    if (sub.is_calibration_sample) {
+      return (
+        <span
+          className="status-badge"
+          style={{
+            backgroundColor: '#f3e8ff',
+            color: '#7e22ce',
+            padding: '0.22rem 0.55rem',
+            borderRadius: '4px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            fontWeight: 700,
+            fontSize: '0.75rem',
+            border: '1px solid #d8b4fe',
+            gap: '0.3rem',
+            whiteSpace: 'nowrap'
+          }}
+          title="Official Lecturer Calibration Exemplar"
+        >
+          <Target size={13} color="#9333ea" style={{ flexShrink: 0 }} />
+          Calibration Example
+        </span>
+      );
+    }
+
     switch (sub.status) {
       case 'graded':
         return (
@@ -267,8 +292,14 @@ const SubmissionsList = () => {
     return name && name !== 'N/A' ? name : `Student ${id || ''}`.trim();
   };
 
+  const calibrationCount = submissions.filter(s => Boolean(s.is_calibration_sample)).length;
+
   const filteredSubmissions = submissions.filter(s => {
-    const matchesFilter = filter === 'all' || s.status === filter;
+    const matchesFilter = filter === 'all'
+      ? true
+      : filter === 'calibration'
+        ? Boolean(s.is_calibration_sample)
+        : s.status === filter;
     const term = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm ||
       (s.student_id && s.student_id.toLowerCase().includes(term)) ||
@@ -324,6 +355,21 @@ const SubmissionsList = () => {
             >
               <Clock size={14} style={{ marginRight: '4px' }} /> Pending ({submissions.filter(s => s.status === 'pending').length})
             </button>
+            {calibrationCount > 0 && (
+              <button
+                className={`btn ${filter === 'calibration' ? 'btn-primary' : ''}`}
+                style={{
+                  padding: '0.4rem 0.8rem',
+                  fontSize: '0.875rem',
+                  background: filter === 'calibration' ? 'var(--primary)' : 'transparent',
+                  color: filter === 'calibration' ? '#fff' : 'var(--text-main)',
+                  border: filter === 'calibration' ? 'none' : '1px solid var(--border)'
+                }}
+                onClick={() => setFilter('calibration')}
+              >
+                <Target size={14} style={{ marginRight: '4px' }} /> Calibration ({calibrationCount})
+              </button>
+            )}
           </div>
         </div>
 
@@ -414,7 +460,7 @@ const SubmissionsList = () => {
             <tr>
               <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Student</th>
               <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>File Name</th>
-              <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>AI Score</th>
+              <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Score</th>
               <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Status</th>
               <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Actions</th>
             </tr>
@@ -429,6 +475,7 @@ const SubmissionsList = () => {
             ) : (
               filteredSubmissions.map((sub) => {
                 const isGrading = isSubmissionGrading(sub);
+                const isCalSample = Boolean(sub.is_calibration_sample);
                 return (
                   <tr
                     key={sub.id}
@@ -499,7 +546,7 @@ const SubmissionsList = () => {
                           >
                             Grading...
                           </button>
-                        ) : (sub.status === 'pending' || sub.status === 'uploaded') ? (
+                        ) : (sub.status === 'pending' || sub.status === 'uploaded') && !isCalSample ? (
                           <button
                             className="btn btn-primary"
                             style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
@@ -507,29 +554,30 @@ const SubmissionsList = () => {
                           >
                             <Play size={14} /> Grade with AI
                           </button>
-                        ) : null}
-                        <button
-                          className={`btn ${sub.status === 'flagged' ? 'btn-primary' : ''}`}
-                          disabled={isGrading}
-                          style={{
-                            padding: '0.4rem 0.8rem',
-                            fontSize: '0.85rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            background: sub.status === 'flagged' ? 'var(--warning)' : 'var(--bg-main)',
-                            color: sub.status === 'flagged' ? '#fff' : 'var(--text-main)',
-                            border: sub.status === 'flagged' ? 'none' : '1px solid var(--border)',
-                            opacity: isGrading ? 0.6 : 1,
-                            cursor: isGrading ? 'not-allowed' : 'pointer'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/review`, { state: { submission: sub } });
-                          }}
-                        >
-                          Review <ChevronRight size={16} />
-                        </button>
+                        ) : (
+                          <button
+                            className={`btn ${sub.status === 'flagged' ? 'btn-primary' : ''}`}
+                            disabled={isGrading}
+                            style={{
+                              padding: '0.4rem 0.8rem',
+                              fontSize: '0.85rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              background: sub.status === 'flagged' ? 'var(--warning)' : 'var(--bg-main)',
+                              color: sub.status === 'flagged' ? '#fff' : 'var(--text-main)',
+                              border: sub.status === 'flagged' ? 'none' : '1px solid var(--border)',
+                              opacity: isGrading ? 0.6 : 1,
+                              cursor: isGrading ? 'not-allowed' : 'pointer'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/review`, { state: { submission: sub } });
+                            }}
+                          >
+                            Review <ChevronRight size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

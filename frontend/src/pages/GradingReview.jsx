@@ -20,7 +20,10 @@ import {
   ChevronUp,
   Scale,
   Bot,
-  Info
+  Info,
+  Lock,
+  Target,
+  UserCheck
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { fetchSubmissionDetail } from '../api/client';
@@ -34,7 +37,7 @@ const formatAuditReason = (rawReason) => {
 
   if (r.toLowerCase().includes('multi-agent') || r.toLowerCase().includes('discrepancy') || r.toLowerCase().includes('conflict')) {
     const qMatch = r.match(/(?:on\s+)([A-Za-z0-9_(),\s|Δ><\.\:]+?)(?::\s*Exceeds|$)/i);
-    let detail = qMatch ? qMatch[1].trim() : 'Primary and Auditor models evaluated different scores.';
+    let detail = qMatch ? qMatch[1].trim() : 'Primary and Auditor evaluated different scores.';
     detail = detail.replace(/:\s*Exceeds.*tolerance/i, '').trim();
     return {
       type: 'AI Conflict',
@@ -310,12 +313,12 @@ const GradingReview = () => {
   }, [targetSubId, isSubmissionUnfinished, currentAssignmentId, currentSub?.status, loadSubmissions, setActiveSubmission]);
 
   const activeSubmissionObj = currentSub || EMPTY_OBJECT;
+  const isCalibrationSample = Boolean(activeSubmissionObj?.is_calibration_sample || currentSub?.is_calibration_sample);
   const feedback = activeSubmissionObj?.feedback || EMPTY_OBJECT;
   const breakdown = Array.isArray(feedback.breakdown) ? feedback.breakdown : EMPTY_ARRAY;
   const multiAgentAudit = feedback.multi_agent_audit || EMPTY_OBJECT;
   const auditorBreakdown = Array.isArray(multiAgentAudit.auditor_breakdown) ? multiAgentAudit.auditor_breakdown : EMPTY_ARRAY;
-  const primaryModelLabel = activeSubmissionObj?.model_used ? activeSubmissionObj.model_used.split('/').pop() : 'Gemini 3.1 Flash';
-  const auditorModelLabel = multiAgentAudit?.model_used ? multiAgentAudit.model_used.split('/').pop() : 'Nemotron 120B';
+
   const primaryOverallScore = multiAgentAudit?.primary_score ?? (
     breakdown && breakdown.length > 0
       ? Math.round(breakdown.reduce((sum, b) => sum + (parseFloat(b.score_awarded) || 0), 0) * 10) / 10
@@ -328,6 +331,23 @@ const GradingReview = () => {
     const cleanQ = String(qKey || '').replace(/[^A-Za-z0-9]/g, '');
     const numMatch = cleanQ.match(/\d+/);
     const numStr = numMatch ? numMatch[0] : cleanQ;
+
+    // Split audit note into sentences and find those matching the question
+    const sentences = auditNote.split(/(?<=[.?!])\s+/);
+    const relevant = sentences.filter(s => {
+      const sLower = s.toLowerCase();
+      return (
+        sLower.includes(`q${numStr.toLowerCase()}`) ||
+        sLower.includes(`question ${numStr.toLowerCase()}`) ||
+        sLower.includes(`q ${numStr.toLowerCase()}`) ||
+        (cleanQ.length > 2 && sLower.includes(cleanQ.toLowerCase()))
+      );
+    });
+
+    if (relevant.length > 0) {
+      return relevant.join(' ').trim();
+    }
+
     const regex = new RegExp(`(?:\\b(?:Q|Question)\\s*${numStr}\\b|\\b${cleanQ}\\b)[^:.]*?:?\\s*([^.]+(?:\\.[^A-Z0-9]+[^.]+){0,2}\\.?)`, 'i');
     const match = auditNote.match(regex);
     if (match && match[0]) {
@@ -853,7 +873,7 @@ const GradingReview = () => {
   };
 
   const renderHighlightedSnippet = (textSnippet, highlightsList) => {
-    if (!highlightsList || highlightsList.length === 0) {
+    if (isCalibrationSample || !highlightsList || highlightsList.length === 0) {
       return textSnippet;
     }
 
@@ -989,16 +1009,20 @@ const GradingReview = () => {
 
           const qKey = matchedQuestion?.question_number || mainKey;
           const currentScoreVal = questionScores[qKey] != null ? questionScores[qKey] : (matchedQuestion?.score_awarded ?? 0);
-          const targetScore = parseFloat(currentScoreVal) || 0;
+          // Highlight evidence strictly reflects what the AI originally evaluated and awarded.
+          // Overriding the question score does not increase or alter the AI evidence highlights.
+          const aiAwardedScore = matchedQuestion?.score_awarded != null ? parseFloat(matchedQuestion.score_awarded) : 0;
+          const targetScore = aiAwardedScore;
 
           // 1. Check if AI reasoning contains explicit sub-question marks: e.g. (a) [3/5]: ... (b) [2/5]: ...
           let blockHighlights = [];
-          const reasoningText = matchedQuestion?.reasoning || '';
-          const subPartRegex = /\(([^)]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]:?\s*/g;
-          const subPartMatches = Array.from(reasoningText.matchAll(subPartRegex));
+          if (!isCalibrationSample) {
+            const reasoningText = matchedQuestion?.reasoning || '';
+            const subPartRegex = /\(([^)]+)\)\s*\[([0-9\.]+)\/([0-9\.]+)\]:?\s*/g;
+            const subPartMatches = Array.from(reasoningText.matchAll(subPartRegex));
 
-          let subPartsProcessed = false;
-          if (subPartMatches.length > 0 && bodyContent && bodyContent.trim().length > 3) {
+            let subPartsProcessed = false;
+            if (subPartMatches.length > 0 && bodyContent && bodyContent.trim().length > 3) {
             const subPartKeys = subPartMatches.map(m => m[1]);
             const positions = [];
             subPartKeys.forEach(k => {
@@ -1179,6 +1203,7 @@ const GradingReview = () => {
 
             blockHighlights = resolveNonOverlappingHighlights(bodyContent, rawCands, targetScore, allowsHalfMarks);
           }
+        }
 
           return (
             <div
@@ -1207,7 +1232,21 @@ const GradingReview = () => {
                   <span style={{ fontWeight: 800, fontSize: '0.85rem', color: isQConflicted ? '#92400E' : 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     📘 {headerTitle || `Question ${mainKey || bIdx + 1}`}
                   </span>
-                  {isQConflicted && (
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 600,
+                    color: '#475569',
+                    backgroundColor: '#e2e8f0',
+                    padding: '0.1rem 0.45rem',
+                    borderRadius: '4px',
+                    border: '1px solid #cbd5e1',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}>
+                    <Lock size={10} /> Read-only
+                  </span>
+                  {!isCalibrationSample && isQConflicted && (
                     <span style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FCD34D', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                       <AlertTriangle size={11} color="#D97706" /> AI Conflict
                     </span>
@@ -1252,22 +1291,22 @@ const GradingReview = () => {
                   padding: '0.9rem 1rem',
                   fontSize: '0.875rem',
                   lineHeight: '1.65',
-                  color: '#334155',
-                  backgroundColor: '#f8fafc',
-                  borderTop: `1px solid ${isQConflicted ? '#FCD34D' : '#e2e8f0'}`,
+                  color: '#475569',
+                  backgroundColor: '#eaedf1',
+                  borderTop: `1px solid ${isQConflicted ? '#FCD34D' : '#cbd5e1'}`,
                   whiteSpace: 'pre-wrap',
                   fontFamily: 'var(--font-body)',
                   cursor: 'default',
                   userSelect: 'text'
                 }}
-                title="Student response"
+                title="Student response (read-only)"
               >
                 {isBodyEmpty ? (
                   <span style={{ color: 'var(--danger)', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <AlertTriangle size={14} color="var(--danger)" /> No response submitted for this question (-). 0 marks awarded.
                   </span>
                 ) : (
-                  renderHighlightedSnippet(bodyContent, blockHighlights)
+                  isCalibrationSample ? bodyContent : renderHighlightedSnippet(bodyContent, blockHighlights)
                 )}
               </div>
             </div>
@@ -1391,7 +1430,7 @@ const GradingReview = () => {
 
           {/* Right Status & Actions */}
           <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', justifyContent: 'flex-end' }}>
-            {activeSubmissionObj.status === 'pending' && (
+            {activeSubmissionObj.status === 'pending' && !isCalibrationSample && (
               <button className="btn btn-primary" onClick={handleGradeWithAI} disabled={saving} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.825rem', padding: '0.4rem 0.85rem' }}>
                 {saving ? (
                   <>
@@ -1405,7 +1444,7 @@ const GradingReview = () => {
               </button>
             )}
 
-            {isFlagged && (
+            {isFlagged && !isCalibrationSample && (
               <button
                 className="btn btn-primary"
                 onClick={handleApproveGrade}
@@ -1444,6 +1483,24 @@ const GradingReview = () => {
                 }}
               >
                 <Loader2 size={12} className="spin" style={{ color: '#2563eb' }} /> Grading
+              </span>
+            ) : isCalibrationSample ? (
+              <span
+                className="status-badge"
+                style={{
+                  backgroundColor: '#F3E8FF',
+                  color: '#6B21A8',
+                  border: '1px solid #E9D5FF',
+                  padding: '0.25rem 0.55rem',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <CheckCircle2 size={12} color="#6B21A8" /> Calibration Example
               </span>
             ) : (
               <span
@@ -1516,8 +1573,8 @@ const GradingReview = () => {
           </div>
         </div>
 
-        {/* Row 3: Clean, Concise Audit Notice */}
-        {isFlagged && rawFlagReasons.length > 0 && (
+        {/* Row 3: Clean, Concise Audit Notice (Only for AI Graded papers) */}
+        {!isCalibrationSample && isFlagged && rawFlagReasons.length > 0 && (
           <div
             style={{
               backgroundColor: '#FEFDF8',
@@ -1607,11 +1664,14 @@ const GradingReview = () => {
           {/* Header */}
           <div style={{ padding: '0.75rem 1.15rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--bg-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: 700 }}>
-              <FileText size={17} color="var(--primary)" /> Highlighted Student Response
+              <FileText size={17} color="var(--primary)" />
+              {isCalibrationSample ? 'Student Response' : 'Highlighted Student Response'}
             </h3>
-            <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 600, backgroundColor: 'var(--surface)', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }}>
-              {highlights.length} Evidence Highlight{highlights.length === 1 ? '' : 's'}
-            </span>
+            {!isCalibrationSample && (
+              <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 600, backgroundColor: 'var(--surface)', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                {highlights.length} Evidence Highlight{highlights.length === 1 ? '' : 's'}
+              </span>
+            )}
           </div>
 
           {/* Scrollable Question Blocks */}
@@ -1627,7 +1687,7 @@ const GradingReview = () => {
           </div>
 
           {/* Evidence Popover at Bottom of Left Column */}
-          {activeHighlightPop && (() => {
+          {!isCalibrationSample && activeHighlightPop && (() => {
             const rawPopMark = activeHighlightPop.aligned_score != null ? activeHighlightPop.aligned_score : activeHighlightPop.score_awarded;
             const popMark = rawPopMark != null ? parseFloat(rawPopMark) : null;
             const isPopPositive = popMark != null ? popMark > 0 : activeHighlightPop.type === 'strength';
@@ -1669,7 +1729,7 @@ const GradingReview = () => {
                 </div>
 
                 <div style={{ fontSize: '0.775rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
-                  💡 <strong>AI Rubric Reasoning:</strong> {activeHighlightPop.comment}
+                  💡 <strong>{isCalibrationSample ? 'Lecturer Feedback:' : 'AI Rubric Reasoning:'}</strong> {activeHighlightPop.comment}
                 </div>
               </div>
             );
@@ -1687,7 +1747,7 @@ const GradingReview = () => {
             paddingRight: '4px'
           }}
         >
-          {/* Card 1: Per-Question Score Overrides (Question by Question) */}
+          {/* Card 1: Per-Question Score Overrides (Question by Question) or Lecturer Breakdown */}
           <div
             className="card-panel"
             style={{
@@ -1700,7 +1760,15 @@ const GradingReview = () => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.925rem', fontWeight: 700 }}>
-                <Edit3 size={16} color="var(--primary)" /> Per-Question Score Override
+                {isCalibrationSample ? (
+                  <>
+                    <CheckCircle2 size={16} color="var(--primary)" /> Question Breakdown
+                  </>
+                ) : (
+                  <>
+                    <Edit3 size={16} color="var(--primary)" /> Per-Question Score Override
+                  </>
+                )}
               </h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <button
@@ -1712,7 +1780,14 @@ const GradingReview = () => {
                   {expandAllFeedback ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                   {expandAllFeedback ? 'Collapse All' : 'Expand All Feedback'}
                 </button>
-                <span style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--primary-dark)', backgroundColor: 'var(--primary-light)', padding: '0.15rem 0.5rem', borderRadius: '4px' }}>
+                <span style={{
+                  fontSize: '0.775rem',
+                  fontWeight: 700,
+                  color: 'var(--primary-dark)',
+                  backgroundColor: 'var(--primary-light)',
+                  padding: '0.15rem 0.5rem',
+                  borderRadius: '4px'
+                }}>
                   {isSubmissionUnfinished ? `Sum: — / ${totalMaxScore}` : `Sum: ${calculatedTotalFromQuestions} / ${totalMaxScore}`}
                 </span>
               </div>
@@ -1726,9 +1801,11 @@ const GradingReview = () => {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                         <Loader2 size={14} className="spin" style={{ color: '#2563eb' }} /> Grading submission against rubric...
                       </span>
-                    ) : activeSubmissionObj.status === 'pending'
-                      ? '⌛ Submission pending AI grading. Click "Run AI Grading" above.'
-                      : 'No rubric breakdown available for this assignment.'}
+                    ) : isCalibrationSample
+                      ? 'No question breakdown available for this submission.'
+                      : activeSubmissionObj.status === 'pending'
+                        ? '⌛ Submission pending AI grading. Click "Run AI Grading" above.'
+                        : 'No rubric breakdown available for this assignment.'}
                   </p>
                 </div>
               ) : (
@@ -1744,7 +1821,7 @@ const GradingReview = () => {
                   const auditorScoreVal = auditorScore != null ? parseFloat(auditorScore) : null;
                   const pScore = parseFloat(item.score_awarded ?? currentScoreVal);
                   const scoreDelta = auditorScoreVal != null ? Math.round(Math.abs(pScore - auditorScoreVal) * 10) / 10 : 0;
-                  const hasConflict = isItemConflicted;
+                  const hasConflict = isItemConflicted || (auditorScoreVal != null && scoreDelta >= 0.5);
 
                   // Active expanded state: defaults to true on conflict or if expandAllFeedback is toggled
                   const isExpanded = expandedFeedback[qKey] !== undefined ? expandedFeedback[qKey] : (hasConflict || expandAllFeedback);
@@ -1785,16 +1862,24 @@ const GradingReview = () => {
                         borderRadius: '6px'
                       }}
                     >
-                      {/* Question Top Row: Label, Max, Conflict Tag & Score Stepper */}
+                      {/* Question Top Row: Label, Max, Conflict Tag & Score Stepper / Read-only Pill */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <span style={{ backgroundColor: hasConflict ? '#FEF3C7' : 'var(--primary)', color: hasConflict ? '#92400E' : '#fff', fontSize: '0.75rem', fontWeight: 800, padding: '0.15rem 0.45rem', borderRadius: '4px', border: hasConflict ? '1px solid #FCD34D' : 'none' }}>
+                          <span style={{
+                            backgroundColor: hasConflict ? '#FEF3C7' : 'var(--primary)',
+                            color: hasConflict ? '#92400E' : '#fff',
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            padding: '0.15rem 0.45rem',
+                            borderRadius: '4px',
+                            border: hasConflict ? '1px solid #FCD34D' : 'none'
+                          }}>
                             {qKey}
                           </span>
                           <span style={{ fontSize: '0.775rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                             Max: {maxSc} pts
                           </span>
-                          {hasConflict && (
+                          {!isCalibrationSample && hasConflict && (
                             <span
                               title={`Auditor Discrepancy: Primary gave ${pScore} pts vs Auditor evaluated ${auditorScoreVal} pts (Δ${scoreDelta} pts)`}
                               style={{ fontSize: '0.68rem', fontWeight: 700, backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.1rem 0.4rem', borderRadius: '4px', border: '1px solid #FCD34D', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
@@ -1804,8 +1889,26 @@ const GradingReview = () => {
                           )}
                         </div>
 
-                        {/* Score Steppers or Minimalist Grading Pill */}
-                        {isSubmissionUnfinished ? (
+                        {/* Score Steppers or Minimalist Read-Only / Grading Pill */}
+                        {isCalibrationSample ? (
+                          <span
+                            style={{
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              color: 'var(--secondary)',
+                              backgroundColor: 'var(--bg-main)',
+                              border: '1px solid var(--border)',
+                              padding: '0.2rem 0.6rem',
+                              borderRadius: '4px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem'
+                            }}
+                            title="Lecturer score (overrides disabled)"
+                          >
+                            <Lock size={11} color="var(--text-muted)" /> {currentScoreVal} / {maxSc} pts
+                          </span>
+                        ) : isSubmissionUnfinished ? (
                           <span
                             style={{
                               fontSize: '0.75rem',
@@ -1859,22 +1962,22 @@ const GradingReview = () => {
                       </div>
 
                       {/* Direct AI Conflict Resolution Strip */}
-                      {hasConflict && auditorScoreVal != null && (
+                      {!isCalibrationSample && hasConflict && auditorScoreVal != null && (
                         <div style={{
+                          backgroundColor: '#FFFBEB',
+                          border: '1.5px solid #FCD34D',
+                          borderRadius: '6px',
+                          padding: '0.42rem 0.65rem',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          backgroundColor: '#FFFBEB',
-                          border: '1px solid #FDE68A',
-                          borderRadius: '5px',
-                          padding: '0.35rem 0.6rem',
-                          fontSize: '0.74rem',
                           flexWrap: 'wrap',
-                          gap: '0.4rem'
+                          gap: '0.4rem',
+                          fontSize: '0.75rem'
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#92400E' }}>
-                            <Scale size={12} color="#D97706" />
-                            <span>Primary: <strong>{pScore} pts</strong> vs Auditor: <strong>{auditorScoreVal} pts</strong></span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#92400E', fontWeight: 700 }}>
+                            <Scale size={13} color="#D97706" />
+                            <span>AI Conflict: Primary <strong>{pScore} pts</strong> vs Auditor <strong>{auditorScoreVal} pts</strong> {scoreDelta > 0 ? `(Δ${scoreDelta} pts)` : ''}</span>
                           </div>
                           {auditorScoreVal !== currentScoreVal && (
                             <button
@@ -1887,7 +1990,7 @@ const GradingReview = () => {
                                 backgroundColor: '#DBEAFE',
                                 border: '1px solid #BFDBFE',
                                 borderRadius: '4px',
-                                padding: '0.12rem 0.45rem',
+                                padding: '0.15rem 0.55rem',
                                 cursor: 'pointer'
                               }}
                               title={`Adopt Auditor score (${auditorScoreVal} pts)`}
@@ -1917,9 +2020,15 @@ const GradingReview = () => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <Sparkles size={12} color="var(--primary)" />
-                          <span style={{ color: 'var(--secondary)' }}>
-                            {isSubmissionUnfinished ? 'AI Feedback' : `AI Feedback (${currentScoreVal}/${maxSc} pts)`}
+                          {isCalibrationSample ? (
+                            <UserCheck size={12} color="var(--primary)" />
+                          ) : (
+                            <Sparkles size={12} color="var(--primary)" />
+                          )}
+                          <span style={{ color: 'var(--secondary)', fontWeight: 700 }}>
+                            {isCalibrationSample
+                              ? `Lecturer Feedback (${currentScoreVal}/${maxSc} pts)`
+                              : (isSubmissionUnfinished ? 'AI Feedback' : `AI Feedback (${currentScoreVal}/${maxSc} pts)`)}
                           </span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', color: 'var(--text-muted)', fontSize: '0.68rem', fontWeight: 600 }}>
@@ -1947,15 +2056,70 @@ const GradingReview = () => {
                           backgroundColor: '#FFFFFF',
                           border: '1px solid #E2E8F0',
                           borderRadius: '6px',
-                          padding: '0.55rem 0.65rem',
-                          fontSize: '0.785rem'
+                          padding: '0.55rem 0.7rem',
+                          fontSize: '0.785rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.55rem'
                         }}>
                           {isSubmissionUnfinished ? (
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#2563eb' }}>
                               <Loader2 size={12} className="spin" /> Evaluating answer against rubric...
                             </span>
                           ) : (
-                            <RenderStructuredFeedback text={effectiveFeedbackText} />
+                            <>
+                              <div>
+                                {hasConflict && (
+                                  <div style={{
+                                    fontSize: '0.71rem',
+                                    fontWeight: 800,
+                                    color: 'var(--primary)',
+                                    marginBottom: '0.25rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.02em'
+                                  }}>
+                                    <Sparkles size={11} color="var(--primary)" /> Primary AI Feedback ({pScore}/{maxSc} pts):
+                                  </div>
+                                )}
+                                <RenderStructuredFeedback text={effectiveFeedbackText} />
+                              </div>
+
+                              {hasConflict && auditorReasoningText && auditorReasoningText !== effectiveFeedbackText && (
+                                <div style={{
+                                  backgroundColor: '#FEFDF8',
+                                  border: '1.5px solid #FCD34D',
+                                  borderRadius: '5px',
+                                  padding: '0.5rem 0.65rem'
+                                }}>
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    marginBottom: '0.3rem',
+                                    borderBottom: '1px dashed #FDE68A',
+                                    paddingBottom: '0.25rem'
+                                  }}>
+                                    <span style={{
+                                      fontSize: '0.71rem',
+                                      fontWeight: 800,
+                                      color: '#B45309',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.35rem',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.02em'
+                                    }}>
+                                      <ShieldAlert size={12} color="#D97706" /> Auditor Feedback ({auditorScoreVal != null ? `${auditorScoreVal}/${maxSc} pts` : 'Reasoning'}):
+                                    </span>
+                                  </div>
+                                  <div style={{ color: '#78350F', fontSize: '0.76rem', lineHeight: '1.45' }}>
+                                    <RenderStructuredFeedback text={auditorReasoningText} />
+                                  </div>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       )}
@@ -1966,64 +2130,122 @@ const GradingReview = () => {
             </div>
           </div>
 
-          {/* Card 2: Final Score Override & Audit Form */}
-          <div className="card-panel" style={{ padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-            <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.925rem', fontWeight: 700 }}>
-              <Save size={16} color="var(--primary)" /> Final Score Override & Audit
-            </h3>
+          {/* Card 2: Final Score Override / Calibration Status */}
+          {isCalibrationSample ? (
+            <div
+              className="card-panel"
+              style={{
+                padding: '1rem 1.15rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.6rem'
+              }}
+            >
+              <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.925rem', fontWeight: 700 }}>
+                <CheckCircle2 size={16} color="var(--success)" /> Lecturer Graded Submission
+              </h3>
 
-            <form onSubmit={handleOverrideSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              <div>
-                <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
-                  Final Score (0 - {totalMaxScore})
-                </label>
-                <input
-                  type="number"
-                  step={stepIncrement}
-                  min="0"
-                  max={totalMaxScore}
-                  className="input-field"
-                  value={overrideScore}
-                  onChange={(e) => setOverrideScore(e.target.value)}
-                  style={{ width: '100%', padding: '0.4rem 0.65rem', fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}
-                  required
-                />
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>
+                Score overrides are disabled for this calibration submission.
+              </p>
+
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-main)',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                marginTop: '0.2rem'
+              }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--secondary)' }}>
+                  Total Score
+                </span>
+                <span style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--primary)' }}>
+                  {activeSubmissionObj.score ?? calculatedTotalFromQuestions} <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>/ {totalMaxScore} pts</span>
+                </span>
               </div>
 
-              <div>
-                <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
-                  Audit Comment / Justification
-                </label>
-                <textarea
-                  rows={2}
-                  className="input-field"
-                  placeholder="Explain reason for grade override (e.g. Alternate derivation accepted)..."
-                  value={overrideComment}
-                  onChange={(e) => setOverrideComment(e.target.value)}
-                  style={{ width: '100%', padding: '0.4rem 0.65rem', fontSize: '0.8rem', resize: 'vertical' }}
-                />
+              <div style={{ paddingTop: '0.35rem', borderTop: '1px solid var(--border)', fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Lock size={12} /> Score overrides disabled
               </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={saving}
-                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem', fontWeight: 600, fontSize: '0.825rem' }}
-              >
-                <Save size={15} /> {saving ? 'Saving...' : 'Save & Record Audit'}
-              </button>
-            </form>
-
-            <div style={{ paddingTop: '0.35rem', borderTop: '1px solid var(--border)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-              🔒 Overrides are recorded in audit logs with full delta traceability.
             </div>
-          </div>
+          ) : (
+            <div className="card-panel" style={{ padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <h3 style={{ margin: 0, color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.925rem', fontWeight: 700 }}>
+                <Save size={16} color="var(--primary)" /> Final Score Override & Audit
+              </h3>
 
-          {/* Card 3: AI Overall Evaluation Summary */}
+              <form onSubmit={handleOverrideSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                <div>
+                  <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                    Final Score (0 - {totalMaxScore})
+                  </label>
+                  <input
+                    type="number"
+                    step={stepIncrement}
+                    min="0"
+                    max={totalMaxScore}
+                    className="input-field"
+                    value={overrideScore}
+                    onChange={(e) => setOverrideScore(e.target.value)}
+                    style={{ width: '100%', padding: '0.4rem 0.65rem', fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)' }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
+                    Audit Comment / Justification
+                  </label>
+                  <textarea
+                    rows={2}
+                    className="input-field"
+                    placeholder="Explain reason for grade override (e.g. Alternate derivation accepted)..."
+                    value={overrideComment}
+                    onChange={(e) => setOverrideComment(e.target.value)}
+                    style={{ width: '100%', padding: '0.4rem 0.65rem', fontSize: '0.8rem', resize: 'vertical' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={saving}
+                  style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem', fontWeight: 600, fontSize: '0.825rem' }}
+                >
+                  <Save size={15} /> {saving ? 'Saving...' : 'Save & Record Audit'}
+                </button>
+              </form>
+
+              <div style={{ paddingTop: '0.35rem', borderTop: '1px solid var(--border)', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                🔒 Overrides are recorded in audit logs with full delta traceability.
+              </div>
+            </div>
+          )}
+
+          {/* Card 3: Overall Feedback */}
           {feedback.summary && (
-            <div className="card-panel" style={{ padding: '1rem 1.15rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+            <div
+              className="card-panel"
+              style={{
+                padding: '1rem 1.15rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.45rem'
+              }}
+            >
               <h4 style={{ margin: 0, color: 'var(--secondary)', fontSize: '0.875rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Award size={15} color="var(--primary)" /> AI Overall Evaluation Summary
+                {isCalibrationSample ? (
+                  <>
+                    <UserCheck size={15} color="var(--primary)" /> Lecturer Overall Feedback
+                  </>
+                ) : (
+                  <>
+                    <Award size={15} color="var(--primary)" /> AI Overall Evaluation Summary
+                  </>
+                )}
               </h4>
               <p style={{ margin: 0, color: 'var(--text-main)', lineHeight: '1.45', fontSize: '0.8rem' }}>
                 {feedback.summary}

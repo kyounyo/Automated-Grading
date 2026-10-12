@@ -569,7 +569,7 @@ const BulkUpload = () => {
                   <span style={{
                     fontSize: '0.68rem',
                     fontWeight: 600,
-                    color: '#64748b',
+                    color: '#475569',
                     backgroundColor: '#e2e8f0',
                     padding: '0.12rem 0.45rem',
                     borderRadius: '4px',
@@ -587,7 +587,7 @@ const BulkUpload = () => {
                     fontSize: '0.825rem',
                     color: '#475569',
                     lineHeight: '1.5',
-                    backgroundColor: '#f1f5f9',
+                    backgroundColor: '#eaedf1',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '6px',
                     border: '1px solid #cbd5e1',
@@ -628,7 +628,9 @@ const BulkUpload = () => {
         </div>
 
         <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-          The maximum score difference allowed between the two AI agents before a paper is flagged for your review.
+          {toleranceVal === 0
+            ? 'Flags any score disagreement between AI graders (0% margin).'
+            : `Flags papers for your review when AI graders differ by more than ${(toleranceVal * 100).toFixed(0)}%.`}
         </p>
 
         <div style={{ maxWidth: '480px' }}>
@@ -665,22 +667,11 @@ const BulkUpload = () => {
                   ))}
                 </div>
 
-                <div style={{
-                  marginTop: '0.65rem',
-                  fontSize: '0.76rem',
-                  color: 'var(--text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem'
-                }}>
-                  <Info size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
-                  <span>
-                    {toleranceVal === 0
-                      ? 'Flag if AI graders differ at all (0% tolerance).'
-                      : `Auto-approves differences within ±${(toleranceVal * 100).toFixed(0)}%; flags larger disagreements.`}
-                  </span>
-                  {savingTolerance && <span style={{ color: 'var(--primary)', fontWeight: 600 }}>Saving…</span>}
-                </div>
+                {savingTolerance && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--primary)', fontWeight: 600 }}>
+                    Saving…
+                  </div>
+                )}
               </>
             );
           })()}

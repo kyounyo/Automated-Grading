@@ -223,18 +223,6 @@ async def upload_submission_file(
     db.commit()
     all_subs = db.query(Submission).filter(Submission.assignment_id == assignment_id).order_by(Submission.created_at.asc()).all()
     assign.total_submissions = len(all_subs)
-
-    # Subsampling strategy: If calibration is enabled on the assignment, designate initial k submissions
-    if assign.calibration_enabled and len(all_subs) > 0:
-        current_cal_samples = [s for s in all_subs if s.is_calibration_sample]
-        target_sample_size = assign.calibration_sample_size or 3
-        if len(current_cal_samples) < target_sample_size:
-            needed = target_sample_size - len(current_cal_samples)
-            # Pick from non-calibration samples
-            candidates = [s for s in all_subs if not s.is_calibration_sample]
-            for s in candidates[:needed]:
-                s.is_calibration_sample = True
-
     db.commit()
 
     return UploadResponse(
