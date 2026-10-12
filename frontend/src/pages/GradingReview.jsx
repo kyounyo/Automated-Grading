@@ -882,9 +882,10 @@ const GradingReview = () => {
         if (matchRes.start === -1) {
           newParts.push(part);
         } else {
-          const before = part.slice(0, matchRes.start);
-          const matchedStr = part.slice(matchRes.start, matchRes.start + matchRes.length);
-          const after = part.slice(matchRes.start + matchRes.length);
+          const matchIdx = matchRes.start;
+          const before = part.slice(0, matchIdx);
+          const matchedStr = part.slice(matchIdx, matchIdx + matchRes.length);
+          const after = part.slice(matchIdx + matchRes.length);
 
           if (before) newParts.push(before);
 
