@@ -21,7 +21,7 @@ def get_llm_model() -> str:
     return os.getenv("LLM_MODEL", "google/gemini-3.1-flash-lite").strip()
 
 def get_auditor_model() -> str:
-    return os.getenv("AUDITOR_MODEL", "nvidia/nemotron-3-super-120b-a12b").strip()
+    return os.getenv("AUDITOR_MODEL", "google/gemini-3.1-flash-lite").strip()
 
 
 
@@ -239,21 +239,67 @@ def format_question_few_shots(question_few_shots: Optional[Dict[str, List[Dict]]
     )
 
 
-
-
 def call_auditor_verification_agent(
-    student_text: str, 
-    rubric_json: list, 
-    primary_eval: Dict[str, Any], 
+    student_text: str,
+    rubric_json: list,
+    primary_eval: Dict[str, Any],
     model: Optional[str] = None,
-    question_few_shots: Optional[Dict[str, List[Dict]]] = None
+    question_few_shots: Optional[Dict[str, List[Dict]]] = None,
+    calculation_questions: Optional[List[str]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Agent 3 (Auditor & Verification Agent):
-    Uses nvidia/nemotron-3-super-120b-a12b to audit Agent 2's evaluation.
+    Uses get_auditor_model() (default google/gemini-3.1-flash-lite, overridable via
+    the AUDITOR_MODEL env var) to audit the primary grader's evaluation.
     Provides independent per-question auditor scores, identifies specific question conflicts, and determines audit_passed.
+
+    calculation_questions (optional): labels of questions the dynamic grader
+    scored via the CALCULATION strategy (deterministic Python scoring from
+    LLM-extracted evidence, not holistic judgement -- see
+    _score_calculation_extraction_dynamic). Passed through so the prompt can
+    steer the Auditor to VERIFY that evidence instead of re-deriving its own
+    independent score the way it does for SHORT_ANSWER/OPEN_ENDED questions;
+    without this, the Auditor's holistic re-grade systematically disagreed with
+    the Python-applied tolerance on ordinary rounding differences, flagging
+    nearly every calculation-question submission for a discrepancy that was
+    never a grading error.
     """
     few_shots_block = format_question_few_shots(question_few_shots)
+
+    calc_section = ""
+    if calculation_questions:
+        calc_list = ", ".join(calculation_questions)
+        calc_section = f"""
+CALCULATION QUESTIONS -- SPECIAL AUDIT PROTOCOL ({calc_list}):
+These questions were graded by a DETERMINISTIC extraction-and-compute pipeline,
+not by holistic judgement: an LLM extracted only what the student explicitly
+wrote (whether working was shown, whether that working is a valid method, and
+the exact final numeric answer stated) with NO authority to award a score, then
+Python computed the mark mechanically from that evidence against the rubric's
+expected answer and a numeric tolerance. For these questions specifically:
+1. Do NOT re-derive an independent score from your own reading of the rubric
+   and student text as you would for a short-answer or open-ended question --
+   the Primary Grader's per-item reasoning already states exactly what evidence
+   was extracted, what tolerance was applied, and how they compare (e.g.
+   "final answer extracted as 199.8mg vs. expected 200mg (tolerance +/-0.5mg)").
+   Verify THAT evidence against the student's actual submission text instead of
+   forming your own figure from scratch.
+2. Only disagree with the Primary Grader's score on one of these questions when
+   you find a genuine EXTRACTION error -- e.g. the student actually wrote
+   working or a final answer that the extraction missed or misread entirely, or
+   the expected answer/tolerance itself looks wrong against the rubric. A
+   student's final answer differing from the expected value by an amount
+   already covered by the stated tolerance is NOT a scoring error to correct --
+   the tolerance is a property of this question's Grading Specification, not a
+   holistic leniency call for you to second-guess, and the Primary Grader
+   already applied it correctly if the reasoning says the answer matched or
+   didn't.
+3. Do not mark a calculation question's score down merely because you
+   personally would have been more lenient (or stricter) on the final numeric
+   figure than the stated tolerance -- that tolerance was sized specifically
+   for this question by the system that classified it, not left to your
+   judgement.
+"""
 
     prompt = f"""
 You are a Senior Academic Quality Auditor. Audit the following AI grading evaluation for fairness, accuracy, score bounds, and per-question score agreement.
@@ -266,7 +312,7 @@ Student Submission:
 
 Primary AI Evaluation Result:
 {json.dumps(primary_eval, indent=2)}
-
+{calc_section}
 INDEPENDENCE & VERIFICATION REQUIREMENT:
 You are the Senior Quality Auditor and Reconciliation Verifier.
 Review the Primary Grader's score, reasoning, and per-question breakdown against:
@@ -275,7 +321,7 @@ Review the Primary Grader's score, reasoning, and per-question breakdown against
 3. Course Examiner Calibration Benchmarks (if provided above, use them as the authoritative baseline for marking standards and partial credit)
 
 AUDIT & RECONCILIATION TASKS:
-1. Re-evaluate student text independently for EACH MAIN QUESTION matching the rubric (e.g. Q6, Q8). Align with Examiner Calibration Benchmarks if provided.
+1. Re-evaluate student text independently for EACH MAIN QUESTION matching the rubric (e.g. Q6, Q8), EXCEPT any question listed under "CALCULATION QUESTIONS -- SPECIAL AUDIT PROTOCOL" above, which follows that protocol instead of an independent re-grade. Align with Examiner Calibration Benchmarks if provided.
 2. Follow rubric marking increments strictly: if rubric uses whole marks (e.g. 1 mark per point), do NOT award 0.5 marks.
 3. Provide your independent score and detailed justification/reasoning for EVERY MAIN QUESTION in "auditor_breakdown" (e.g. Q6, Q8). Explain what concepts were correct, missing, or why marks were adjusted against the rubric.
 4. Compare your evaluation with the Primary Grader question by question:
@@ -703,7 +749,30 @@ For CALCULATION, extract per sub-part/person:
 - source_evidence: if RUBRIC_EXPLICIT, the exact rubric text you copied the
   number from. If DERIVED, the calculation you performed to reach it (e.g.
   "65 kg x 8 mg/kg = 520 mg"), so a human can check your arithmetic.
-- tolerance: 0 unless the rubric explicitly allows a margin (e.g. rounding).
+- tolerance: the numeric margin Python should accept around expected_answer. If
+  the rubric explicitly states a margin, use it. Otherwise choose a margin sized
+  to the rubric's OWN rounding precision for a continuous quantity (dose, mL,
+  concentration, cost): roughly half of the last decimal place the rubric's own
+  figure is stated to (e.g. a dose given as a whole number like "200mg" ->
+  tolerance ~0.5; a concentration given to 2dp like "12.50mg/mL" -> tolerance
+  ~0.05), widened further for a multi-step calculation where intermediate
+  rounding compounds. This is not leniency -- it reflects that the rubric's own
+  figure is itself a rounded result, and a student who computed correctly should
+  not be marked wrong for landing on an equally valid rounding of the same true
+  value. Use tolerance 0 ONLY for a genuinely discrete/whole-count answer where a
+  non-integer result is never legitimate (number of tablets, doses, items) --
+  Python already applies its own small rounding-precision floor on top of
+  whatever you set here, so there is no need to pad a discrete count's tolerance
+  for ordinary float imprecision.
+  TEACHER-TYPO CHECK: if the rubric's own worked example is internally
+  inconsistent -- its final stated figure does not actually match what its own
+  shown formula/working computes from the question's own data -- this is likely
+  an arithmetic slip in the rubric itself, not evidence the lecturer wants that
+  exact figure enforced to the decimal. In that case still extract
+  expected_answer as the rubric's own final stated figure (per answer_source
+  above), but set tolerance generously enough to ALSO accept the value your own
+  correct recomputation produces, so a student who computed correctly from the
+  given method is not penalised for a mistake in the answer key.
 - unit: the unit of the final answer as the rubric expresses it (e.g. "mg",
   "tablets", "mL", "squares"), or null if dimensionless.
 - working_mark / answer_mark: the mark value the rubric assigns to showing
@@ -743,8 +812,10 @@ For OPEN_ENDED, extract:
   edge cases to a new marker.
 
 Do not invent scoring rules, criteria, numeric answers, or caps the rubric does
-not support. If the rubric is ambiguous about strictness, partial credit, or
-tolerance, prefer the stricter/narrower reading rather than assuming leniency.
+not support. If the rubric is ambiguous about strictness or partial credit,
+prefer the stricter/narrower reading rather than assuming leniency -- this does
+NOT apply to CALCULATION tolerance, which follows its own sizing rule above
+regardless of whether the rubric states a margin explicitly.
 
 OUTPUT ONLY VALID JSON matching the Grading Specification schema, including only
 the fields relevant to the chosen question_type:
@@ -1093,7 +1164,7 @@ the student explicitly wrote, for each of {labels}, independently.
 Student Submission:
 {student_text}
 
-For EACH labelled item, extract exactly two fields from the student's own text:
+For EACH labelled item, extract exactly three fields from the student's own text:
 
 1. "working_shown": true if the student explicitly wrote ANY intermediate
    calculation step for this item -- an equation, an intermediate value, a
@@ -1101,29 +1172,63 @@ For EACH labelled item, extract exactly two fields from the student's own text:
    count -- set this to false in that case. Do not infer or assume working that
    was not actually written.
 
-2. "final_answer": the exact final numeric answer the student's response states
+2. "working_correct": only meaningful when working_shown is true (set to false
+   when working_shown is false). True if the working shown reflects a VALID
+   method for this calculation -- the correct formula and the correct inputs
+   from the question, even if the final numeric result the student reaches has
+   drifted slightly from a rounding choice partway through. False if the
+   working uses a wrong formula, wrong inputs, or a conceptually incorrect
+   method, even if the final answer happens to land close to the expected
+   value. This is a judgement about the METHOD shown, not about whether
+   final_answer below matches -- that comparison is handled separately by
+   Python, not by you.
+
+3. "final_answer": the exact final numeric answer the student's response states
    for this item, as a number, or null if none is given. Do not round, infer, or
    correct it yourself -- extract exactly what the student wrote. Route content
    to the correct item by its label, not by position/order in the response.
 
 Do not award marks, compute totals, apply any cap, or invent any additional
-category beyond these two fields -- scoring is handled separately.
+category beyond these three fields -- scoring is handled separately, and Python
+(not you) applies the item's tolerance when comparing final_answer to the
+expected value.
 
-QUESTION-MATCHED EXAMINER CALIBRATION: "working_shown" is the one judgement call
-in this extraction (the final answer is matched exactly, with no leniency). If
-Examiner Calibration Benchmarks are provided above, align what counts as
-sufficient working shown with the examiner's demonstrated standard for this
+QUESTION-MATCHED EXAMINER CALIBRATION: "working_shown" and "working_correct" are
+the two judgement calls in this extraction (final_answer is extracted verbatim,
+with no rounding or correction by you -- Python applies tolerance separately).
+If Examiner Calibration Benchmarks are provided above, align what counts as
+sufficient/correct working with the examiner's demonstrated standard for this
 question. If none are provided, use the "acceptable working shown" examples
 given in the Reference above.
 
 OUTPUT FORMAT (Respond ONLY in valid JSON matching this schema):
 {{
   "extractions": [
-    {{"label": "{items[0]['label']}", "working_shown": true, "working_quote": "verbatim quote, or null if working_shown is false", "final_answer": {items[0]['expected_answer']}}}
+    {{"label": "{items[0]['label']}", "working_shown": true, "working_correct": true, "working_quote": "verbatim quote, or null if working_shown is false", "final_answer": {items[0]['expected_answer']}}}
   ],
   "reasoning": "Brief note per item on what evidence was found and why."
 }}
 """
+
+
+def _auto_rounding_tolerance(expected: float) -> float:
+    """
+    Minimum numeric tolerance Python ALWAYS applies on top of whatever the
+    Grading Specification states, sized to the expected answer's own displayed
+    precision -- an answer stated to 0 decimal places (e.g. 200) tolerates
+    +/-0.5, one stated to 1 decimal place (e.g. 12.5) tolerates +/-0.05, and so
+    on (capped at 4dp). This is the Python-side half of the hybrid calculation
+    fix: it models ordinary intermediate-rounding drift between a correct
+    student calculation and the rubric's own rounded figure, and applies
+    unconditionally -- including to specs interpreted before this fix, which
+    may still carry tolerance=0 -- rather than depending on every Interpreter
+    call having followed the (now more generous) tolerance guidance perfectly.
+    It is deliberately small and symmetric, so it never changes which whole
+    number a genuinely different wrong answer is closest to.
+    """
+    s = f"{abs(expected):.10f}".rstrip("0")
+    decimals = min(len(s.split(".")[1]) if "." in s else 0, 4)
+    return 0.5 * (10 ** -decimals)
 
 
 def _score_calculation_extraction_dynamic(
@@ -1134,9 +1239,13 @@ def _score_calculation_extraction_dynamic(
     Deterministic scorer matching _build_calculation_extraction_prompt_dynamic --
     per item the only possible outcomes are {0, working_mark, answer_mark,
     working_mark+answer_mark}, so an invented scoring category is structurally
-    impossible. Tolerance-based numeric comparison (default 0 = exact match), and
-    per-item mark values instead of one uniform working/answer mark shared by
-    every item.
+    impossible. Tolerance-based numeric comparison (the Grading Spec's own
+    tolerance, floored by _auto_rounding_tolerance -- never a bare 0 = exact
+    match), and per-item mark values instead of one uniform working/answer mark
+    shared by every item. The working mark now requires BOTH working_shown and
+    working_correct (the LLM's extraction of whether the shown method is valid,
+    not just present) -- Python still makes the actual award, from that
+    extracted judgement, exactly as before.
     """
     raw_extractions = [e for e in (extraction_res.get("extractions") or []) if isinstance(e, dict)]
 
@@ -1178,29 +1287,40 @@ def _score_calculation_extraction_dynamic(
     for it in items:
         e = item_to_extraction.get(id(it), {})
         working_shown = bool(e.get("working_shown", False))
+        # Backward-compatible default: an older extraction result (or a model
+        # that ignores the new field) without "working_correct" present falls
+        # back to working_shown's own value, i.e. the pre-fix behaviour of
+        # awarding on presence alone -- never stricter than before by accident.
+        working_correct = bool(e.get("working_correct", working_shown))
         working_mark_each = float(it.get("working_mark", 0.5))
         answer_mark_each = float(it.get("answer_mark", 1.0))
-        tolerance = float(it.get("tolerance", 0.0))
+        expected = float(it["expected_answer"])
+        spec_tolerance = float(it.get("tolerance", 0.0))
+        tolerance = max(spec_tolerance, _auto_rounding_tolerance(expected))
 
         try:
             final_answer_val = float(e["final_answer"]) if e.get("final_answer") is not None else None
         except (TypeError, ValueError):
             final_answer_val = None
 
-        expected = float(it["expected_answer"])
         answer_match = final_answer_val is not None and abs(final_answer_val - expected) <= tolerance
 
-        working_mark = working_mark_each if working_shown else 0.0
+        working_mark = working_mark_each if (working_shown and working_correct) else 0.0
         answer_mark = answer_mark_each if answer_match else 0.0
         person_total = working_mark + answer_mark
         total += person_total
 
         unit = f" {it['unit']}" if it.get("unit") else ""
+        if not working_shown:
+            working_note = f"Working NOT shown (+0/{working_mark_each:.2g} marks)"
+        elif not working_correct:
+            working_note = f"Working shown but not valid for this method (+0/{working_mark_each:.2g} marks)"
+        else:
+            working_note = f"Working shown and valid (+{working_mark_each:.2g} marks)"
         reasoning = (
-            f"Working {'shown' if working_shown else 'NOT shown'} "
-            f"({'+' if working_shown else '+0/'}{working_mark_each:.2g} marks); "
-            f"final answer extracted as {final_answer_val if final_answer_val is not None else 'none given'}{unit} "
-            f"vs. expected {expected}{unit} "
+            f"{working_note}; final answer extracted as "
+            f"{final_answer_val if final_answer_val is not None else 'none given'}{unit} "
+            f"vs. expected {expected}{unit} (tolerance +/-{tolerance:.2g}{unit}) "
             f"({'+' if answer_match else '+0/'}{answer_mark_each:.2g} marks)."
         )
         breakdown.append({
@@ -1784,7 +1904,7 @@ def grade_submission_dynamic(
     target_model = model or get_llm_model()
 
     merged_breakdown, merged_highlights, merged_reasoning, merged_flags = [], [], [], []
-    failed_questions, graded_questions = [], []
+    failed_questions, graded_questions, calculation_questions = [], [], []
 
     for item in rubric_json:
         if not isinstance(item, dict):
@@ -1820,6 +1940,9 @@ def grade_submission_dynamic(
         if not spec:
             failed_questions.append(q_label)
             continue
+
+        if spec.get("question_type") == "CALCULATION":
+            calculation_questions.append(q_label)
 
         q_few_shots = question_few_shots.get(q_label) if question_few_shots else None
         if not q_few_shots and question_few_shots:
@@ -1867,7 +1990,10 @@ def grade_submission_dynamic(
         result["flag_reasons"] = merged_flags
     if failed_questions:
         result["_failed_questions"] = failed_questions
+    if calculation_questions:
+        result["_calculation_questions"] = calculation_questions
     return result
+
 
 def call_llm_for_grading(
     student_text: str,
@@ -1932,6 +2058,7 @@ def call_llm_for_grading(
         return _mock_heuristic_evaluation(student_text, clean_rubric, total_max_score)
 
     failed_questions = primary_res.pop("_failed_questions", None)
+    calculation_questions = primary_res.pop("_calculation_questions", None)
 
     # Ensure feedback dictionary and standardized breakdown list exist (aggregated to Main Questions)
     feedback = primary_res.get("feedback", {})
@@ -1960,7 +2087,8 @@ def call_llm_for_grading(
         student_text=student_text,
         rubric_json=clean_rubric,
         primary_eval=primary_res,
-        question_few_shots=question_few_shots
+        question_few_shots=question_few_shots,
+        calculation_questions=calculation_questions,
     )
 
     standardized_a_bd = []
@@ -2232,150 +2360,64 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         if not hl.get("question_number") or hl.get("question_number") in ["Rubric Evidence", "Rubric", "N/A"]:
             hl["question_number"] = "General Rubric Evidence"
 
-    # 1. Normalize question numbers and remove invalid tags like [ADDRESS]
-    for hl in highlights:
-        if not isinstance(hl, dict):
-            continue
-        q_raw = str(hl.get("question_number", "")).strip()
-        if not q_raw or "[" in q_raw or "Rubric" in q_raw or "General" in q_raw or "N/A" in q_raw:
-            hl_quote = hl.get("text", "")
-            pos = student_text.find(hl_quote) if hl_quote else -1
-            if pos != -1:
-                prefix = student_text[max(0, pos - 400):pos]
-                m_det = re.findall(r'(?:Question|Q)\s*([Q0-9A-Za-z\(\)]+)', prefix, re.IGNORECASE)
-                if m_det:
-                    clean_det = f"Q{m_det[-1]}" if not m_det[-1].startswith("Q") else m_det[-1]
-                    hl["question_number"] = clean_det
-
-    # 2. Deduplicate existing highlights (remove duplicate quotes)
-    unique_hls = []
-    for h in highlights:
-        if not isinstance(h, dict) or not h.get("text"):
-            continue
-        h_text = h["text"].strip().lower()
-        is_dup = any(h_text in ex["text"].strip().lower() or ex["text"].strip().lower() in h_text for ex in unique_hls)
-        if not is_dup:
-            unique_hls.append(h)
-    highlights = unique_hls
-
-    from .confidence import extract_main_question_number
-
-    # 3. Process each breakdown item with sub-part awareness
+    # Ensure EVERY question in breakdown has at least one highlight entry
+    existing_q_nums = set(h.get("question_number") for h in highlights if isinstance(h, dict) and h.get("question_number"))
+    
     for b in breakdown:
         if not isinstance(b, dict):
             continue
         b_q = b.get("question_number", "")
-        if not b_q:
+        if not b_q or b_q in existing_q_nums:
             continue
-        main_bq = extract_main_question_number(b_q)
-        score_aw = float(b.get("score_awarded", 0.0) or 0.0)
-        max_sc = float(b.get("max_score", 10.0) or 10.0)
+
+        score_aw = b.get("score_awarded", 0.0)
+        max_sc = b.get("max_score", 10.0)
         reasoning = b.get("reasoning", "Rubric criterion evaluation completed.")
 
-        q_matches = [h for h in highlights if extract_main_question_number(h.get("question_number", "")) == main_bq]
-
-        # Check for sub-parts in reasoning: e.g. (a) [3/5]: ... (b) [2/5]: ...
-        subpart_matches = list(re.finditer(r'\(([a-zA-Z0-9]+)\)\s*\[([0-9\.]+)/([0-9\.]+)\]:\s*([^|(]+)', reasoning))
-        if subpart_matches:
-            subpart_sum = sum(float(sp.group(2)) for sp in subpart_matches)
-            clamped_sum = min(max_sc, subpart_sum)
-            if abs(clamped_sum - score_aw) > 0.01:
-                b["score_awarded"] = int(clamped_sum) if clamped_sum.is_integer() else clamped_sum
-                score_aw = float(b["score_awarded"])
-
-        # Find question chunk in student_text
-        clean_bq_str = re.sub(r'[^a-zA-Z0-9]', '', b_q).lower()
-        q_pos = text_lower.find(clean_bq_str)
+        # Find matching section text snippet in raw student text
+        clean_bq = re.sub(r'[^a-zA-Z0-9]', '', b_q).lower()
+        q_pos = -1
+        if clean_bq:
+            q_pos = text_lower.find(clean_bq)
         if q_pos == -1 and len(b_q) > 1:
             m_q = re.search(r'(?:Question|Q)?\s*' + re.escape(b_q), student_text, re.IGNORECASE)
             if m_q:
                 q_pos = m_q.start()
 
-        body_chunk = ""
+        extracted_sentences = []
         if q_pos != -1:
-            chunk_after = student_text[q_pos:q_pos + 1500]
-            body_match = re.search(r'(?:Question|Q|Problem)\s*[A-Za-z0-9_()]+:?\s*([\s\S]*)', chunk_after, re.IGNORECASE)
-            raw_chunk = body_match.group(1) if body_match else chunk_after
-            next_q = re.search(r'(?:^|\n\n)(?:Question|Q|Problem)\s+[A-Za-z0-9_()]+', raw_chunk, re.IGNORECASE)
-            body_chunk = raw_chunk[:next_q.start()].strip() if next_q else raw_chunk.strip()
+            # Look ahead up to 500 characters for the answer body
+            section_chunk = student_text[q_pos:q_pos + 600]
+            # Strip off the question header (e.g. "Question 6: ")
+            body_match = re.search(r'(?:Question|Q|Problem)\s*[A-Za-z0-9_()]+:?\s*([\s\S]*)', section_chunk, re.IGNORECASE)
+            raw_body = body_match.group(1) if body_match else section_chunk
+            # Split into sentences
+            all_s = [s.strip() for s in re.split(r'(?<=[.?!])\s+', raw_body) if len(s.strip()) > 8]
+            # Next question boundary check
+            cleaned_s = []
+            for s in all_s:
+                if re.match(r'^(?:Question|Q|Problem)\s+[A-Za-z0-9_()]+', s, re.IGNORECASE):
+                    break
+                cleaned_s.append(s)
+            extracted_sentences = cleaned_s
 
-        if subpart_matches and body_chunk:
-            subpart_keys = [sp.group(1) for sp in subpart_matches]
-            positions = []
-            for sp in subpart_matches:
-                k = sp.group(1)
-                esc_k = re.escape(k)
-                pat = rf'(?:^|\n|\s)(?:\({esc_k}\)|{esc_k}\)|{esc_k}\.)'
-                m = re.search(pat, body_chunk, re.IGNORECASE)
-                if m:
-                    positions.append({
-                        "start": m.start() + (len(m.group(0)) - len(m.group(0).lstrip())),
-                        "key": k.lower(),
-                        "sp": sp
-                    })
-            positions.sort(key=lambda x: x["start"])
+        if not extracted_sentences:
+            extracted_sentences = [f"Response section for {b_q}"]
 
-            first_k = subpart_keys[0].lower()
-            if not any(p["key"] == first_k for p in positions) and positions:
-                first_sp = next(sp for sp in subpart_matches if sp.group(1).lower() == first_k)
-                positions.insert(0, {"start": 0, "key": first_k, "sp": first_sp})
-
-            if len(positions) >= max(1, len(subpart_matches) - 1):
-                # Replace existing coarse highlights for this question with sub-part highlights
-                highlights = [h for h in highlights if extract_main_question_number(h.get("question_number", "")) != main_bq]
-                for i in range(len(positions)):
-                    p = positions[i]
-                    nxt = positions[i + 1]["start"] if i + 1 < len(positions) else len(body_chunk)
-                    s_text = body_chunk[p["start"]:nxt].strip()
-                    sp = p["sp"]
-                    p_key = sp.group(1)
-                    p_sc = float(sp.group(2))
-                    p_mx = float(sp.group(3))
-                    p_rs = sp.group(4).strip()
-
-                    is_short = len(s_text) <= 60
-                    if is_short:
-                        highlights.append({
-                            "text": s_text,
-                            "question_number": f"{b_q}({p_key})",
-                            "score_awarded": int(p_sc) if p_sc.is_integer() else p_sc,
-                            "max_score": p_mx,
-                            "type": "strength" if p_sc > 0 else "weakness",
-                            "comment": f"({p_key}) [{p_sc}/{p_mx}]: {p_rs}",
-                            "location_in_raw_text": f"Question {b_q} Section"
-                        })
-                    else:
-                        sentences = [s.strip().lstrip('*- ') for s in re.split(r'(?<=[.?!])\s+|\n+', s_text) if len(s.strip()) > 10 and not re.match(r'^\(?[a-zA-Z0-9][\)\.]', s.strip())]
-                        pick = sentences[0] if sentences else s_text[:120]
-                        highlights.append({
-                            "text": pick,
-                            "question_number": f"{b_q}({p_key})",
-                            "score_awarded": int(p_sc) if p_sc.is_integer() else p_sc,
-                            "max_score": p_mx,
-                            "type": "strength" if p_sc > 0 else "weakness",
-                            "comment": f"({p_key}) [{p_sc}/{p_mx}]: {p_rs}",
-                            "location_in_raw_text": f"Question {b_q} Section"
-                        })
-                continue
-
-        # If question has no highlights at all and score_aw > 0
-        if not q_matches and body_chunk and score_aw > 0:
-            sentences = [s.strip() for s in re.split(r'(?<=[.?!])\s+', body_chunk) if len(s.strip()) > 8]
-            if sentences:
-                num_to_take = min(len(sentences), max(1, int(round(score_aw))))
-                step = score_aw / num_to_take
-                for s_idx in range(num_to_take):
-                    highlights.append({
-                        "text": sentences[s_idx],
-                        "question_number": b_q,
-                        "score_awarded": round(step, 1),
-                        "max_score": max_sc,
-                        "type": "strength",
-                        "comment": f"Evaluated for {b_q}. Reasoning: {reasoning}",
-                        "location_in_raw_text": f"Question {b_q} Section"
-                    })
-
-    # 4. Strict final alignment: Ensure sum of strength highlights strictly equals score_awarded
+        num_to_take = min(len(extracted_sentences), max(1, min(3, int(round(score_aw)))))
+        for s_idx in range(num_to_take):
+            snippet = extracted_sentences[s_idx]
+            new_hl = {
+                "text": snippet,
+                "question_number": b_q,
+                "score_awarded": 1.0 if score_aw > 0 else 0.0,
+                "max_score": max_sc,
+                "type": "strength" if score_aw > 0 else "weakness",
+                "comment": f"Evaluated for {b_q}. Reasoning: {reasoning}",
+                "location_in_raw_text": f"Question {b_q} Section"
+            }
+            highlights.append(new_hl)
+    # Ensure highlight scores strictly align with each question's score_awarded
     for b in breakdown:
         if not isinstance(b, dict):
             continue
@@ -2383,12 +2425,13 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
         if not b_q:
             continue
         target_score = float(b.get("score_awarded", 0.0) or 0.0)
-        main_bq = extract_main_question_number(b_q)
 
+        clean_bq = re.sub(r'[^a-zA-Z0-9]', '', b_q).upper()
         q_hls = [
             h for h in highlights
-            if isinstance(h, dict) and extract_main_question_number(h.get("question_number", "")) == main_bq
+            if isinstance(h, dict) and re.sub(r'[^a-zA-Z0-9]', '', str(h.get("question_number", ""))).upper() == clean_bq
         ]
+
         if not q_hls:
             continue
 
@@ -2402,24 +2445,36 @@ def _enrich_highlights_with_question_info(primary_res: Dict[str, Any], student_t
             for h in q_hls:
                 h["score_awarded"] = 0.0
                 h["type"] = "weakness"
-        elif abs(current_sum - target_score) > 0.05 and positive_hls:
+        elif abs(current_sum - target_score) > 0.05:
+            # Rebalance scores cleanly into integer or standard half-mark increments
             if len(positive_hls) == 1:
                 clean_target = int(target_score) if target_score.is_integer() else target_score
                 positive_hls[0]["score_awarded"] = clean_target
                 positive_hls[0]["type"] = "strength"
             else:
+                is_fractional = (target_score % 1) != 0
+                step = 0.5 if is_fractional else 1.0
+                total_units = int(round(target_score / step))
                 total_weight = sum(float(h.get("score_awarded", 0.0) or 1.0) for h in positive_hls)
+
+                allocated_units = []
+                remainders = []
                 for h in positive_hls:
                     w = float(h.get("score_awarded", 0.0) or 1.0)
-                    scaled = (w / (total_weight if total_weight > 0 else len(positive_hls))) * target_score
-                    h["score_awarded"] = int(round(scaled)) if (target_score.is_integer() and round(scaled).is_integer()) else round(scaled, 1)
-                    h["type"] = "strength" if h["score_awarded"] > 0 else "weakness"
+                    exact = (w / (total_weight if total_weight > 0 else len(positive_hls))) * total_units
+                    base = int(exact)
+                    allocated_units.append(base)
+                    remainders.append(exact - base)
 
-        if target_score > 0:
-            highlights = [
-                h for h in highlights
-                if not (extract_main_question_number(h.get("question_number", "")) == main_bq and h.get("type") == "strength" and float(h.get("score_awarded", 0.0) or 0.0) == 0)
-            ]
+                remaining_units = total_units - sum(allocated_units)
+                sorted_indices = sorted(range(len(positive_hls)), key=lambda i: remainders[i], reverse=True)
+                for i in range(min(remaining_units, len(positive_hls))):
+                    allocated_units[sorted_indices[i]] += 1
+
+                for idx, h in enumerate(positive_hls):
+                    final_score = allocated_units[idx] * step
+                    h["score_awarded"] = int(final_score) if (isinstance(final_score, float) and final_score.is_integer()) else final_score
+                    h["type"] = "strength" if final_score > 0 else "weakness"
 
     primary_res["highlights"] = highlights
 
