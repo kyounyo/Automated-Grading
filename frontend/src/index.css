@@ -238,6 +238,14 @@ p {
   box-shadow: none !important;
 }
 
+.student-response-readonly {
+  background-color: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  cursor: default;
+  user-select: text;
+}
+
 .label {
   display: block;
   font-family: var(--font-heading);

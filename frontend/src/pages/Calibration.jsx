@@ -4,7 +4,8 @@ import {
   Upload, BookOpen, CheckCircle2, ChevronRight, ArrowRight,
   Sparkles, Loader2, Target, Info, AlertTriangle, RefreshCw,
   Edit3, Plus, Minus, FileText, Check, Save, X, Award, ShieldAlert,
-  FileSpreadsheet, CheckCircle, HelpCircle, Trash2
+  FileSpreadsheet, CheckCircle, HelpCircle, Trash2, Lock,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import {
@@ -73,6 +74,8 @@ const Calibration = () => {
   const [previewError, setPreviewError] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [showAllPreview, setShowAllPreview] = useState(false);
+  const [showAllSavedExemplars, setShowAllSavedExemplars] = useState(false);
 
   // Quick navigation / grade trigger state
   const [startingGrading, setStartingGrading] = useState(false);
@@ -1155,9 +1158,13 @@ const Calibration = () => {
                               backgroundColor: '#e2e8f0',
                               padding: '0.12rem 0.45rem',
                               borderRadius: '4px',
-                              border: '1px solid #cbd5e1'
+                              border: '1px solid #cbd5e1',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+
                             }}>
-                              Submitted Answer (Read-only)
+                              <Lock size={10} /> Submitted Answer (Read-only)
                             </span>
                           </div>
                           <textarea
@@ -1507,39 +1514,14 @@ const Calibration = () => {
           {/* EXTRACTED EXAMPLES PREVIEW CARD */}
           {previewData && (
             <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* Detected Headers Row */}
-              <div style={{
-                padding: '0.85rem 1rem', backgroundColor: '#f8fafc',
-                border: '1px solid var(--border)', borderRadius: '8px'
-              }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.45rem' }}>
-                  Smart Column Detection:
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: '4px', backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}>
-                    Question: <strong>{previewData.columns_detected.question_number}</strong>
-                  </span>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: '4px', backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}>
-                    Answer: <strong>{previewData.columns_detected.student_response}</strong>
-                  </span>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: '4px', backgroundColor: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}>
-                    Score: <strong>{previewData.columns_detected.examiner_score}</strong>
-                  </span>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: '4px', backgroundColor: '#f3f4f6', color: '#475569', fontWeight: 600 }}>
-                    Feedback: <strong>{previewData.has_feedback ? previewData.columns_detected.examiner_feedback : 'Optional (None detected)'}</strong>
-                  </span>
-                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.55rem', borderRadius: '4px', backgroundColor: '#f3f4f6', color: '#475569', fontWeight: 600 }}>
-                    Student ID: <strong>{previewData.columns_detected.student_id}</strong>
-                  </span>
-                </div>
-              </div>
+
 
               {/* Extracted / Imported Examples Table */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <h4 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--secondary)' }}>
-                      {previewData.isImported ? 'Imported Calibration Examples' : 'Extracted Examples Preview'} ({previewData.preview_examples.length} samples shown)
+                      {previewData.isImported ? 'Imported Calibration Examples' : 'Extracted Examples Preview'} ({showAllPreview ? previewData.preview_examples.length : Math.min(3, previewData.preview_examples.length)} of {previewData.preview_examples.length} samples shown)
                     </h4>
                     {previewData.isImported && (
                       <span style={{
@@ -1570,16 +1552,16 @@ const Calibration = () => {
                         <th style={{ padding: '0.6rem 0.75rem', width: 110 }}>Student</th>
                         <th style={{ padding: '0.6rem 0.75rem' }}>Student Answer (Preview)</th>
                         <th style={{ padding: '0.6rem 0.75rem', width: 85, textAlign: 'center' }}>Score</th>
-                        <th style={{ padding: '0.6rem 0.75rem', width: 180 }}>Feedback (Optional)</th>
+                        <th style={{ padding: '0.6rem 0.75rem', width: 220 }}>Feedback (Optional)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {previewData.preview_examples.map((ex, idx) => (
-                        <tr key={idx} style={{ borderBottom: idx < previewData.preview_examples.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                          <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-dim)', fontWeight: 700 }}>
+                      {(showAllPreview ? previewData.preview_examples : previewData.preview_examples.slice(0, 3)).map((ex, idx) => (
+                        <tr key={idx} style={{ borderBottom: idx < (showAllPreview ? previewData.preview_examples.length : Math.min(3, previewData.preview_examples.length)) - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                          <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-dim)', fontWeight: 700, verticalAlign: 'top' }}>
                             {idx + 1}
                           </td>
-                          <td style={{ padding: '0.55rem 0.75rem' }}>
+                          <td style={{ padding: '0.55rem 0.75rem', verticalAlign: 'top' }}>
                             <span style={{
                               fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.45rem',
                               borderRadius: '4px', backgroundColor: '#e0e7ff', color: '#3730a3'
@@ -1587,13 +1569,15 @@ const Calibration = () => {
                               {ex.question_number}
                             </span>
                           </td>
-                          <td style={{ padding: '0.55rem 0.75rem', color: 'var(--secondary)', fontWeight: 600 }}>
+                          <td style={{ padding: '0.55rem 0.75rem', color: 'var(--secondary)', fontWeight: 600, verticalAlign: 'top' }}>
                             {ex.student_id}
                           </td>
-                          <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
-                            {ex.student_text || <em style={{ color: 'var(--text-dim)' }}>(No text provided)</em>}
+                          <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-main)', lineHeight: 1.45, verticalAlign: 'top' }}>
+                            <div style={{ maxHeight: '72px', overflowY: 'auto', fontSize: '0.785rem', wordBreak: 'break-word' }}>
+                              {ex.student_text || <em style={{ color: 'var(--text-dim)' }}>(No text provided)</em>}
+                            </div>
                           </td>
-                          <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center' }}>
+                          <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', verticalAlign: 'top' }}>
                             <span style={{ fontWeight: 800, color: '#16a34a' }}>
                               {ex.examiner_score}
                             </span>
@@ -1601,14 +1585,54 @@ const Calibration = () => {
                               /{ex.max_score}
                             </span>
                           </td>
-                          <td style={{ padding: '0.55rem 0.75rem', color: ex.has_custom_feedback ? 'var(--text-main)' : 'var(--text-dim)', fontStyle: ex.has_custom_feedback ? 'normal' : 'italic' }}>
-                            {ex.examiner_feedback}
+                          <td style={{
+                            padding: '0.55rem 0.75rem',
+                            color: ex.has_custom_feedback ? 'var(--text-main)' : 'var(--text-dim)',
+                            fontStyle: ex.has_custom_feedback ? 'normal' : 'italic',
+                            verticalAlign: 'top'
+                          }}>
+                            <div style={{ maxHeight: '72px', overflowY: 'auto', fontSize: '0.785rem', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                              {ex.examiner_feedback || '(None provided)'}
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+
+                {previewData.preview_examples.length > 3 && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllPreview(prev => !prev)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.35rem 0.85rem',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: 'var(--primary)',
+                        backgroundColor: '#eef2ff',
+                        border: '1px solid #c7d2fe',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {showAllPreview ? (
+                        <>
+                          <ChevronUp size={14} /> Show fewer (3 items)
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown size={14} /> Show all ({previewData.preview_examples.length} items)
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -1724,7 +1748,7 @@ const Calibration = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <h4 style={{ margin: 0, fontSize: '0.925rem', fontWeight: 800, color: 'var(--secondary)' }}>
-                    Active Calibration Exemplars in System ({activeSavedExemplars.length} saved)
+                    Active Calibration Exemplars in System ({showAllSavedExemplars ? activeSavedExemplars.length : Math.min(3, activeSavedExemplars.length)} of {activeSavedExemplars.length} saved)
                   </h4>
                   <span style={{
                     fontSize: '0.725rem', fontWeight: 700, padding: '0.2rem 0.6rem',
@@ -1775,12 +1799,12 @@ const Calibration = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {activeSavedExemplars.map((ex, idx) => (
-                      <tr key={ex.id || idx} style={{ borderBottom: idx < activeSavedExemplars.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                        <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-dim)', fontWeight: 700 }}>
+                    {(showAllSavedExemplars ? activeSavedExemplars : activeSavedExemplars.slice(0, 3)).map((ex, idx) => (
+                      <tr key={ex.id || idx} style={{ borderBottom: idx < (showAllSavedExemplars ? activeSavedExemplars.length : Math.min(3, activeSavedExemplars.length)) - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                        <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-dim)', fontWeight: 700, verticalAlign: 'top' }}>
                           {idx + 1}
                         </td>
-                        <td style={{ padding: '0.55rem 0.75rem' }}>
+                        <td style={{ padding: '0.55rem 0.75rem', verticalAlign: 'top' }}>
                           <span style={{
                             fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.45rem',
                             borderRadius: '4px', backgroundColor: '#e0e7ff', color: '#3730a3'
@@ -1788,10 +1812,12 @@ const Calibration = () => {
                             {ex.question_number}
                           </span>
                         </td>
-                        <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-main)', lineHeight: 1.45 }}>
-                          {ex.student_text || <em style={{ color: 'var(--text-dim)' }}>(No text provided)</em>}
+                        <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-main)', lineHeight: 1.45, verticalAlign: 'top' }}>
+                          <div style={{ maxHeight: '72px', overflowY: 'auto', fontSize: '0.785rem', wordBreak: 'break-word' }}>
+                            {ex.student_text || <em style={{ color: 'var(--text-dim)' }}>(No text provided)</em>}
+                          </div>
                         </td>
-                        <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', verticalAlign: 'top' }}>
                           <span style={{ fontWeight: 800, color: '#16a34a' }}>
                             {ex.examiner_score}
                           </span>
@@ -1799,10 +1825,17 @@ const Calibration = () => {
                             /{ex.max_score}
                           </span>
                         </td>
-                        <td style={{ padding: '0.55rem 0.75rem', color: ex.examiner_feedback ? 'var(--text-main)' : 'var(--text-dim)', fontStyle: ex.examiner_feedback ? 'normal' : 'italic' }}>
-                          {ex.examiner_feedback || '(None provided)'}
+                        <td style={{
+                          padding: '0.55rem 0.75rem',
+                          color: ex.examiner_feedback ? 'var(--text-main)' : 'var(--text-dim)',
+                          fontStyle: ex.examiner_feedback ? 'normal' : 'italic',
+                          verticalAlign: 'top'
+                        }}>
+                          <div style={{ maxHeight: '72px', overflowY: 'auto', fontSize: '0.785rem', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                            {ex.examiner_feedback || '(None provided)'}
+                          </div>
                         </td>
-                        <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center' }}>
+                        <td style={{ padding: '0.55rem 0.75rem', textAlign: 'center', verticalAlign: 'top' }}>
                           <button
                             type="button"
                             title="Remove this exemplar"
@@ -1820,6 +1853,39 @@ const Calibration = () => {
                   </tbody>
                 </table>
               </div>
+
+              {activeSavedExemplars.length > 3 && (
+                <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllSavedExemplars(prev => !prev)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--primary)',
+                      backgroundColor: '#eef2ff',
+                      border: '1px solid #c7d2fe',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {showAllSavedExemplars ? (
+                      <>
+                        <ChevronUp size={14} /> Show fewer (3 items)
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown size={14} /> Show all ({activeSavedExemplars.length} items)
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -175,30 +175,80 @@ const SubmissionsList = () => {
     switch (sub.status) {
       case 'graded':
         return (
-          <span className="status-badge" style={{ backgroundColor: 'var(--success-bg)', color: 'var(--success)', padding: '0.25rem 0.6rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center' }}>
-            <CheckCircle size={14} style={{ marginRight: '4px' }} /> Graded
+          <span
+            className="status-badge"
+            style={{
+              backgroundColor: 'var(--success-bg)',
+              color: 'var(--success)',
+              padding: '0.22rem 0.55rem',
+              borderRadius: '4px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              gap: '0.3rem',
+              border: '1px solid var(--success-border)'
+            }}
+          >
+            <CheckCircle size={13} style={{ flexShrink: 0 }} /> Graded
           </span>
         );
       case 'flagged':
-        const rawReason = sub.feedback?.flag_reasons?.[0] || '';
-        const friendlyReason = rawReason.toLowerCase().includes('multi-agent')
-          ? 'Two AIs disagreed — please check this score'
-          : rawReason.toLowerCase().includes('low system confidence')
-            ? 'AI was unsure about this grade'
-            : rawReason.toLowerCase().includes('terse')
-              ? 'Answer was very short'
-              : rawReason.toLowerCase().includes('random')
-                ? 'Random spot-check selected'
-                : 'Needs your review';
+        const rawReason = (sub.feedback?.flag_reasons?.[0] || '').toLowerCase();
+        let shortLabel = 'AI Conflict';
+        if (rawReason.includes('multi-agent') || rawReason.includes('discrepancy') || rawReason.includes('conflict')) {
+          shortLabel = 'AI Conflict';
+        } else if (rawReason.includes('confidence')) {
+          shortLabel = 'Low Confidence';
+        } else if (rawReason.includes('terse') || rawReason.includes('word')) {
+          shortLabel = 'Brief Answer';
+        } else if (rawReason.includes('random') || rawReason.includes('spot-check') || rawReason.includes('qc')) {
+          shortLabel = 'QC Audit';
+        } else {
+          shortLabel = 'Review Needed';
+        }
         return (
-          <span className="status-badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#b45309', padding: '0.35rem 0.75rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', fontWeight: 600, fontSize: '0.825rem', border: '1px solid rgba(245, 158, 11, 0.3)', maxWidth: '280px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={rawReason || 'This paper needs your attention'}>
-            <AlertTriangle size={14} style={{ marginRight: '6px', flexShrink: 0 }} /> ⚠️ {friendlyReason}
+          <span
+            className="status-badge"
+            style={{
+              backgroundColor: '#FEF3C7',
+              color: '#92400E',
+              padding: '0.22rem 0.55rem',
+              borderRadius: '4px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontWeight: 700,
+              fontSize: '0.75rem',
+              border: '1px solid #FCD34D',
+              gap: '0.3rem',
+              whiteSpace: 'nowrap'
+            }}
+            title={sub.feedback?.flag_reasons?.[0] || 'Flagged for lecturer review'}
+          >
+            <AlertTriangle size={13} color="#D97706" style={{ flexShrink: 0 }} />
+            {shortLabel}
           </span>
         );
       default:
         return (
-          <span className="status-badge" style={{ backgroundColor: isGradingActive ? 'rgba(234, 179, 8, 0.12)' : 'var(--bg-hover)', color: isGradingActive ? '#a16207' : 'var(--text-muted)', padding: '0.25rem 0.6rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', fontWeight: isGradingActive ? 600 : 400 }}>
-            <Clock size={14} style={{ marginRight: '4px' }} /> {isGradingActive ? 'Queued for AI' : 'Waiting to be graded'}
+          <span
+            className="status-badge"
+            style={{
+              backgroundColor: isGradingActive ? '#FEF9C3' : '#F1F5F9',
+              color: isGradingActive ? '#854D0E' : '#475569',
+              padding: '0.22rem 0.55rem',
+              borderRadius: '4px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              border: `1px solid ${isGradingActive ? '#FDE047' : '#CBD5E1'}`,
+              gap: '0.3rem',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <Clock size={13} style={{ flexShrink: 0 }} />
+            {isGradingActive ? 'Queued' : 'Pending'}
           </span>
         );
     }
