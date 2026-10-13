@@ -396,7 +396,7 @@ const AssignmentCreator = () => {
                 Review and fine-tune parsed criteria. AutoGrade+ uses model answers to index criteria into ChromaDB.
               </p>
             </div>
-            
+
             <button type="button" className="btn btn-outline" onClick={handleAddQuestion} style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}>
               <Plus size={14} /> Add Question
             </button>
@@ -450,7 +450,7 @@ const AssignmentCreator = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
                   <div>
                     <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
-                      Question Prompt / Criteria Description
+                      Question/ Criteria Description
                     </label>
                     <textarea
                       rows={3}
@@ -467,7 +467,7 @@ const AssignmentCreator = () => {
 
                   <div>
                     <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
-                      Model Answer & Marking Allocation (ChromaDB Key)
+                      Rubric & Marking Allocation (ChromaDB Key)
                     </label>
                     <textarea
                       rows={3}

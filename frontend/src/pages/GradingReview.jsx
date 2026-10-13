@@ -23,7 +23,8 @@ import {
   Info,
   Lock,
   Target,
-  UserCheck
+  UserCheck,
+  BookOpen
 } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import { fetchSubmissionDetail } from '../api/client';
@@ -229,6 +230,10 @@ const GradingReview = () => {
   // Expandable question feedback state
   const [expandedFeedback, setExpandedFeedback] = useState({});
   const [expandAllFeedback, setExpandAllFeedback] = useState(false);
+
+  // Expandable question rubric reference state
+  const [expandedRubric, setExpandedRubric] = useState({});
+  const [expandAllRubric, setExpandAllRubric] = useState(false);
 
   // Only review AI-graded student submissions (calibration sample papers belong exclusively in the Calibration page)
   // Review all student submissions for the assignment
@@ -1770,7 +1775,7 @@ const GradingReview = () => {
                   </>
                 )}
               </h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   onClick={() => setExpandAllFeedback(!expandAllFeedback)}
@@ -1778,7 +1783,26 @@ const GradingReview = () => {
                   style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
                 >
                   {expandAllFeedback ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                  {expandAllFeedback ? 'Collapse All' : 'Expand All Feedback'}
+                  {expandAllFeedback ? 'Collapse Feedback' : 'Expand All Feedback'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !expandAllRubric;
+                    setExpandAllRubric(next);
+                    const update = {};
+                    effectiveQuestions.forEach((eq, idx) => {
+                      const k = eq.question_number || `Q${idx + 1}`;
+                      update[k] = next;
+                    });
+                    setExpandedRubric(update);
+                  }}
+                  className="btn btn-outline"
+                  style={{ fontSize: '0.725rem', padding: '0.2rem 0.5rem', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  title="Toggle all question rubric & answer schemes"
+                >
+                  <BookOpen size={12} color="var(--primary)" />
+                  <span>{expandAllRubric ? 'Collapse Rubrics' : 'Expand All Rubrics'}</span>
                 </button>
                 <span style={{
                   fontSize: '0.775rem',
@@ -1848,6 +1872,27 @@ const GradingReview = () => {
                     effectiveFeedbackText = 'Evaluated against rubric criteria.';
                   }
 
+                  // Match rubric data for this question to provide reference marking scheme
+                  const rubricMatch = rubricQuestions.find(rq => {
+                    const rqNum = rq.question_number || '';
+                    return extractMainQKey(rqNum) === mainKey || rqNum.toLowerCase() === qKey.toLowerCase();
+                  }) || (rubricQuestions[index] && extractMainQKey(rubricQuestions[index].question_number || '') === mainKey ? rubricQuestions[index] : null);
+
+                  const rawRubricPrompt = (rubricMatch?.prompt || rubricMatch?.text || item.prompt || '').trim();
+                  const rawRubricModel = (rubricMatch?.model_answer || rubricMatch?.modelAnswer || item.model_answer || '').trim();
+                  const rubricCriteria = Array.isArray(rubricMatch?.criteria) ? rubricMatch.criteria : null;
+
+                  // Clean generic prompts so we don't display redundant "Question Q1" labels
+                  const isGenericPrompt = !rawRubricPrompt ||
+                    rawRubricPrompt.toLowerCase() === qKey.toLowerCase() ||
+                    rawRubricPrompt.toLowerCase() === `question ${qKey.toLowerCase()}` ||
+                    rawRubricPrompt.toLowerCase() === `question ${mainKey.toLowerCase()}`;
+                  const rubricPrompt = isGenericPrompt ? '' : rawRubricPrompt;
+
+                  const isPromptSameAsModel = Boolean(rubricPrompt && rawRubricModel && rubricPrompt.toLowerCase() === rawRubricModel.toLowerCase());
+                  const rubricModelAnswer = rawRubricModel;
+                  const isRubricExpanded = Boolean(expandedRubric[qKey]);
+
                   return (
                     <div
                       key={index}
@@ -1891,42 +1936,118 @@ const GradingReview = () => {
 
                         {/* Score Steppers or Minimalist Read-Only / Grading Pill */}
                         {isCalibrationSample ? (
-                          <span
-                            style={{
-                              fontSize: '0.8rem',
-                              fontWeight: 700,
-                              color: 'var(--secondary)',
-                              backgroundColor: 'var(--bg-main)',
-                              border: '1px solid var(--border)',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '4px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.3rem'
-                            }}
-                            title="Lecturer score (overrides disabled)"
-                          >
-                            <Lock size={11} color="var(--text-muted)" /> {currentScoreVal} / {maxSc} pts
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRubric(prev => ({ ...prev, [qKey]: !isRubricExpanded }))}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                padding: '0.18rem 0.45rem',
+                                borderRadius: '4px',
+                                border: isRubricExpanded ? '1px solid #93C5FD' : '1px solid #CBD5E1',
+                                backgroundColor: isRubricExpanded ? '#EFF6FF' : '#F8FAFC',
+                                color: isRubricExpanded ? '#1D4ED8' : '#475569',
+                                cursor: 'pointer',
+                                height: '26px'
+                              }}
+                              title="View rubric criteria & model answer for this question"
+                            >
+                              <BookOpen size={12} color={isRubricExpanded ? '#1D4ED8' : '#64748B'} />
+                              <span>Rubric</span>
+                              {isRubricExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                            </button>
+                            <span
+                              style={{
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                color: 'var(--secondary)',
+                                backgroundColor: 'var(--bg-main)',
+                                border: '1px solid var(--border)',
+                                padding: '0.2rem 0.6rem',
+                                borderRadius: '4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                height: '26px'
+                              }}
+                              title="Lecturer score (overrides disabled)"
+                            >
+                              <Lock size={11} color="var(--text-muted)" /> {currentScoreVal} / {maxSc} pts
+                            </span>
+                          </div>
                         ) : isSubmissionUnfinished ? (
-                          <span
-                            style={{
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                              color: '#2563eb',
-                              border: '1px solid rgba(59, 130, 246, 0.25)',
-                              padding: '0.2rem 0.55rem',
-                              borderRadius: '4px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.35rem'
-                            }}
-                          >
-                            <Loader2 size={11} className="spin" style={{ color: '#2563eb' }} /> Grading
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRubric(prev => ({ ...prev, [qKey]: !isRubricExpanded }))}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                padding: '0.18rem 0.45rem',
+                                borderRadius: '4px',
+                                border: isRubricExpanded ? '1px solid #93C5FD' : '1px solid #CBD5E1',
+                                backgroundColor: isRubricExpanded ? '#EFF6FF' : '#F8FAFC',
+                                color: isRubricExpanded ? '#1D4ED8' : '#475569',
+                                cursor: 'pointer',
+                                height: '26px'
+                              }}
+                              title="View rubric criteria & model answer for this question"
+                            >
+                              <BookOpen size={12} color={isRubricExpanded ? '#1D4ED8' : '#64748B'} />
+                              <span>Rubric</span>
+                              {isRubricExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                            </button>
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                                color: '#2563eb',
+                                border: '1px solid rgba(59, 130, 246, 0.25)',
+                                padding: '0.2rem 0.55rem',
+                                borderRadius: '4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                height: '26px'
+                              }}
+                            >
+                              <Loader2 size={11} className="spin" style={{ color: '#2563eb' }} /> Grading
+                            </span>
+                          </div>
                         ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRubric(prev => ({ ...prev, [qKey]: !isRubricExpanded }))}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                padding: '0.18rem 0.45rem',
+                                borderRadius: '4px',
+                                border: isRubricExpanded ? '1px solid #93C5FD' : '1px solid #CBD5E1',
+                                backgroundColor: isRubricExpanded ? '#EFF6FF' : '#F8FAFC',
+                                color: isRubricExpanded ? '#1D4ED8' : '#475569',
+                                cursor: 'pointer',
+                                height: '26px'
+                              }}
+                              title="View rubric criteria & model answer for this question"
+                            >
+                              <BookOpen size={12} color={isRubricExpanded ? '#1D4ED8' : '#64748B'} />
+                              <span>Rubric</span>
+                              {isRubricExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                            </button>
+
                             <button
                               type="button"
                               className="btn btn-outline"
@@ -1960,6 +2081,113 @@ const GradingReview = () => {
                           </div>
                         )}
                       </div>
+
+                      {/* Expandable Rubric & Marking Scheme Reference Card */}
+                      {isRubricExpanded && (
+                        <div style={{
+                          backgroundColor: '#F8FAFC',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          padding: '0.65rem 0.8rem',
+                          fontSize: '0.785rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.55rem',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderBottom: '1px solid #E2E8F0',
+                            paddingBottom: '0.35rem'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, color: 'var(--primary-dark)', fontSize: '0.76rem' }}>
+                              <BookOpen size={13} color="var(--primary)" />
+                              <span>Marking Rubric & Scheme ({maxSc} pts max)</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedRubric(prev => ({ ...prev, [qKey]: false }))}
+                              style={{
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#64748B',
+                                cursor: 'pointer',
+                                fontSize: '0.68rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              Close
+                            </button>
+                          </div>
+
+                          {/* Question Prompt */}
+                          {rubricPrompt && !isPromptSameAsModel && (
+                            <div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '0.2rem' }}>
+                                Question Prompt:
+                              </div>
+                              <div style={{
+                                color: '#1E293B',
+                                lineHeight: '1.45',
+                                backgroundColor: '#FFFFFF',
+                                padding: '0.45rem 0.65rem',
+                                borderRadius: '4px',
+                                border: '1px solid #E2E8F0',
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.765rem'
+                              }}>
+                                {rubricPrompt}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Model Answer / Marking Criteria */}
+                          {rubricModelAnswer ? (
+                            <div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#0369A1', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '0.2rem' }}>
+                                {isPromptSameAsModel ? 'Marking Rubric / Criteria:' : 'Answer Scheme & Scoring Criteria:'}
+                              </div>
+                              <div style={{
+                                color: '#0F172A',
+                                lineHeight: '1.45',
+                                backgroundColor: '#F0F9FF',
+                                padding: '0.5rem 0.65rem',
+                                borderRadius: '4px',
+                                border: '1px solid #BAE6FD',
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.765rem'
+                              }}>
+                                {rubricModelAnswer}
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.74rem' }}>
+                              No specific marking scheme entered for this question. Max marks: {maxSc} pts.
+                            </div>
+                          )}
+
+                          {/* Multi-criteria breakdown list if criteria array exists */}
+                          {rubricCriteria && rubricCriteria.length > 0 && (
+                            <div>
+                              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '0.25rem' }}>
+                                Detailed Criteria:
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                                {rubricCriteria.map((crit, cIdx) => (
+                                  <div key={cIdx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF', padding: '0.35rem 0.55rem', borderRadius: '4px', border: '1px solid #E2E8F0', fontSize: '0.73rem' }}>
+                                    <span style={{ color: '#334155' }}>{crit.description || crit.name || crit.text || `Criterion ${cIdx + 1}`}</span>
+                                    <span style={{ fontWeight: 700, color: '#0F172A', marginLeft: '0.5rem', whiteSpace: 'nowrap' }}>
+                                      {crit.max_score || crit.maxMark || crit.score || 0} pts
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Direct AI Conflict Resolution Strip */}
                       {!isCalibrationSample && hasConflict && auditorScoreVal != null && (
