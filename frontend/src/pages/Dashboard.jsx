@@ -64,7 +64,7 @@ const Dashboard = () => {
 
   // Separate graded submissions from unassessed submissions
   const gradedSubs = submissions.filter(s => s.score != null && (s.status === 'graded' || s.status === 'approved' || s.status === 'flagged'));
-  const unassessedSubs = submissions.filter(s => s.score == null || s.status === 'pending' || s.status === 'uploaded' || s.status === 'extracting_answers' || s.status === 'retrieving_rubric' || s.status === 'grading');
+  const unassessedSubs = submissions.filter(s => !s.is_calibration_sample && (s.score == null || s.status === 'pending' || s.status === 'uploaded' || s.status === 'extracting_answers' || s.status === 'retrieving_rubric' || s.status === 'grading'));
 
   const totalRubricMax = (currentAssignment?.rubric_data && currentAssignment.rubric_data.length > 0)
     ? currentAssignment.rubric_data.reduce((acc, item) => acc + (parseFloat(item.max_score || item.maxMark) || 0), 0)

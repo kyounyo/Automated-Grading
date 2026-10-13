@@ -7,14 +7,16 @@ import { Loader2 } from 'lucide-react';
  * Hidden automatically when grading is not active (no "Grading Complete!" popup).
  */
 const GradingProgressBar = ({ submissions = [], isGrading = false }) => {
-  const total = submissions.length;
-  const graded = submissions.filter(s =>
+  // Exclude calibration examples from grading progress
+  const nonCalibrationSubs = submissions.filter(s => !s.is_calibration_sample);
+  const total = nonCalibrationSubs.length;
+  const graded = nonCalibrationSubs.filter(s =>
     s.status === 'graded' || s.status === 'flagged' || s.status === 'approved'
   ).length;
-  const processing = submissions.filter(s =>
+  const processing = nonCalibrationSubs.filter(s =>
     ['processing', 'grading', 'extracting_answers', 'retrieving_rubric'].includes(s.status)
   ).length;
-  const pending = submissions.filter(s =>
+  const pending = nonCalibrationSubs.filter(s =>
     s.status === 'pending' || s.status === 'uploaded'
   ).length;
 
@@ -62,7 +64,7 @@ const GradingProgressBar = ({ submissions = [], isGrading = false }) => {
           {graded}
         </span>
         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)', marginLeft: '0.3rem' }}>
-          / {total} papers graded
+          / {total} submissions graded
         </span>
       </div>
 

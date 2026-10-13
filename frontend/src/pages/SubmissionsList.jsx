@@ -308,10 +308,11 @@ const SubmissionsList = () => {
     return matchesFilter && matchesSearch;
   });
 
-  const totalSubmissionsCount = submissions.length;
-  const gradedCount = submissions.filter(s => s.status === 'graded').length;
-  const flaggedCount = submissions.filter(s => s.status === 'flagged').length;
-  const processingCount = submissions.filter(s => s.status === 'processing' || isSubmissionGrading(s)).length;
+  const nonCalibrationSubs = submissions.filter(s => !s.is_calibration_sample);
+  const totalSubmissionsCount = nonCalibrationSubs.length;
+  const gradedCount = nonCalibrationSubs.filter(s => s.status === 'graded').length;
+  const flaggedCount = nonCalibrationSubs.filter(s => s.status === 'flagged').length;
+  const processingCount = nonCalibrationSubs.filter(s => s.status === 'processing' || isSubmissionGrading(s)).length;
   const completedCount = gradedCount + flaggedCount;
   const isBatchActive = gradingSubIds.size > 0 || processingCount > 0;
   const progressPercent = totalSubmissionsCount > 0 ? Math.round((completedCount / totalSubmissionsCount) * 100) : 0;
