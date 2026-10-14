@@ -197,6 +197,30 @@ const SubmissionsList = () => {
       );
     }
 
+    if (sub.feedback?.is_overridden) {
+      return (
+        <span
+          className="status-badge"
+          style={{
+            backgroundColor: '#EFF6FF',
+            color: '#1D4ED8',
+            padding: '0.22rem 0.55rem',
+            borderRadius: '4px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            fontWeight: 700,
+            fontSize: '0.75rem',
+            gap: '0.3rem',
+            border: '1px solid #BFDBFE',
+            whiteSpace: 'nowrap'
+          }}
+          title={sub.feedback?.override_comment ? `Score Overridden: ${sub.feedback.override_comment}` : 'Score overridden by lecturer'}
+        >
+          <CheckCircle size={13} style={{ flexShrink: 0, color: '#2563EB' }} /> Overridden
+        </span>
+      );
+    }
+
     switch (sub.status) {
       case 'graded':
         return (

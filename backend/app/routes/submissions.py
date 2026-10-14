@@ -230,7 +230,22 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
     fb_dict = dict(sub.feedback) if isinstance(sub.feedback, dict) else {}
     if payload.updated_breakdown is not None:
         fb_dict["breakdown"] = payload.updated_breakdown
-    fb_dict["flag_reasons"] = []
+    clean_comment = payload.comment.strip() if payload.comment else ""
+    is_boilerplate = clean_comment.lower() in [
+        "grade overridden / adjusted by lecturer",
+        "audited and approved by lecturer",
+        "manual grade adjustment by lecturer"
+    ]
+    effective_comment = "" if is_boilerplate else clean_comment
+
+    if effective_comment:
+        fb_dict["override_comment"] = effective_comment
+        fb_dict["lecturer_comment"] = effective_comment
+    else:
+        fb_dict.pop("override_comment", None)
+        fb_dict.pop("lecturer_comment", None)
+
+    fb_dict["is_overridden"] = True
     sub.feedback = fb_dict
     flag_modified(sub, "feedback")
 
@@ -244,7 +259,7 @@ def override_submission_score(submission_id: str, payload: ScoreOverrideRequest,
         action="manual_override",
         old_score=old_score,
         new_score=final_score,
-        comment=payload.comment
+        comment=effective_comment if effective_comment else None
     )
     db.add(audit)
 

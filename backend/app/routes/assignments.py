@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 from ..database import get_db
-from ..models import Assignment, Submission, CalibrationSet, CalibrationExample
+from ..models import Assignment, Submission, CalibrationSet, CalibrationExample, AuditLog
 from ..schemas import (
     AssignmentCreate, 
     AssignmentResponse, 
@@ -749,8 +749,8 @@ async def parse_rubric_file(files: List[UploadFile] = File(...)):
 @router.get("/{assignment_id}/export-csv")
 def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
     """
-    Exports student grades for an assignment as a simplified CSV file containing:
-    Student ID, Student Name, Submission File, Student Response, Total Score, Status, AI Evaluation Summary
+    Exports student grades for an assignment as a comprehensive CSV file containing:
+    Student ID, Student Name, Submission File, Student Response, Total Score, Status, AI Feedback, Lecturer Feedback
     """
     import io
     import csv
@@ -770,17 +770,150 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
         "Student Response",
         "Total Score",
         "Status",
-        "AI Evaluation Summary"
+        "AI Feedback",
+        "Lecturer Feedback"
     ]
 
     output = io.StringIO()
+    # Write UTF-8 BOM so Microsoft Excel and other spreadsheet apps render UTF-8 characters cleanly
+    output.write('\ufeff')
     writer = csv.writer(output)
     writer.writerow(header)
 
     for sub in submissions:
         fb = sub.feedback if isinstance(sub.feedback, dict) else {}
-        summary = fb.get("summary", "")
         score_val = sub.score if sub.score is not None else ""
+
+        # 1. Check if submission score was overridden and extract lecturer feedback
+        override_log = db.query(AuditLog).filter(
+            AuditLog.submission_id == sub.id,
+            AuditLog.action == "manual_override"
+        ).order_by(AuditLog.timestamp.desc()).first()
+
+        is_overridden = bool(override_log or fb.get("is_overridden"))
+
+        lecturer_fb = ""
+        raw_comment = ""
+        if override_log and override_log.comment:
+            raw_comment = override_log.comment.strip()
+        elif fb.get("override_comment"):
+            raw_comment = str(fb.get("override_comment")).strip()
+        elif fb.get("lecturer_comment"):
+            raw_comment = str(fb.get("lecturer_comment")).strip()
+
+        # Exclude generic automated boilerplates
+        generic_placeholders = [
+            "grade overridden / adjusted by lecturer",
+            "audited and approved by lecturer",
+            "manual grade adjustment by lecturer"
+        ]
+        if raw_comment and raw_comment.lower() not in generic_placeholders:
+            lecturer_fb = raw_comment
+
+        # Status determination: "Overridden", "Graded", "Flagged", "Pending", etc.
+        if is_overridden:
+            status_val = "Overridden"
+        elif sub.is_calibration_sample:
+            status_val = "Calibration Example"
+        elif sub.status == "flagged":
+            status_val = "Flagged"
+        elif sub.status in ["graded", "approved"]:
+            status_val = "Graded"
+        elif sub.status in ["pending", "uploaded"]:
+            status_val = "Pending"
+        elif sub.status in ["processing", "grading", "extracting_answers", "retrieving_rubric"]:
+            status_val = "Grading"
+        else:
+            status_val = sub.status.capitalize() if sub.status else "Unknown"
+
+        # 2. Determine AI Feedback (combining primary grader & auditor if flagged/conflict)
+        multi_audit = fb.get("multi_agent_audit") if isinstance(fb.get("multi_agent_audit"), dict) else {}
+        is_flagged_or_conflict = (
+            sub.status == "flagged" or
+            bool(fb.get("flag_reasons")) or
+            multi_audit.get("auditor_passed") is False or
+            bool(multi_audit.get("audit_note")) or
+            bool(multi_audit.get("reconciliation_reason"))
+        )
+
+        # Primary Grader Feedback
+        primary_summary = fb.get("summary", "").strip()
+        primary_breakdown = fb.get("breakdown") if isinstance(fb.get("breakdown"), list) else []
+
+        primary_sections = []
+        if primary_summary:
+            primary_sections.append(f"Summary: {primary_summary}")
+
+        if primary_breakdown:
+            bd_lines = []
+            for item in primary_breakdown:
+                q_num = item.get("question_number") or item.get("criterion") or "Question"
+                sc = item.get("score_awarded", item.get("score"))
+                mx = item.get("max_score")
+                sc_str = f" ({sc}/{mx} pts)" if sc is not None and mx is not None else ""
+                reason = (item.get("reasoning") or "").strip()
+                if reason:
+                    bd_lines.append(f"• {q_num}{sc_str}: {reason}")
+                elif sc_str:
+                    bd_lines.append(f"• {q_num}{sc_str}")
+            if bd_lines:
+                primary_sections.append("Question Breakdown:\n" + "\n".join(bd_lines))
+
+        primary_text = "\n\n".join(primary_sections) if primary_sections else ""
+
+        flag_reasons_list = fb.get("flag_reasons") or []
+        flag_reasons_str = "; ".join(str(r) for r in flag_reasons_list) if isinstance(flag_reasons_list, list) else str(flag_reasons_list).strip()
+
+        # Auditor Feedback (if flagged / conflict)
+        auditor_text = ""
+        if is_flagged_or_conflict and multi_audit:
+            auditor_sections = []
+            if flag_reasons_str:
+                auditor_sections.append(f"Audit Flag Reason(s): {flag_reasons_str}")
+
+            audit_note = (multi_audit.get("audit_note") or multi_audit.get("reconciliation_reason") or "").strip()
+            auditor_score = multi_audit.get("auditor_score")
+            primary_score = multi_audit.get("primary_score")
+
+            note_header = "Auditor Discrepancy Note"
+            if auditor_score is not None and primary_score is not None:
+                note_header += f" (Auditor: {auditor_score} pts vs Primary: {primary_score} pts)"
+
+            if audit_note:
+                auditor_sections.append(f"{note_header}:\n{audit_note}")
+            elif auditor_score is not None:
+                auditor_sections.append(f"{note_header}: Discrepancy identified between evaluators.")
+
+            auditor_breakdown = multi_audit.get("auditor_breakdown") if isinstance(multi_audit.get("auditor_breakdown"), list) else []
+            if auditor_breakdown:
+                a_lines = []
+                for a_item in auditor_breakdown:
+                    q_num = a_item.get("question_number") or "Question"
+                    a_sc = a_item.get("score_awarded", a_item.get("auditor_score", a_item.get("score")))
+                    a_mx = a_item.get("max_score")
+                    a_sc_str = f" ({a_sc}/{a_mx} pts)" if a_sc is not None and a_mx is not None else ""
+                    a_reason = (a_item.get("reasoning") or "").strip()
+                    if a_reason and not a_reason.lower().startswith("evaluated against"):
+                        a_lines.append(f"• {q_num}{a_sc_str}: {a_reason}")
+                    elif a_sc_str:
+                        a_lines.append(f"• {q_num}{a_sc_str}")
+                if a_lines:
+                    auditor_sections.append("Auditor Question Breakdown:\n" + "\n".join(a_lines))
+
+            if auditor_sections:
+                auditor_text = "\n\n".join(auditor_sections)
+
+        # Assemble single "AI Feedback" column
+        if is_flagged_or_conflict and auditor_text:
+            ai_feedback_col = f"[PRIMARY GRADER]\n{primary_text if primary_text else 'Evaluated against rubric criteria.'}\n\n[AUDITOR]\n{auditor_text}"
+        elif is_flagged_or_conflict and flag_reasons_str:
+            ai_feedback_col = f"[PRIMARY GRADER]\n{primary_text if primary_text else 'Evaluated against rubric criteria.'}\n\n[AUDITOR]\nAudit Flag Reason(s): {flag_reasons_str}"
+        elif primary_text:
+            ai_feedback_col = primary_text
+        elif sub.is_calibration_sample:
+            ai_feedback_col = "N/A (Examiner Calibration Sample)"
+        else:
+            ai_feedback_col = "No evaluation feedback recorded."
 
         row = [
             sub.student_id,
@@ -788,8 +921,9 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
             sub.file_name,
             sub.raw_text or "",
             score_val,
-            sub.status,
-            summary
+            status_val,
+            ai_feedback_col,
+            lecturer_fb
         ]
         writer.writerow(row)
 

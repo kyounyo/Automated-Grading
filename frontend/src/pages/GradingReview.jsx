@@ -684,7 +684,7 @@ const GradingReview = () => {
       const updated = await handleScoreOverride(
         activeSubmissionObj.id,
         newScore,
-        overrideComment || 'Grade overridden / adjusted by lecturer',
+        overrideComment ? overrideComment.trim() : '',
         updatedBreakdown
       );
 
@@ -720,7 +720,7 @@ const GradingReview = () => {
       const updated = await handleScoreOverride(
         activeSubmissionObj.id,
         finalScoreToApprove,
-        overrideComment || 'Audited and approved by lecturer',
+        overrideComment ? overrideComment.trim() : '',
         updatedBreakdown
       );
       if (updated) {
@@ -1511,9 +1511,9 @@ const GradingReview = () => {
               <span
                 className="status-badge"
                 style={{
-                  backgroundColor: isFlagged ? '#FEF3C7' : 'var(--success-bg)',
-                  color: isFlagged ? '#92400E' : 'var(--success)',
-                  border: `1px solid ${isFlagged ? '#FCD34D' : 'var(--success-border)'}`,
+                  backgroundColor: isFlagged ? '#FEF3C7' : (activeSubmissionObj?.feedback?.is_overridden ? '#EFF6FF' : 'var(--success-bg)'),
+                  color: isFlagged ? '#92400E' : (activeSubmissionObj?.feedback?.is_overridden ? '#1D4ED8' : 'var(--success)'),
+                  border: `1px solid ${isFlagged ? '#FCD34D' : (activeSubmissionObj?.feedback?.is_overridden ? '#BFDBFE' : 'var(--success-border)')}`,
                   padding: '0.3rem 0.65rem',
                   fontSize: '0.8rem',
                   fontWeight: 700,
@@ -1526,6 +1526,10 @@ const GradingReview = () => {
                 {isFlagged ? (
                   <>
                     <AlertTriangle size={13} color="#D97706" /> AI Conflict
+                  </>
+                ) : activeSubmissionObj?.feedback?.is_overridden ? (
+                  <>
+                    <CheckCircle2 size={13} color="#2563EB" /> Overridden
                   </>
                 ) : (
                   <>
