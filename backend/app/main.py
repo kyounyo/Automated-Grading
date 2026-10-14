@@ -41,7 +41,7 @@ try:
         if 'assignments' in insp.get_table_names():
             cols = [c['name'] for c in insp.get_columns('assignments')]
             if 'calibration_enabled' not in cols:
-                conn.execute(text('ALTER TABLE assignments ADD COLUMN calibration_enabled BOOLEAN DEFAULT 0'))
+                conn.execute(text('ALTER TABLE assignments ADD COLUMN calibration_enabled BOOLEAN DEFAULT FALSE'))
             if 'calibration_sample_size' not in cols:
                 conn.execute(text('ALTER TABLE assignments ADD COLUMN calibration_sample_size INTEGER DEFAULT 3'))
             if 'calibration_settings' not in cols:
@@ -53,13 +53,13 @@ try:
         if 'submissions' in insp.get_table_names():
             sub_cols = [c['name'] for c in insp.get_columns('submissions')]
             if 'is_calibration_sample' not in sub_cols:
-                conn.execute(text('ALTER TABLE submissions ADD COLUMN is_calibration_sample BOOLEAN DEFAULT 0'))
+                conn.execute(text('ALTER TABLE submissions ADD COLUMN is_calibration_sample BOOLEAN DEFAULT FALSE'))
             
             # Startup Self-Healing: Reset any stuck in-progress submissions left by previous server crashes/restarts
             conn.execute(text("""
                 UPDATE submissions 
                 SET status = CASE 
-                    WHEN score IS NOT NULL AND feedback LIKE '%flag_reasons%' AND feedback NOT LIKE '%"flag_reasons": []%' THEN 'flagged'
+                    WHEN score IS NOT NULL AND CAST(feedback AS TEXT) LIKE '%flag_reasons%' AND CAST(feedback AS TEXT) NOT LIKE '%"flag_reasons": []%' THEN 'flagged'
                     WHEN score IS NOT NULL THEN 'graded'
                     ELSE 'pending'
                 END

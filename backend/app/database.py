@@ -5,12 +5,16 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/autograde")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/autograde").strip()
+
+# Render & Heroku provide URLs starting with postgres://, which SQLAlchemy 1.4+ rejects
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Create engine with graceful fallback if PostgreSQL local server isn't running
 try:
     if DATABASE_URL.startswith("postgresql"):
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
         # Test connection
         with engine.connect() as conn:
             pass
@@ -26,16 +30,18 @@ except Exception as e:
 
 from sqlalchemy import event
 
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    try:
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=30000")
-        cursor.close()
-    except Exception:
-        pass
+# Only apply SQLite PRAGMAs if running on SQLite
+if engine.dialect.name == "sqlite":
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.close()
+        except Exception:
+            pass
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
