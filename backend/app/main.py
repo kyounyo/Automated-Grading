@@ -108,7 +108,7 @@ app.include_router(submissions.router)
 app.include_router(uploads.router)
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {
         "service": "AutoGrade+ Backend Service",

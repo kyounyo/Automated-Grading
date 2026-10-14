@@ -8,25 +8,41 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/autograde").strip()
 
 # Render & Heroku provide URLs starting with postgres://, which SQLAlchemy 1.4+ rejects
+# Normalize postgres dialect to explicitly use psycopg2 (psycopg2-binary) or psycopg (v3)
+normalized_url = DATABASE_URL
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    normalized_url = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+"):
+    normalized_url = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-# Create engine with graceful fallback if PostgreSQL local server isn't running
+# Create engine with graceful fallback if PostgreSQL server isn't running
 try:
-    if DATABASE_URL.startswith("postgresql"):
-        engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
+    if normalized_url.startswith("postgresql"):
+        engine = create_engine(normalized_url, pool_pre_ping=True, pool_recycle=300)
         # Test connection
         with engine.connect() as conn:
             pass
-    elif DATABASE_URL.startswith("sqlite"):
-        engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False, "timeout": 30})
+    elif normalized_url.startswith("sqlite"):
+        engine = create_engine(normalized_url, connect_args={"check_same_thread": False, "timeout": 30})
     else:
-        engine = create_engine(DATABASE_URL)
+        engine = create_engine(normalized_url)
 except Exception as e:
-    print(f"[Database Warning] Could not connect to PostgreSQL ({e}). Falling back to local SQLite database.")
-    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "autograde_dev.db")
-    FALLBACK_URL = f"sqlite:///{db_path}"
-    engine = create_engine(FALLBACK_URL, connect_args={"check_same_thread": False, "timeout": 30})
+    # If psycopg2 driver fails, try standard postgresql:// in case psycopg v3 is present
+    fallback_success = False
+    if "psycopg2" in normalized_url:
+        try:
+            alt_url = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1) if DATABASE_URL.startswith("postgres://") else DATABASE_URL
+            engine = create_engine(alt_url, pool_pre_ping=True, pool_recycle=300)
+            with engine.connect() as conn:
+                fallback_success = True
+        except Exception:
+            pass
+
+    if not fallback_success:
+        print(f"[Database Warning] Could not connect to PostgreSQL ({e}). Falling back to local SQLite database.")
+        db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "autograde_dev.db")
+        FALLBACK_URL = f"sqlite:///{db_path}"
+        engine = create_engine(FALLBACK_URL, connect_args={"check_same_thread": False, "timeout": 30})
 
 from sqlalchemy import event
 
