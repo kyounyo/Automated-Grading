@@ -202,7 +202,21 @@ const AssignmentCreator = () => {
             disabled={isSaving || isParsing || !isFormValid}
             style={{ fontSize: '0.8rem', padding: '0.4rem 1rem', opacity: !isFormValid ? 0.6 : 1, cursor: !isFormValid ? 'not-allowed' : 'pointer' }}
           >
-            {isSaving ? 'Creating...' : 'Create & Index Rubric'} <ArrowRight size={14} />
+            {isSaving ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Loader2 size={13} className="spin" />
+                Creating & Indexing...
+              </span>
+            ) : isParsing ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <Loader2 size={13} className="spin" />
+                Parsing Rubrics...
+              </span>
+            ) : (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                Create & Index Rubric <ArrowRight size={14} />
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -582,7 +596,21 @@ const AssignmentCreator = () => {
             disabled={isSaving || isParsing || !isFormValid}
             style={{ padding: '0.5rem 1.35rem', fontSize: '0.875rem', opacity: !isFormValid ? 0.6 : 1, cursor: !isFormValid ? 'not-allowed' : 'pointer' }}
           >
-            {isSaving ? 'Creating...' : 'Create Assignment & Index Rubric'} <ArrowRight size={15} />
+            {isSaving ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Loader2 size={16} className="spin" />
+                Creating Assignment & Indexing Vectors...
+              </span>
+            ) : isParsing ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Loader2 size={16} className="spin" />
+                Parsing Rubrics...
+              </span>
+            ) : (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                Create Assignment & Index Rubric <ArrowRight size={15} />
+              </span>
+            )}
           </button>
         </div>
       </form>
