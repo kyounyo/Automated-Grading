@@ -124,6 +124,7 @@ const SubmissionsList = () => {
   };
 
   const handleGradeAllBatch = async () => {
+    if (isBatchActive) return;
     try {
       setGradingBatch(true);
       await triggerGradeAll(currentAssignmentId);
@@ -138,10 +139,13 @@ const SubmissionsList = () => {
   useEffect(() => {
     if (location.state?.startGrading && currentAssignmentId && !hasTriggeredInitialBatch.current) {
       hasTriggeredInitialBatch.current = true;
-      handleGradeAllBatch();
+      const hasUnassessed = submissions.some(s => !s.is_calibration_sample && (s.score == null || s.status === 'pending' || s.status === 'uploaded'));
+      if (hasUnassessed) {
+        handleGradeAllBatch();
+      }
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state?.startGrading, currentAssignmentId]);
+  }, [location.state?.startGrading, currentAssignmentId, submissions]);
 
   const onExportCSVClick = () => {
     handleExportCSV(currentAssignmentId);
@@ -347,6 +351,12 @@ const SubmissionsList = () => {
   const flaggedCount = nonCalibrationSubs.filter(s => s.status === 'flagged').length;
   const processingCount = nonCalibrationSubs.filter(s => s.status === 'processing' || isSubmissionGrading(s)).length;
   const completedCount = gradedCount + flaggedCount;
+  const pendingSubs = nonCalibrationSubs.filter(s =>
+    s.status === 'pending' || s.status === 'uploaded' || (s.score == null && s.status !== 'graded' && s.status !== 'flagged')
+  );
+  const pendingCount = pendingSubs.length;
+  const hasPending = pendingCount > 0;
+  const isAllGraded = totalSubmissionsCount > 0 && pendingCount === 0;
   const isBatchActive = gradingSubIds.size > 0 || processingCount > 0;
   const progressPercent = totalSubmissionsCount > 0 ? Math.round((completedCount / totalSubmissionsCount) * 100) : 0;
 
@@ -419,9 +429,23 @@ const SubmissionsList = () => {
 
           <button
             className="btn btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--primary)', padding: '0.5rem 1rem' }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              backgroundColor: 'var(--primary)',
+              color: '#fff',
+              opacity: (!hasPending || isBatchActive) ? 0.5 : 1,
+              cursor: (!hasPending || isBatchActive) ? 'not-allowed' : 'pointer'
+            }}
             onClick={handleGradeAllBatch}
-            disabled={isBatchActive}
+            disabled={isBatchActive || !hasPending}
+            title={
+              !hasPending
+                ? "All submissions have already been graded"
+                : "Grade all pending submissions with AI"
+            }
           >
             {isBatchActive ? (
               <>

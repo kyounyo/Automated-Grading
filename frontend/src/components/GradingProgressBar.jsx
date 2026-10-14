@@ -22,8 +22,8 @@ const GradingProgressBar = ({ submissions = [], isGrading = false }) => {
 
   const isActivelyGrading = Boolean(isGrading || processing > 0);
 
-  // Strictly pop out ONLY during the grading process
-  if (!isActivelyGrading || total === 0) return null;
+  // Strictly pop out ONLY during active grading process; never pop up if everything is already finished
+  if (!isActivelyGrading || total === 0 || (processing === 0 && pending === 0)) return null;
 
   const pct = total > 0 ? Math.round((graded / total) * 100) : 0;
 

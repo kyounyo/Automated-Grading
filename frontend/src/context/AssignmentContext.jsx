@@ -230,9 +230,19 @@ export const AssignmentProvider = ({ children }) => {
     const targetId = (typeof assignmentId === 'string' && assignmentId.trim()) ? assignmentId : currentAssignmentId;
     if (!targetId) return;
     try {
-      setActiveGradingAssignments(prev => new Set(prev).add(targetId));
-      setIsGradingActive(true);
       const res = await apiGradeAllSubmissions(targetId);
+      if (res?.status === 'idle') {
+        setActiveGradingAssignments(prev => {
+          if (!prev.has(targetId)) return prev;
+          const next = new Set(prev);
+          next.delete(targetId);
+          return next;
+        });
+        setIsGradingActive(false);
+      } else {
+        setActiveGradingAssignments(prev => new Set(prev).add(targetId));
+        setIsGradingActive(true);
+      }
       // Immediately pull fresh backend state
       await loadSubmissions(targetId, true);
       return res;
