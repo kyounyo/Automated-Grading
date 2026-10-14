@@ -1,4 +1,7 @@
-const API_BASE_URL = 'http://localhost:8000/api';
+// Reads the deployed backend's URL from the build-time env var (set on the
+// hosting platform, e.g. VITE_API_BASE_URL=https://autograde-backend.onrender.com/api).
+// Falls back to the local dev server so `npm run dev` keeps working unchanged.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 export async function fetchAssignments() {
   const response = await fetch(`${API_BASE_URL}/assignments`);
