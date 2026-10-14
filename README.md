@@ -55,6 +55,20 @@ AutoGrade+ /
 
 ---
 
+## 🐳 Quick Start with Docker (easiest way to run the app)
+
+Run the whole app on any computer with Docker Desktop. No Python or Node.js needed:
+
+```bash
+cp .env.example .env          # Windows: copy .env.example .env
+# edit .env and paste your OPENROUTER_API_KEY
+docker compose up -d --build
+```
+
+Open **http://localhost:8080**. See **[DOCKER.md](DOCKER.md)** for the full guide (data, backups, troubleshooting).
+
+---
+
 ## ⚡ Quick Start
 
 ### 1. Prerequisites

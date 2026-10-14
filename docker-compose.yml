@@ -1,0 +1,46 @@
+# AutoGrade+ — run the whole app with:  docker compose up -d --build
+# Then open http://localhost:8080  (see DOCKER.md for details)
+
+name: autograde
+
+services:
+  backend:
+    build: ./backend
+    image: autograde-backend:latest
+    restart: unless-stopped
+    environment:
+      # Required — copy .env.example to .env and paste your key there
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Missing OPENROUTER_API_KEY. Copy .env.example to .env and add your OpenRouter API key.}
+      LLM_MODEL: ${LLM_MODEL:-google/gemini-3.1-flash-lite}
+      AUDITOR_MODEL: ${AUDITOR_MODEL:-google/gemini-3.1-flash-lite}
+      PROMPT_VERSION: ${PROMPT_VERSION:-v1.2-rubric-cot}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD:-0.75}
+      ENABLE_RANDOM_QC_AUDIT: ${ENABLE_RANDOM_QC_AUDIT:-false}
+      QC_AUDIT_RATE: ${QC_AUDIT_RATE:-0.05}
+      # Optional S3 storage (leave blank to keep files inside the uploads volume)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      DATABASE_URL: sqlite:////app/data/autograde.db
+    volumes:
+      - autograde_data:/app/data
+      - autograde_chroma:/app/chroma_db
+      - autograde_uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    image: autograde-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# Data lives in these named volumes and survives restarts and rebuilds.
+# `docker compose down -v` deletes them (all assignments, grades and uploads).
+volumes:
+  autograde_data:
+  autograde_chroma:
+  autograde_uploads:

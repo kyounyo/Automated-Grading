@@ -1,0 +1,21 @@
+# Pinned dependencies for the Docker image.
+# Versions match the development environment the app was built and tested on,
+# so a fresh `docker compose build` installs exactly the same libraries.
+# (requirements.txt stays unpinned for local development.)
+fastapi==0.141.1
+uvicorn==0.52.1
+sqlalchemy==2.0.51
+psycopg2-binary==2.9.12
+pydantic==2.13.4
+boto3==1.43.65
+chromadb==1.5.9
+onnxruntime==1.28.0
+numpy==2.5.1
+pandas==3.0.5
+pypdf==6.15.0
+python-docx==1.2.0
+openpyxl==3.1.5
+python-multipart==0.0.32
+python-dotenv==1.2.2
+requests==2.34.2
+httpx==0.28.1

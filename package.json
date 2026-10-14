@@ -11,6 +11,9 @@
     "preview": "cd frontend && npm run preview",
     "generate-mock": "cd backend && venv/bin/python ../ai-pipeline/generate_mock_data.py",
     "evaluate": "cd backend && venv/bin/python ../evaluation/evaluate_prompts.py",
-    "reset-db": "cd backend && (venv/bin/python reset_db.py || venv\\Scripts\\python reset_db.py)"
+    "reset-db": "cd backend && (venv/bin/python reset_db.py || venv\\Scripts\\python reset_db.py)",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f backend"
   }
 }
