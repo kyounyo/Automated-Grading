@@ -242,7 +242,7 @@ const BulkUpload = () => {
 
 
       {/* 2. SIDE-BY-SIDE SECTION: Step 1 (Target Assignment) + Step 2 (Upload Student Submissions) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '1.25rem', alignItems: 'stretch' }}>
+      <div className="responsive-two-col">
 
         {/* Column 1: Step 1 Target Assignment */}
         <div className="card-panel" style={{ padding: '1.35rem 1.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', minHeight: '235px' }}>

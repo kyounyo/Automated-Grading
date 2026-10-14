@@ -1347,13 +1347,16 @@ const GradingReview = () => {
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.55rem', position: 'sticky', top: 0, zIndex: 20, backgroundColor: 'var(--bg-main, #f8fafc)' }}>
 
         {/* Row 1: Back Button | Quick Student Switcher (Locked Center Position) | Action Status */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(180px, 1fr) auto minmax(180px, 1fr)',
-          alignItems: 'center',
-          gap: '0.75rem',
-          minHeight: '40px'
-        }}>
+        <div 
+          className="review-header-row"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(180px, 1fr) auto minmax(180px, 1fr)',
+            alignItems: 'center',
+            gap: '0.75rem',
+            minHeight: '40px'
+          }}
+        >
 
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
             <button
@@ -1649,6 +1652,7 @@ const GradingReview = () => {
           2. SPACIOUS TWO-COLUMN SEPARATED LAYOUT (Independent Scrolling Viewports)
           ========================================================================= */}
       <div
+        className="review-split-columns"
         style={{
           flex: 1,
           minHeight: 0,

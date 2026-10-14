@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, FileUp, Files, CheckSquare, Sparkles, BookOpen, ChevronDown, PlusCircle, Target } from 'lucide-react';
+import { LayoutDashboard, FileUp, Files, CheckSquare, Sparkles, BookOpen, ChevronDown, PlusCircle, Target, Menu, X } from 'lucide-react';
 import { useAssignment } from '../context/AssignmentContext';
 import HelpSidebar from './HelpSidebar';
 import GradingProgressBar from './GradingProgressBar';
@@ -11,6 +11,12 @@ const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentAssignmentId, setCurrentAssignmentId, assignments = [], submissions = [], isGradingActive, currentAssignment } = useAssignment();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Auto-close mobile drawer when user navigates
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const availableAssignments = assignments.length > 0 ? assignments : [
     { id: '', title: 'No Active Assignments' }
@@ -18,8 +24,17 @@ const Layout = () => {
 
   return (
     <div className="layout-container">
-      {/* Docked Left Sidebar */}
-      <aside className="sidebar">
+      {/* Mobile Drawer Backdrop Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setMobileMenuOpen(false)} 
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Docked Left Sidebar (Drawers in on mobile) */}
+      <aside className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="logo-badge">
             <span>AG+</span>
@@ -28,13 +43,27 @@ const Layout = () => {
             <span className="brand-title">AutoGrade+</span>
             <span className="brand-tag">Academic Assessment</span>
           </div>
+
+          {/* Close button visible only on mobile */}
+          <button 
+            type="button"
+            className="mobile-close-btn"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close menu"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <div className="sidebar-content">
           {/* Section 1: Overview */}
           <div className="nav-section">
             <span className="nav-section-title">Overview</span>
-            <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink 
+              to="/" 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
               <LayoutDashboard size={18} /> Dashboard
             </NavLink>
           </div>
@@ -45,19 +74,32 @@ const Layout = () => {
             <NavLink
               to="/create-assignment"
               className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
             >
               <div className="step-badge">1</div>
               <span>Create Assignment</span>
             </NavLink>
-            <NavLink to="/bulk-upload" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink 
+              to="/bulk-upload" 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
               <div className="step-badge">2</div> Submissions Upload
             </NavLink>
             {currentAssignment?.calibration_enabled && (
-              <NavLink to="/calibration" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <NavLink 
+                to="/calibration" 
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
                 <div className="step-badge">3</div> Calibration
               </NavLink>
             )}
-            <NavLink to="/submissions" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink 
+              to="/submissions" 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
               <div className="step-badge">{currentAssignment?.calibration_enabled ? '4' : '3'}</div> Submissions List
             </NavLink>
           </div>
@@ -65,7 +107,11 @@ const Layout = () => {
           {/* Section 3: Evaluation Studio */}
           <div className="nav-section">
             <span className="nav-section-title">Evaluation</span>
-            <NavLink to="/review" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink 
+              to="/review" 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
               <CheckSquare size={18} /> Grading & Review
             </NavLink>
           </div>
@@ -79,16 +125,26 @@ const Layout = () => {
 
         {/* Top Header */}
         <header className="top-header">
-          {/* Group: Assessment Dropdown + New Button RIGHT BESIDE IT */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          {/* Hamburger Menu Toggle (Mobile / Tablet) */}
+          <button
+            type="button"
+            className="mobile-menu-toggle"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open navigation menu"
+          >
+            <Menu size={22} />
+          </button>
+
+          {/* Group: Assessment Dropdown + New Button */}
+          <div className="header-assignment-group">
             <div className="active-assignment-pill">
               <div className="assignment-badge-icon">
                 <BookOpen size={16} color="var(--primary)" />
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
                 <span className="assignment-label">Current Assessment</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', minWidth: 0 }}>
                   <select
                     className="assignment-select"
                     value={currentAssignmentId}
@@ -100,7 +156,7 @@ const Layout = () => {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown size={14} color="var(--primary)" style={{ pointerEvents: 'none' }} />
+                  <ChevronDown size={14} color="var(--primary)" style={{ pointerEvents: 'none', flexShrink: 0 }} />
                 </div>
               </div>
             </div>

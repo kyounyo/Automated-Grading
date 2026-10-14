@@ -33,7 +33,8 @@ const WorkflowBanner = () => {
       backgroundColor: 'var(--surface)',
       border: '1px solid var(--border)',
       borderRadius: '10px',
-      overflow: 'hidden',
+      overflowX: 'auto',
+      WebkitOverflowScrolling: 'touch',
       flexShrink: 0,
     }}>
       {steps.map((step, i) => {

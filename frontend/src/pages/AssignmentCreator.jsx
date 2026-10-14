@@ -210,7 +210,7 @@ const AssignmentCreator = () => {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
         {/* 2. SIDE-BY-SIDE SECTION: Step 1 (Details) + Step 2 (Upload Rubrics) */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '1.25rem', alignItems: 'stretch' }}>
+        <div className="responsive-two-col">
 
           {/* Column 1: Step 1 Assignment Details */}
           <div className="card-panel" style={{ padding: '1.35rem 1.6rem', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', minHeight: '235px' }}>
@@ -447,7 +447,7 @@ const AssignmentCreator = () => {
                 </div>
 
                 {/* 2-Column Side-by-Side: Prompt on Left (50%), Model Answer on Right (50%) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                <div className="responsive-split-fields">
                   <div>
                     <label className="label" style={{ fontSize: '0.75rem', marginBottom: '0.2rem' }}>
                       Question/ Criteria Description

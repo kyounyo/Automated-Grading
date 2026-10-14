@@ -318,19 +318,28 @@ const SubmissionsList = () => {
 
   const calibrationCount = submissions.filter(s => Boolean(s.is_calibration_sample)).length;
 
-  const filteredSubmissions = submissions.filter(s => {
-    const matchesFilter = filter === 'all'
-      ? true
-      : filter === 'calibration'
-        ? Boolean(s.is_calibration_sample)
-        : s.status === filter;
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm ||
-      (s.student_id && s.student_id.toLowerCase().includes(term)) ||
-      (s.student_name && s.student_name.toLowerCase().includes(term)) ||
-      (s.student_email && s.student_email.toLowerCase().includes(term));
-    return matchesFilter && matchesSearch;
-  });
+  const filteredSubmissions = submissions
+    .filter(s => {
+      const matchesFilter = filter === 'all'
+        ? true
+        : filter === 'calibration'
+          ? Boolean(s.is_calibration_sample)
+          : s.status === filter;
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm ||
+        (s.student_id && s.student_id.toLowerCase().includes(term)) ||
+        (s.student_name && s.student_name.toLowerCase().includes(term)) ||
+        (s.student_email && s.student_email.toLowerCase().includes(term));
+      return matchesFilter && matchesSearch;
+    })
+    .sort((a, b) => {
+      const aIsCal = Boolean(a.is_calibration_sample);
+      const bIsCal = Boolean(b.is_calibration_sample);
+      if (aIsCal !== bIsCal) {
+        return aIsCal ? 1 : -1;
+      }
+      return 0;
+    });
 
   const nonCalibrationSubs = submissions.filter(s => !s.is_calibration_sample);
   const totalSubmissionsCount = nonCalibrationSubs.length;
@@ -479,8 +488,8 @@ const SubmissionsList = () => {
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="table-responsive" style={{ flex: 1, overflowY: 'auto', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <table style={{ width: '100%', minWidth: '620px', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-main)', zIndex: 1, borderBottom: '2px solid var(--border)' }}>
             <tr>
               <th style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>Student</th>

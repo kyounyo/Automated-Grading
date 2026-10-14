@@ -409,3 +409,157 @@
     transform: translateY(0);
   }
 }
+
+/* =====================================================================
+   MOBILE RESPONSIVENESS & SLIDING DRAWER
+   ===================================================================== */
+.mobile-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background-color: var(--primary-light);
+  border: 1px solid var(--border);
+  color: var(--primary-dark);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.mobile-menu-toggle:hover {
+  background-color: #CEE7F8;
+  border-color: var(--primary);
+}
+
+.mobile-close-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  color: var(--secondary);
+  cursor: pointer;
+  margin-left: auto;
+  transition: background-color var(--transition-fast);
+}
+
+.mobile-close-btn:hover {
+  background-color: var(--primary-light);
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 998;
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.header-assignment-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  flex: 1;
+}
+
+@media (max-width: 900px) {
+  .mobile-menu-toggle {
+    display: inline-flex;
+  }
+
+  .mobile-close-btn {
+    display: inline-flex;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 1000;
+    width: 260px;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 25px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .top-header {
+    padding: 0 0.85rem;
+    height: 60px;
+    gap: 0.5rem;
+  }
+
+  .active-assignment-pill {
+    padding: 0.35rem 0.55rem;
+    gap: 0.45rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .assignment-select {
+    min-width: 0;
+    max-width: 180px;
+    font-size: 0.825rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .assignment-label {
+    font-size: 0.6rem;
+  }
+
+  .new-assignment-btn {
+    height: 40px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.775rem;
+  }
+
+  .page-content {
+    padding: 0.85rem 0.85rem 1.25rem 0.85rem;
+    height: calc(100vh - 60px);
+  }
+
+  .page-content:has(.grading-review-container) {
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .assignment-select {
+    max-width: 130px;
+  }
+
+  .new-assignment-btn span {
+    display: none;
+  }
+
+  .new-assignment-btn {
+    padding: 0.35rem 0.5rem;
+    width: 38px;
+    justify-content: center;
+  }
+
+  .active-assignment-pill .assignment-badge-icon {
+    width: 26px;
+    height: 26px;
+  }
+}

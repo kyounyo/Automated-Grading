@@ -296,3 +296,107 @@ p {
 .animate-pulse-subtle {
   animation: pulse-subtle 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* =====================================================================
+   GLOBAL RESPONSIVE UTILITIES & MOBILE ADAPTATION
+   ===================================================================== */
+.responsive-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.responsive-split-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.review-split-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.review-header-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 40px;
+}
+
+@media (max-width: 900px) {
+  .responsive-two-col {
+    grid-template-columns: 1fr !important;
+  }
+
+  .review-split-columns {
+    grid-template-columns: 1fr !important;
+    overflow-y: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  .review-header-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    gap: 0.5rem !important;
+  }
+
+  .grading-review-container {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow-y: auto !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .responsive-split-fields {
+    grid-template-columns: 1fr !important;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+  }
+
+  h2 {
+    font-size: 1.15rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+  }
+
+  /* Prevent automatic mobile safari font zooming by ensuring 16px minimum on touch focus */
+  .input-field,
+  select.input-field,
+  textarea.input-field {
+    font-size: 16px !important;
+  }
+
+  .btn {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.825rem;
+  }
+
+  .card-panel {
+    padding: 1rem !important;
+  }
+
+  .calibration-methods-grid {
+    margin-left: 0 !important;
+    grid-template-columns: 1fr !important;
+  }
+}

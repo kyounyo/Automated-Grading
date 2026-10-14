@@ -234,6 +234,7 @@ const HelpSidebar = () => {
           right: 0,
           bottom: 0,
           width: '340px',
+          maxWidth: '88vw',
           backgroundColor: 'var(--surface)',
           borderLeft: '1px solid var(--border)',
           zIndex: 1002,

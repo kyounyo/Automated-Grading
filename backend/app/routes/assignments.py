@@ -760,7 +760,16 @@ def export_assignment_csv(assignment_id: str, db: Session = Depends(get_db)):
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    submissions = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()
+    submissions = (
+        db.query(Submission)
+        .filter(Submission.assignment_id == assignment_id)
+        .order_by(
+            Submission.is_calibration_sample.asc(),
+            Submission.created_at.asc(),
+            Submission.student_id.asc(),
+        )
+        .all()
+    )
 
     # Build CSV Header
     header = [

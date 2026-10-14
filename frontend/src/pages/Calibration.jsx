@@ -691,7 +691,7 @@ const Calibration = () => {
             </p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginLeft: '2.35rem' }}>
+          <div className="calibration-methods-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginLeft: '2.35rem' }}>
             {/* Method A: Grade in this system */}
             <button
               type="button"

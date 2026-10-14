@@ -29,11 +29,13 @@ const GradingProgressBar = ({ submissions = [], isGrading = false }) => {
 
   return (
     <div
+      className="grading-progress-container"
       style={{
         position: 'fixed',
         bottom: '5.5rem',
         right: '1.75rem',
         width: '280px',
+        maxWidth: 'calc(100vw - 2rem)',
         backgroundColor: '#EFF6FF',
         border: '1px solid #BFDBFE',
         borderRadius: '10px',
@@ -47,6 +49,13 @@ const GradingProgressBar = ({ submissions = [], isGrading = false }) => {
         @keyframes slideInRight {
           from { opacity: 0; transform: translateX(20px); }
           to { opacity: 1; transform: translateX(0); }
+        }
+        @media (max-width: 640px) {
+          .grading-progress-container {
+            right: 1rem !important;
+            bottom: 4.5rem !important;
+            width: calc(100vw - 2rem) !important;
+          }
         }
       `}</style>
 
